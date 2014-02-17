@@ -21,6 +21,7 @@ LDFLAGS = -O3 -ggdb -L$(ZDIR) -lz -lboost_serialization -lboost_iostreams /Users
 
 PyBreakCopies : \
 		Common.o\
+		DebugCheck.o\
 		Parsers.o\
 		PyBreakCopies.o
 
