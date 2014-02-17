@@ -1,0 +1,405 @@
+import os
+import fnmatch
+import subprocess
+
+external_dir = os.path.join(os.pardir, 'external')
+
+boost_version = '1.55.0'
+boost_basename = 'boost_1_55_0'
+
+boost_url = 'http://downloads.sourceforge.net/project/boost/boost/' + boost_version + '/' + boost_basename + '.tar.gz'
+boost_tgz_filename = boost_basename + '.tar.gz'
+boost_dir = os.path.join(external_dir, boost_basename)
+boost_sentinal = os.path.join(boost_dir, 'sentinal')
+
+if not os.path.exists(boost_sentinal):
+    subprocess.check_call('wget -c ' + boost_url, shell=True)
+    subprocess.check_call('tar -C ' + external_dir + ' -xzvf ' + boost_tgz_filename, shell=True)
+    with open(boost_sentinal, 'w'):
+        pass
+
+env = Environment(ENV=os.environ)
+
+common_sources = """
+    Common.cpp
+    DebugCheck.cpp
+""".split()
+
+bamtools_dir = os.path.join(external_dir, 'BamTools-2.0')
+
+def find_files(directory, pattern):
+    for root, dirs, files in os.walk(directory):
+        for basename in files:
+            if fnmatch.fnmatch(basename, pattern):
+                filename = os.path.join(root, basename)
+                yield filename
+
+bamtools_sources = list(find_files(bamtools_dir, '*.cpp'))
+
+boost_iostreams_sources = list(find_files(os.path.join(boost_dir, 'libs/iostreams/src'), '*.cpp'))
+boost_serialization_sources = list(find_files(os.path.join(boost_dir, 'libs/serialization/src'), '*.cpp'))
+
+env.Append(CPPPATH=[external_dir, bamtools_dir, boost_dir])
+env.Append(LIBS=['z', 'bz2'])
+env.Append(CCFLAGS='-O3')
+env.Append(CCFLAGS='-g')
+
+sources = """
+    CompactBreakRegion.cpp
+    overlapclusters.cpp
+""".split()
+env.Program(target='overlapclusters', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    MatePairGibbs.cpp
+    Parsers.cpp
+    asa136.cpp
+    asa241.cpp
+    ../external/Triangle/triangle.c
+    mclustermatepairs.cpp
+""".split()
+env.Program(target='mclustermatepairs', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    Parsers.cpp
+    Sequences.cpp
+    mpredictbreaks.cpp
+""".split()
+env.Program(target='mpredictbreaks', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    MatePairGibbs.cpp
+    Parsers.cpp
+    asa136.cpp
+    asa241.cpp
+    clustermatepairs.cpp
+    ../external/Triangle/triangle.c
+""".split()
+env.Program(target='clustermatepairs', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    Parsers.cpp
+    Sequences.cpp
+    predictbreaks.cpp
+""".split()
+env.Program(target='predictbreaks', source=common_sources+sources)
+
+sources = """
+    Parsers.cpp
+    presetcover.cpp
+""".split()
+env.Program(target='presetcover', source=common_sources+sources)
+
+sources = """
+    Algorithms.cpp
+    Parsers.cpp
+    setcover.cpp
+""".split()
+env.Program(target='setcover', source=common_sources+sources)
+
+sources = """
+    Algorithms.cpp
+    Parsers.cpp
+    setcover_dnarna.cpp
+""".split()
+env.Program(target='setcover_dnarna', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    ExonRegions.cpp
+    ReadIndex.cpp
+    Sequences.cpp
+    SplitAlignment.cpp
+    SplitReadAligner.cpp
+    Parsers.cpp
+    initsplitalign.cpp
+""".split()
+env.Program(target='initsplitalign', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    ExonRegions.cpp
+    ReadIndex.cpp
+    Sequences.cpp
+    SplitAlignment.cpp
+    SplitReadAligner.cpp
+    Parsers.cpp
+    ReadStream.cpp
+    dosplitalign.cpp
+""".split()
+env.Program(target='dosplitalign', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    ExonRegions.cpp
+    Parsers.cpp
+    ReadIndex.cpp
+    Sequences.cpp
+    SplitAlignment.cpp
+    SplitReadAligner.cpp
+    ReadStream.cpp
+    evalsplitalign.cpp
+""".split()
+env.Program(target='evalsplitalign', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    ExonRegions.cpp
+    ReadIndex.cpp
+    Sequences.cpp
+    SplitAlignment.cpp
+    SplitReadAligner.cpp
+    Parsers.cpp
+    PathFinder.cpp
+    splitseq.cpp
+""".split()
+env.Program(target='splitseq', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    ReadIndex.cpp
+    Sequences.cpp
+    SplitAlignmentGen.cpp
+    SplitReadAligner.cpp
+    Parsers.cpp
+    ReadStream.cpp
+    dosplitaligngen.cpp
+""".split()
+env.Program(target='dosplitaligngen', source=common_sources+sources)
+
+sources = """
+    CompactBreakRegion.cpp
+    Parsers.cpp
+    decisionmetrics.cpp
+""".split()
+env.Program(target='decisionmetrics', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    Parsers.cpp
+    calcspandist.cpp
+""".split()
+env.Program(target='calcspandist', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    ExonRegions.cpp
+    calccov.cpp
+""".split()
+env.Program(target='calccov', source=common_sources+sources)
+
+sources = """
+    EstCatalog.cpp
+    estislands.cpp
+""".split()
+env.Program(target='estislands', source=common_sources+sources)
+
+sources = """
+    localalign.cpp
+    SimpleAligner.cpp
+""".split()
+env.Program(target='localalign', source=common_sources+sources)
+
+sources = """
+    realign2.cpp
+    AlignmentProbability.cpp
+    AlignmentStream.cpp
+    Parsers.cpp
+    ReadStream.cpp
+    Sequences.cpp
+    SimpleAligner.cpp
+""".split()
+env.Program(target='realign2', source=common_sources+sources)
+
+sources = """
+    realign.cpp
+    AlignmentStream.cpp
+    Parsers.cpp
+    ReadStream.cpp
+    Sequences.cpp
+    SimpleAligner.cpp
+""".split()
+env.Program(target='realign', source=common_sources+sources)
+
+sources = """
+    realign_rna.cpp
+    AlignmentProbability.cpp
+    AlignmentStream.cpp
+    ExonRegions.cpp
+    Parsers.cpp
+    ReadStream.cpp
+    Sequences.cpp
+    SimpleAligner.cpp
+""".split()
+env.Program(target='realign_rna', source=common_sources+sources)
+
+sources = """
+    realignp.cpp
+    AlignmentProbability.cpp
+    AlignmentStream.cpp
+    Parsers.cpp
+    ReadStream.cpp
+    Sequences.cpp
+    SimpleAligner.cpp
+""".split()
+env.Program(target='realignp', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    Parsers.cpp
+    ReadStream.cpp
+    Sequences.cpp
+    testsplit.cpp
+""".split()
+env.Program(target='testsplit', source=common_sources+sources)
+
+sources = """
+    aligntrue.cpp
+    AlignmentStream.cpp
+    Parsers.cpp
+    Sequences.cpp
+    SimpleAligner.cpp
+""".split()
+env.Program(target='aligntrue', source=common_sources+sources)
+
+sources = """
+    alignnull.cpp
+    AlignmentStream.cpp
+    Parsers.cpp
+    ReadStream.cpp
+    Sequences.cpp
+    SimpleAligner.cpp
+""".split()
+env.Program(target='alignnull', source=common_sources+sources)
+
+sources = """
+    rankclusters.cpp
+    Parsers.cpp
+""".split()
+env.Program(target='rankclusters', source=common_sources+sources)
+
+sources = """
+    ShortestPath.cpp
+    Parsers.cpp
+    cycles.cpp
+""".split()
+env.Program(target='cycles', source=common_sources+sources)
+
+sources = """
+    ShortestPath.cpp
+    Parsers.cpp
+    paths.cpp
+""".split()
+env.Program(target='paths', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    RegionDB.cpp
+    filterreads.cpp
+""".split()
+env.Program(target='filterreads', source=common_sources+sources)
+
+sources = """
+    AlignmentStream.cpp
+    ExonRegions.cpp
+    filterrnaseq.cpp
+""".split()
+env.Program(target='filterrnaseq', source=common_sources+sources)
+
+sources = """
+    Parsers.cpp
+    clusterconnectivity.cpp
+""".split()
+env.Program(target='clusterconnectivity', source=common_sources+sources)
+
+sources = """
+    qualtrimfastq.cpp
+""".split()
+env.Program(target='qualtrimfastq', source=common_sources+sources)
+
+sources = """
+    SimpleAligner.cpp
+    testssealign.cpp
+""".split()
+env.Program(target='testssealign', source=common_sources+sources)
+
+sources = """
+    samplefastq.cpp
+""".split()
+env.Program(target='samplefastq', source=common_sources+sources)
+
+sources = """
+    bamdiscordantfastq.cpp
+""".split()
+env.Program(target='bamdiscordantfastq', source=common_sources+bamtools_sources+sources+boost_iostreams_sources+boost_serialization_sources)
+
+sources = """
+    bamsamplespanning.cpp
+""".split()
+env.Program(target='bamsamplespanning', source=common_sources+bamtools_sources+sources)
+
+sources = """
+    bamsamplefastq.cpp
+""".split()
+env.Program(target='bamsamplefastq', source=common_sources+bamtools_sources+sources)
+
+sources = """
+    bamfastq.cpp
+""".split()
+env.Program(target='bamfastq', source=common_sources+bamtools_sources+sources)
+
+sources = """
+    Parsers.cpp
+    bamconcordantcounts.cpp
+""".split()
+env.Program(target='bamconcordantcounts', source=common_sources+bamtools_sources+sources)
+
+sources = """
+    Parsers.cpp
+    bamconcordantreads.cpp
+""".split()
+env.Program(target='bamconcordantreads', source=common_sources+bamtools_sources+sources+boost_iostreams_sources+boost_serialization_sources)
+
+sources = """
+    Parsers.cpp
+    bamstats.cpp
+""".split()
+env.Program(target='bamstats', source=common_sources+bamtools_sources+sources)
+
+sources = """
+    bammixture.cpp
+""".split()
+env.Program(target='bammixture', source=common_sources+bamtools_sources+sources)
+
+sources = """
+    Parsers.cpp
+    Sequences.cpp
+    samplegc.cpp
+""".split()
+env.Program(target='samplegc', source=common_sources+bamtools_sources+sources)
+
+sources = """
+    Parsers.cpp
+    Sequences.cpp
+    samplemap.cpp
+""".split()
+env.Program(target='samplemap', source=common_sources+bamtools_sources+sources)
+
+sources = """
+    Parsers.cpp
+    Sequences.cpp
+    estimategc.cpp
+""".split()
+env.Program(target='estimategc', source=common_sources+bamtools_sources+sources)
+
+sources = """
+    Parsers.cpp
+    RegionDB.cpp
+    samplemappable.cpp
+""".split()
+env.Program(target='samplemappable', source=common_sources+sources)
+
