@@ -393,6 +393,7 @@ else:
             header += 'break_' + cluster_end + '\t'
         for lib_name in lib_names:
             header += lib_name + '_count' + '\t'
+        header += 'exact_break' + '\t'
         header += 'align_prob' + '\t'
         header += 'chimeric_prob' + '\t'
         header += 'valid_prob' + '\t'
@@ -412,6 +413,13 @@ else:
 
 
     def clusters_table_row(lib_names, cluster_id, cluster_info, probs, setcover_ratio, breakpoint_info, dgv_info, cycle_info, sequences, gene_models):
+        exact_break = 1
+        break_positions = breakpoint_info[3]
+        if break_positions is None:
+            exact_break = 0
+            break_positions = []
+            for cluster_end in (0, 1):
+                break_positions.append((cluster_info[0][cluster_end].start, cluster_info[0][cluster_end].end)[cluster_info[0][cluster_end].strand == '+'])
         row = cluster_id + '\t'
         for cluster_end in (0, 1):
             row += cluster_info[0][cluster_end].chromosome + '\t'
@@ -430,9 +438,10 @@ else:
             row += gene_id + '\t'
             row += gene_name + '\t'
             row += gene_location + '\t'
-            row += str(breakpoint_info[3][cluster_end]) + '\t'
+            row += str(break_positions[cluster_end]) + '\t'
         for lib_name in lib_names:
             row += str(cluster_info[1].get(lib_name, 0)) + '\t'
+        row += str(exact_break) + '\t'
         row += str(probs[cluster_id][0]) + '\t'
         row += str(probs[cluster_id][1]) + '\t'
         row += str(probs[cluster_id][2]) + '\t'
@@ -625,6 +634,6 @@ else:
             clusters_table_file.write(clusters_table_header(lib_names))
             for cluster_id, cluster_info in cluster_infos.iteritems():
                 setcover_ratio = setcover_ratios[cluster_id]
-                breakpoint_info = breakpoint_infos.get(cluster_id, (0, 0, 0, ('NA', 'NA')))
+                breakpoint_info = breakpoint_infos.get(cluster_id, (0, 0, 0, None))
                 cycle_info = cycle_infos.get(cluster_id, ('NA', []))
                 clusters_table_file.write(clusters_table_row(lib_names, cluster_id, cluster_info, probs, setcover_ratio, breakpoint_info, dgv_info, cycle_info, sequences, gene_models))
