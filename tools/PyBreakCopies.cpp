@@ -181,7 +181,7 @@ public:
 			// Add likelihood if we have at least one read
 			if (mEdges[i].read_count > 0)
 			{
-				obj_value += mEdges[i].region_length * x[i] - mEdges[i].read_count * log(x[i]);
+				obj_value += mEdges[i].region_length * x[i] - mEdges[i].read_count * log(x[i] + 1e-20);
 			}
 
 			// Add regularization penalty
@@ -201,7 +201,7 @@ public:
 			// Likelihood gradiant if we have at least one read
 			if (mEdges[i].read_count > 0)
 			{
-				grad_f[i] += mEdges[i].region_length - mEdges[i].read_count / x[i];
+				grad_f[i] += mEdges[i].region_length - mEdges[i].read_count / (x[i] + 1e-20);
 			}
 
 			// Add regularization penalty
@@ -289,7 +289,7 @@ public:
 			// return the values of the hessian of the lagrangian
 			for (Index i = 0; i < n; i++)
 			{
-				values[i] += mEdges[i].read_count / (x[i] * x[i]);
+				values[i] = obj_factor * mEdges[i].read_count / ((x[i] + 1e-20) * (x[i] + 1e-20));
 			}
 		}
 
@@ -351,6 +351,9 @@ int main(int argv, char* argc[])
 	app->Options()->SetNumericValue("tol", 1e-9);
 	app->Options()->SetStringValue("mu_strategy", "adaptive");
 	app->Options()->SetStringValue("output_file", "ipopt.out");
+	app->Options()->SetStringValue("derivative_test", "second-order");
+	app->Options()->SetStringValue("derivative_test_print_all", "yes");
+	app->Options()->SetStringValue("check_derivatives_for_naninf", "yes");
 
 	// Intialize the IpoptApplication and process the options
 	ApplicationReturnStatus status;
