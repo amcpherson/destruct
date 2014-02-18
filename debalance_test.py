@@ -159,7 +159,7 @@ if __name__ == '__main__':
         '-s', pyp.sch.iobj('bamstats').prop('fragment_stddev'),
         '-a', cfg.mappability_length,
         '-l', pyp.sch.ifile('gcloess'),
-        '>', pyp.sch.input(os.path.join(cfg.outdir, 'interval.readcounts.lengths')))
+        '>', pyp.sch.output(os.path.join(cfg.outdir, 'interval.readcounts.lengths')))
 
 
 
