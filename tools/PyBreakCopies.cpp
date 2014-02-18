@@ -5,20 +5,20 @@
 //  Copyright (c) 2013 Andrew. All rights reserved.
 //
 
-// #include <boost/python/class.hpp>
-// #include <boost/python/module.hpp>
-// #include <boost/python/def.hpp>
-// #include <boost/python/list.hpp>
-// #include <boost/python/tuple.hpp>
-// #include <boost/python/dict.hpp>
-// #include <boost/python/overloads.hpp>
+#include <boost/python/class.hpp>
+#include <boost/python/module.hpp>
+#include <boost/python/def.hpp>
+#include <boost/python/list.hpp>
+#include <boost/python/tuple.hpp>
+#include <boost/python/dict.hpp>
+#include <boost/python/overloads.hpp>
 
 #include <string>
 #include <fstream>
 #include <boost/unordered_map.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include <IpIpoptApplication.hpp>
+#include <coin/IpIpoptApplication.hpp>
 
 #include <Parsers.h>
 
@@ -54,6 +54,8 @@ public:
 	vector<EdgeInfo> mEdges;
 	unordered_map<int,vector<NodeInfo> > mNodes;
 	int mIncidences;
+
+	vector<double> mCopies;
 
 	// read the problem from files
 	void ReadProblem(const string& edge_filename, const string& node_filename)
@@ -99,7 +101,51 @@ public:
 
 				NodeInfo node_info;
 				node_info.edge_idx = SAFEPARSE(int, fields[1]);
-				node_info.edge_coeff = SAFEPARSE(float, fields[2]);
+				node_info.edge_coeff = SAFEPARSE(double, fields[2]);
+
+				mNodes[node_idx].push_back(node_info);
+				mIncidences++;
+			}
+		}
+	}
+
+	// initialize the problem from python lists
+	void InitProblem(python::list edges, python::list nodes)
+	{
+		{
+			mEdges.clear();
+			
+			python::ssize_t num_edges = python::len(edges);
+
+			for (python::ssize_t i = 0; i < num_edges; i++)
+			{
+				python::tuple edge_tuple = python::extract<python::tuple>(edges[i]);
+
+				EdgeInfo edge_info;
+				edge_info.read_count = python::extract<double>(edge_tuple[0]);
+				edge_info.region_length = python::extract<double>(edge_tuple[1]);
+				edge_info.obj_coeff = python::extract<double>(edge_tuple[2]);
+				edge_info.upper_bound = python::extract<double>(edge_tuple[3]);
+
+				mEdges.push_back(edge_info);
+			}
+		}
+
+		{
+			mNodes.clear();
+			mIncidences = 0;
+			
+			python::ssize_t num_nodes = python::len(nodes);
+
+			for (python::ssize_t i = 0; i < num_nodes; i++)
+			{
+				python::tuple node_tuple = python::extract<python::tuple>(nodes[i]);
+
+				int node_idx = python::extract<int>(node_tuple[0]);
+
+				NodeInfo node_info;
+				node_info.edge_idx = python::extract<int>(node_tuple[1]);
+				node_info.edge_coeff = python::extract<double>(node_tuple[2]);
 
 				mNodes[node_idx].push_back(node_info);
 				mIncidences++;
@@ -303,6 +349,13 @@ public:
 						   const IpoptData* ip_data,
 						   IpoptCalculatedQuantities* ip_cq)
 	{
+		mCopies.resize(n);
+		for (Index i = 0; i < n; i++)
+		{
+			mCopies[i] = x[i];
+		}
+
+		/*
 	  // here is where we would store the solution to variables, or write to a file, etc
 	  // so we could use the solution.
 
@@ -327,10 +380,12 @@ public:
 	  for (Index i=0; i<m ;i++) {
 	    std::cout << "g(" << i << ") = " << g[i] << std::endl;
 	  }
+	  */
 	}
 };
 
 
+/*
 int main(int argv, char* argc[])
 {
 	// Create a new instance of your nlp 
@@ -383,15 +438,51 @@ int main(int argv, char* argc[])
 
 	return (int) status;
 }
+*/
 
+python::list solve(python::list edges, python::list nodes, bool verbose=false)
+{
+	SmartPtr<BreakCopies> mynlp = new BreakCopies();
 
-// BOOST_PYTHON_FUNCTION_OVERLOADS(solve_min_overloads, solve_min, 2, 4);
+	mynlp->InitProblem(edges, nodes);
 
-// BOOST_PYTHON_MODULE(pycplex)
-// {
-// 	using namespace python;
+	SmartPtr<IpoptApplication> app = IpoptApplicationFactory();
+	app->Options()->SetNumericValue("tol", 1e-9);
+	app->Options()->SetStringValue("mu_strategy", "adaptive");
+	app->Options()->SetIntegerValue("print_level", verbose ? 12 : 0);
+
+	ApplicationReturnStatus status;
+
+	status = app->Initialize();
+
+	if (status != Solve_Succeeded)
+	{
+		throw runtime_error("Error: Initialization failed with error code " + lexical_cast<string>(status));
+	}
+
+	status = app->OptimizeTNLP(mynlp);
+
+	if (status != Solve_Succeeded)
+	{
+		throw runtime_error("Error: Solve failed with error code " + lexical_cast<string>(status));
+	}
+
+	python::list copies;
+	for (size_t i = 0; i < mynlp->mCopies.size(); i++)
+	{
+		copies.append(mynlp->mCopies[i]);
+	}
+
+	return copies;
+}
+
+BOOST_PYTHON_FUNCTION_OVERLOADS(solve_overloads, solve, 2, 3);
+
+BOOST_PYTHON_MODULE(pybreakcopies)
+{
+	using namespace python;
 	
-// 	def("solve_min", solve_min, solve_min_overloads());
-// }
+	def("solve", solve, solve_overloads());
+}
 
 
