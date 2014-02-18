@@ -1,8 +1,5 @@
 //
-//  pycplex.cpp
-//
-//  Created by Andrew McPherson on 2013-10-03.
-//  Copyright (c) 2013 Andrew. All rights reserved.
+//  PyBreakCopies.cpp
 //
 
 #include <boost/python/class.hpp>
