@@ -17,7 +17,7 @@ INCLUDE = -I. -I../external -I$(ZDIR) -I$(BAMTOOLSDIR) -I$(HOME)/Install/include
 CC = g++
 CXX = g++
 CXXFLAGS = -O3 -ggdb -DDEBUG_CHECKS $(INCLUDE)
-LDFLAGS = -O3 -ggdb -L$(ZDIR) -lz -lboost_serialization -lboost_iostreams /Users/amcphers/Install/lib/libipopt.a -lblas -llapack
+LDFLAGS = -O3 -ggdb -L$(ZDIR) -lz -lboost_serialization -lboost_iostreams -lipopt -lblas -llapack -lgfortran -lcoinmumps -lcoinmetis
 
 PyBreakCopies : \
 		Common.o\
