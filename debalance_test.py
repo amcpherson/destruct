@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.metrics import roc_curve, auc
 
-import pygenes
 import pypeliner
 
 if __name__ == '__main__':
