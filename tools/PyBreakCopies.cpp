@@ -349,6 +349,7 @@ int main(int argv, char* argc[])
 	// Note: The following choices are only examples, they might not be
 	//       suitable for your optimization problem.
 	app->Options()->SetNumericValue("tol", 1e-9);
+	app->Options()->SetIntegerValue("print_level", 0);
 	app->Options()->SetStringValue("mu_strategy", "adaptive");
 	app->Options()->SetStringValue("output_file", "ipopt.out");
 	app->Options()->SetStringValue("derivative_test", "second-order");
