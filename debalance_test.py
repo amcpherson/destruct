@@ -16,6 +16,8 @@ from sklearn.metrics import roc_curve, auc
 
 import pypeliner
 
+import demix
+
 if __name__ == '__main__':
 
     import debalance_test
@@ -61,7 +63,7 @@ if __name__ == '__main__':
         bwaalign_script,
         pyp.sch.input(os.path.join(cfg.outdir, 'simulated.1.fastq')),
         pyp.sch.input(os.path.join(cfg.outdir, 'simulated.2.fastq')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'simulated.bam')),
+        pyp.sch.output(os.path.join(cfg.outdir, 'simulated.bam')),  # This should be temp
         '--config', pyp.sch.input(cfg.config),
         '--tmp', pyp.sch.tmpfile('bwa_tmp'))
 
@@ -70,6 +72,11 @@ if __name__ == '__main__':
         pyp.sch.input(os.path.join(cfg.outdir, 'simulated.bam')),
         pyp.sch.tmpfile('sorttemp'),
         '>', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.sorted.bam')))
+
+    pyp.sch.commandline('bam_index', (), ctx,
+        cfg.samtools_bin, 'index',
+        pyp.sch.input(os.path.join(cfg.outdir, 'simulated.sorted.bam')),
+        pyp.sch.output(os.path.join(cfg.outdir, 'simulated.sorted.bam.bai')))
 
     pyp.sch.transform('write_bam_list', (), ctx, debalance_test.write_bam_list,
         None,
@@ -88,13 +95,81 @@ if __name__ == '__main__':
         '--tmp', pyp.sch.tmpfile('destruct_tmp'),
         '--nocleanup')
 
-    pyp.sch.transform('plot', (), ctx, debalance_test.create_roc_plot,
+    pyp.sch.transform('create_changepoints', (), ctx, debalance_test.create_changepoints,
         None,
-        pyp.sch.iobj('simulation.params'),
-        pyp.sch.input(os.path.join(cfg.outdir, 'simulated.tsv')),
         pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints.tsv')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'annotated.tsv')),
-        pyp.sch.output(os.path.abspath(cfg.results)))
+        pyp.sch.output(os.path.join(cfg.outdir, 'changepoints.tsv')))
+
+    pyp.sch.commandline('bam_stats', (), ctx, cfg.bamstats_tool,
+        '-b', pyp.sch.input(os.path.join(cfg.outdir, 'simulated.sorted.bam')),
+        '--flen', '1000',
+        '-s', pyp.sch.ofile('bamstats.file'))
+
+    pyp.sch.transform('read_bam_stats', (), ctx, demix.read_stats,
+        pyp.sch.oobj('bamstats'),
+        pyp.sch.ifile('bamstats.file'))
+
+    for chromosome in cfg.chromosomes.split():
+
+        pyp.sch.commandline('read_concordant_{0}'.format(chromosome), (), ctx, cfg.bamconcordantreads_tool,
+                            '--clipmax', '8', '--flen', '1000', '--chr', chromosome,
+                            '-b', pyp.sch.input(os.path.join(cfg.outdir, 'simulated.sorted.bam')),
+                            '-r', pyp.sch.ofile('reads.{0}'.format(chromosome)),
+                            '-a', pyp.sch.ofile('alleles.{0}'.format(chromosome)))
+        
+        pyp.sch.transform('infer_haps_{0}'.format(chromosome), (), ctx, demix.infer_haps, None,
+                          cfg, pyp.sch.temps_dir, pyp.sch.tmpfile('infer_haps'), chromosome, cfg.snp_positions,
+                          pyp.sch.ifile('alleles.{0}'.format(chromosome)),
+                          pyp.sch.ofile('hets.{0}'.format(chromosome)),
+                          pyp.sch.ofile('haps.{0}'.format(chromosome)))
+
+        pyp.sch.transform('create_readcounts_{0}'.format(chromosome), (), ctx, 
+                          demix.create_counts, None, chromosome, 
+                          pyp.sch.input(os.path.join(cfg.outdir, 'changepoints.tsv')),
+                          pyp.sch.ifile('haps.{0}'.format(chromosome)),
+                          pyp.sch.ifile('reads.{0}'.format(chromosome)),
+                          pyp.sch.ifile('alleles.{0}'.format(chromosome)),
+                          pyp.sch.ofile('interval.readcounts.{0}'.format(chromosome)),
+                          pyp.sch.ofile('alleles.readcounts.{0}'.format(chromosome)),
+                          pyp.sch.input(cfg.genome_fai))
+
+    pyp.sch.transform('merge_interval_readcounts', (), ctx, demix.merge_files, None,
+                      pyp.sch.ofile('interval.readcounts'),
+                      *[pyp.sch.ifile('interval.readcounts.{0}'.format(chromosome)) for chromosome in cfg.chromosomes.split()])
+
+    pyp.sch.commandline('samplegc', (), ctx, cfg.samplegc_tool, 
+        '-b', pyp.sch.input(os.path.join(cfg.outdir, 'simulated.sorted.bam')),
+        '-m', cfg.mappability_filename,
+        '-g', cfg.genome_fasta,
+        '-o', '4', '-n', '10000000',
+        '-f', pyp.sch.iobj('bamstats').prop('fragment_length'),
+        '>', pyp.sch.ofile('gcsamples'))
+
+    pyp.sch.commandline('gcloess', (), ctx, cfg.rscript_bin, cfg.gc_loess_rscript,
+        pyp.sch.ifile('gcsamples'),
+        pyp.sch.ofile('gcloess'),
+        pyp.sch.ofile('gcplots'))
+
+    pyp.sch.commandline('gc_interval', (), ctx, cfg.estimategc_tool,
+        '-m', cfg.mappability_filename,
+        '-g', cfg.genome_fasta,
+        '-c', pyp.sch.ifile('interval.readcounts'),
+        '-i', '-o', '4', '-u',
+        pyp.sch.iobj('bamstats').prop('fragment_mean'),
+        '-s', pyp.sch.iobj('bamstats').prop('fragment_stddev'),
+        '-a', cfg.mappability_length,
+        '-l', pyp.sch.ifile('gcloess'),
+        '>', pyp.sch.input(os.path.join(cfg.outdir, 'interval.readcounts.lengths')))
+
+
+
+    # pyp.sch.transform('plot', (), ctx, debalance_test.create_roc_plot,
+    #     None,
+    #     pyp.sch.iobj('simulation.params'),
+    #     pyp.sch.input(os.path.join(cfg.outdir, 'simulated.tsv')),
+    #     pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints.tsv')),
+    #     pyp.sch.output(os.path.join(cfg.outdir, 'annotated.tsv')),
+    #     pyp.sch.output(os.path.abspath(cfg.results)))
 
     pyp.run()
 
@@ -112,6 +187,18 @@ else:
         with open(bam_list_filename, 'w') as bam_list_file:
             for lib_id, bam_filename in kwargs.iteritems():
                 bam_list_file.write(lib_id + '\t' + bam_filename + '\n')
+
+
+    def create_changepoints(breakpoints_filename, changepoints_filename):
+
+        breakpoints = pd.read_csv(breakpoints_filename, sep='\t', converters={'chromosome_1':str, 'chromosome_2':str})
+        breakpoints['break_1'][breakpoints['break_1'].isnull()] = breakpoints[breakpoints['break_1'].isnull()].apply(lambda row: (row['start_1'], row['end_1'])[row['strand_1'] == '+'], axis=1)
+        breakpoints['break_2'][breakpoints['break_2'].isnull()] = breakpoints[breakpoints['break_2'].isnull()].apply(lambda row: (row['start_2'], row['end_2'])[row['strand_2'] == '+'], axis=1)
+        breakpoints['break_1'] = breakpoints['break_1'].astype(int)
+        breakpoints['break_2'] = breakpoints['break_2'].astype(int)
+        changepoints = pd.concat([breakpoints[['chromosome_1', 'break_1']].rename(columns=lambda a: a[:-2]), 
+                                  breakpoints[['chromosome_2', 'break_2']].rename(columns=lambda a: a[:-2])], ignore_index=True)
+        changepoints.to_csv(changepoints_filename, sep='\t', header=False, index=False)
 
 
     def create_roc_plot(sim_info, simulated_filename, predicted_filename, annotated_filename, plot_filename):
