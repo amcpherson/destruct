@@ -84,13 +84,15 @@ if __name__ == '__main__':
         pyp.sch.output(os.path.join(cfg.outdir, 'breakpoints.tsv')),
         pyp.sch.output(os.path.join(cfg.outdir, 'breakreads.tsv')),
         '--config', pyp.sch.input(cfg.config),
-        '--tmp', pyp.sch.tmpfile('destruct_tmp'))
+        '--tmp', pyp.sch.tmpfile('destruct_tmp'),
+        '--nocleanup')
 
     pyp.sch.transform('plot', (), ctx, destruct_test.create_roc_plot,
         None,
         pyp.sch.iobj('simulation.params'),
         pyp.sch.input(os.path.join(cfg.outdir, 'simulated.tsv')),
         pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints.tsv')),
+        pyp.sch.output(os.path.join(cfg.outdir, 'annotated.tsv')),
         pyp.sch.output(os.path.abspath(cfg.results)))
 
     pyp.run()
@@ -126,7 +128,7 @@ else:
                 bam_list_file.write(lib_id + '\t' + bam_filename + '\n')
 
 
-    def create_roc_plot(sim_info, simulated_filename, predicted_filename, plot_filename):
+    def create_roc_plot(sim_info, simulated_filename, predicted_filename, annotated_filename, plot_filename):
 
         breakpoints = pd.read_csv(simulated_filename, sep='\t', header=None,
                           converters={'chromosome1':str, 'chromosome2':str},
@@ -162,6 +164,8 @@ else:
             return true_pos_id
 
         results['true_pos_id'] = results.apply(identify_true_positive, axis=1)
+
+        results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
         num_positive = int(sim_info['num_breakpoints'])
 
