@@ -67,16 +67,13 @@ if __name__ == '__main__':
         '--config', pyp.sch.input(cfg.config),
         '--tmp', pyp.sch.tmpfile('bwa_tmp'))
 
-    pyp.sch.commandline('bam_sort', (), ctx,
-        cfg.samtools_bin, 'sort', '-o',
+    pyp.sch.transform('bam_sort_index', (), ctx, debalance_test.bam_sort_index,
+        None,
+        cfg.samtools_bin,
         pyp.sch.input(os.path.join(cfg.outdir, 'simulated.bam')),
-        pyp.sch.tmpfile('sorttemp'),
-        '>', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.sorted.bam')))
-
-    pyp.sch.commandline('bam_index', (), ctx,
-        cfg.samtools_bin, 'index',
-        pyp.sch.input(os.path.join(cfg.outdir, 'simulated.sorted.bam')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'simulated.sorted.bam.bai')))
+        pyp.sch.output(os.path.join(cfg.outdir, 'simulated.sorted.bam')),
+        pyp.sch.output(os.path.join(cfg.outdir, 'simulated.sorted.bam.bai')),
+        pyp.sch.tmpfile('sorttemp'))
 
     pyp.sch.transform('write_bam_list', (), ctx, debalance_test.write_bam_list,
         None,
@@ -187,6 +184,12 @@ else:
         with open(bam_list_filename, 'w') as bam_list_file:
             for lib_id, bam_filename in kwargs.iteritems():
                 bam_list_file.write(lib_id + '\t' + bam_filename + '\n')
+
+
+    def bam_sort_index(samtools_bin, bam_filename, sorted_bam_filename, sorted_bam_index_filename, sort_temp):
+
+        pypeliner.commandline.execute(samtools_bin, 'sort', '-o', bam_filename, sort_temp, '>', sorted_bam_filename)
+        pypeliner.commandline.execute(samtools_bin, 'index', sorted_bam_filename, sorted_bam_index_filename)
 
 
     def create_changepoints(breakpoints_filename, changepoints_filename):
