@@ -192,10 +192,6 @@ else:
     def create_changepoints(breakpoints_filename, changepoints_filename):
 
         breakpoints = pd.read_csv(breakpoints_filename, sep='\t', converters={'chromosome_1':str, 'chromosome_2':str})
-        breakpoints['break_1'][breakpoints['break_1'].isnull()] = breakpoints[breakpoints['break_1'].isnull()].apply(lambda row: (row['start_1'], row['end_1'])[row['strand_1'] == '+'], axis=1)
-        breakpoints['break_2'][breakpoints['break_2'].isnull()] = breakpoints[breakpoints['break_2'].isnull()].apply(lambda row: (row['start_2'], row['end_2'])[row['strand_2'] == '+'], axis=1)
-        breakpoints['break_1'] = breakpoints['break_1'].astype(int)
-        breakpoints['break_2'] = breakpoints['break_2'].astype(int)
         changepoints = pd.concat([breakpoints[['chromosome_1', 'break_1']].rename(columns=lambda a: a[:-2]), 
                                   breakpoints[['chromosome_2', 'break_2']].rename(columns=lambda a: a[:-2])], ignore_index=True)
         changepoints.to_csv(changepoints_filename, sep='\t', header=False, index=False)
