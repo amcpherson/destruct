@@ -437,7 +437,7 @@ int main(int argv, char* argc[])
 }
 */
 
-python::list solve(python::list edges, python::list nodes, bool verbose=false)
+python::list solve(python::list edges, python::list nodes, int verbose=0)
 {
 	SmartPtr<BreakCopies> mynlp = new BreakCopies();
 
@@ -446,7 +446,7 @@ python::list solve(python::list edges, python::list nodes, bool verbose=false)
 	SmartPtr<IpoptApplication> app = IpoptApplicationFactory();
 	app->Options()->SetNumericValue("tol", 1e-9);
 	app->Options()->SetStringValue("mu_strategy", "adaptive");
-	app->Options()->SetIntegerValue("print_level", verbose ? 12 : 0);
+	app->Options()->SetIntegerValue("print_level", verbose);
 
 	ApplicationReturnStatus status;
 
