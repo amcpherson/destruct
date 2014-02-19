@@ -36,7 +36,7 @@ class SequenceEdge(object):
     def position2(self):
         return self.read_count_data.position2[self.read_count_idx]
     @property
-    def readcount(self):
+    def read_count(self):
         return self.read_count_data.readcount[self.read_count_idx].astype(float)
     @property
     def is_disabled(self):
@@ -65,7 +65,7 @@ class ReferenceEdge(SequenceEdge):
     def region_length(self):
         return 0.0
     @property
-    def readcount(self):
+    def read_count(self):
         return 0.0
 
 class VariantEdge(SequenceEdge):
@@ -78,7 +78,7 @@ class VariantEdge(SequenceEdge):
     def region_length(self):
         return 0.0
     @property
-    def readcount(self):
+    def read_count(self):
         return 0.0
     @property
     def unregularized(self):
@@ -115,7 +115,7 @@ class TelomereEdge(object):
     def edge_type(self):
         return 'telomere'
     @property
-    def readcount(self):
+    def read_count(self):
         return 0.0
     @property
     def region_length(self):
