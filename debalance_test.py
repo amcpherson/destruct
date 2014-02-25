@@ -17,6 +17,9 @@ from sklearn.metrics import roc_curve, auc
 import pypeliner
 
 import demix
+import breakpoint_graph
+import eulerian
+
 
 if __name__ == '__main__':
 
@@ -158,15 +161,11 @@ if __name__ == '__main__':
         '-l', pyp.sch.ifile('gcloess'),
         '>', pyp.sch.output(os.path.join(cfg.outdir, 'interval.readcounts.lengths')))
 
-
-
-    # pyp.sch.transform('plot', (), ctx, debalance_test.create_roc_plot,
-    #     None,
-    #     pyp.sch.iobj('simulation.params'),
-    #     pyp.sch.input(os.path.join(cfg.outdir, 'simulated.tsv')),
-    #     pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints.tsv')),
-    #     pyp.sch.output(os.path.join(cfg.outdir, 'annotated.tsv')),
-    #     pyp.sch.output(os.path.abspath(cfg.results)))
+    pyp.sch.transform('plot', (), ctx, debalance_test.infer_break_copies,
+        None,
+        pyp.sch.input(os.path.join(cfg.outdir, 'interval.readcounts.lengths')),
+        pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints.tsv')),
+        pyp.sch.output(os.path.join(cfg.outdir, 'breakpoints_copies.tsv')))
 
     pyp.run()
 
@@ -200,68 +199,110 @@ else:
         changepoints.to_csv(changepoints_filename, sep='\t', header=False, index=False)
 
 
-    def create_roc_plot(sim_info, simulated_filename, predicted_filename, annotated_filename, plot_filename):
+    def infer_break_copies(intervals_filename, destruct_filename, results_filename):
 
-        breakpoints = pd.read_csv(simulated_filename, sep='\t', header=None,
-                          converters={'chromosome1':str, 'chromosome2':str},
-                          names=['break_id',
-                                 'chromosome1', 'strand1', 'position1',
-                                 'chromosome2', 'strand2', 'position2',
-                                 'inserted', 'homology'])
+        # Read interval data
+        interval_data = pd.read_csv(intervals_filename, sep='\t', header=None, converters={'id':str, 'chromosome1':str, 'chromosome2':str},
+                                    names=['id', 'chromosome1', 'position1', 'strand1', 'chromosome2', 'position2', 'strand2', 'readcount', 'length'])
 
-        results = pd.read_csv(predicted_filename, sep='\t',
-                              converters={'chromosome_1':str, 'chromosome_2':str})
+        # Create reference data
+        left_positions = interval_data[['chromosome1', 'position1']]
+        right_positions = interval_data[['chromosome2', 'position2']]
+        reference_data = pd.merge(left_positions, right_positions, left_on=['chromosome1', 'position1'], right_on=['chromosome2', 'position2'])
+        reference_data['strand1'] = '+'
+        reference_data['strand2'] = '-'
+        reference_data['id'] = xrange(len(reference_data))
 
-        min_dist = 200
+        # Read destruct results for variant data
+        destruct_results = pd.read_csv(destruct_filename, sep='\t', converters={'chromosome_1':str, 'chromosome_2':str})
+        variant_data = destruct_results[['cluster_id', 'chromosome_1', 'strand_1', 'break_1', 'chromosome_2', 'strand_2', 'break_2']]
+        variant_data.columns = ['id', 'chromosome1', 'strand1', 'position1', 'chromosome2', 'strand2', 'position2']
 
-        def match(region, breakpoint):
-            for side in (0, 1):
-                if region[0][0] != breakpoint[side][0] or region[0][1] != breakpoint[side][1] or region[1][0] != breakpoint[1-side][0] or region[1][1] != breakpoint[1-side][1]:
-                    continue
-                if breakpoint[side][2] > region[0][3] + min_dist or breakpoint[side][2] < region[0][2] - min_dist or breakpoint[1-side][2] > region[1][3] + min_dist or breakpoint[1-side][2] < region[1][2] - min_dist:
-                    continue
-                return True
-            return False
+        # Create telomeres as boundaries of intervals/variants
+        def boundaries(df):
+            return pd.concat([df[['chromosome1', 'strand1', 'position1']].rename(columns=lambda a: a[:-1]),
+                              df[['chromosome2', 'strand2', 'position2']].rename(columns=lambda a: a[:-1])],
+                             axis=0, ignore_index=True)
 
-        def identify_true_positive(row):
-            pred_region = [[row['chromosome_1'], row['strand_1'], row['start_1'], row['end_1']],
-                           [row['chromosome_2'], row['strand_2'], row['start_2'], row['end_2']]]
-            true_pos_id = None
-            for idx, true_pos in breakpoints.iterrows():
-                true_pos_region = [[true_pos['chromosome1'], true_pos['strand1'], true_pos['position1']],
-                                   [true_pos['chromosome2'], true_pos['strand2'], true_pos['position2']]]
-                if match(pred_region, true_pos_region):
-                    true_pos_id = true_pos['break_id']
-                    break
-            return true_pos_id
+        interval_boundaries = boundaries(interval_data)
 
-        results['true_pos_id'] = results.apply(identify_true_positive, axis=1)
+        variant_boundaries = boundaries(variant_data)
+        variant_boundaries['is_breakpoint'] = True
 
-        results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
+        telomere_data = pd.merge(interval_boundaries, variant_boundaries, how='outer')
+        telomere_data = telomere_data[pd.isnull(telomere_data['is_breakpoint'])]
+        telomere_data = telomere_data.drop('is_breakpoint', axis=1)
 
-        num_positive = int(sim_info['num_breakpoints'])
+        telomere_data = interval_boundaries
 
-        y_test = results['true_pos_id'].notnull()
+        telomere_data.set_index('chromosome', inplace=True)
+        telomere_data['min_pos'] = telomere_data.groupby(level=0)['position'].min()
+        telomere_data['max_pos'] = telomere_data.groupby(level=0)['position'].max()
+        telomere_data.reset_index(inplace=True)
+        telomere_data['is_normal'] = (telomere_data['position'] == telomere_data['min_pos']) | (telomere_data['position'] == telomere_data['max_pos'])
+        telomere_data = telomere_data.drop(['min_pos', 'max_pos'], axis=1)
+        telomere_data['id'] = xrange(len(telomere_data))
 
-        num_missed = num_positive - np.sum(y_test)
+        bg = breakpoint_graph.BreakpointGraph(interval_data, reference_data, variant_data, telomere_data)
 
-        y_test = np.concatenate([y_test, np.array([False]*num_missed)])
+        ldas = np.linspace(0.0, 100000.0, num=101)
 
-        fig = plt.figure(figsize=(16,16))
+        coverage_paths = list()
+        relevant = list()
 
-        for feature in ('align_prob', 'valid_prob', 'chimeric_prob', 'simulated_count', 'num_split'):
-            probs = np.concatenate([results[feature], np.array([0.0]*num_missed)])
-            fpr, tpr, thresholds = roc_curve(y_test, probs)
-            roc_auc = auc(fpr, tpr)
-            plt.plot(fpr, tpr, label='{0} AUC = {1:.2f}'.format(feature, roc_auc))
+        for lda in ldas:
+            
+            bg.clear_disabled_edges()
 
-        plt.plot([0, 1], [0, 1], 'k--')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.0])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver operating characteristic example')
-        plt.legend(loc="lower right")
+            solution = eulerian.solve_lasso(bg, lda, 1000.0 + 10.0 * lda)
+            
+            for edge_idx, coverage in enumerate(list(solution.edge_copies)):
+                edge_type = bg.edges[edge_idx].edge_type
+                if coverage <= 0.0 and (edge_type == 'variant' or edge_type == 'telomere'):
+                    bg.set_disabled_edge(edge_idx)
 
-        fig.savefig(plot_filename, format='pdf')
+            solution = eulerian.solve_lasso(bg, 0.0, 1000.0)
+
+            if len(coverage_paths) == 0:
+                num_edges = len(solution.edge_copies)
+                coverage_paths = [list() for a in range(num_edges)]
+                relevant = [True] * num_edges
+
+            for edge_idx, coverage in enumerate(list(solution.edge_copies)):
+                if coverage > 0.0:
+                    if relevant[edge_idx]:
+                        coverage_paths[edge_idx].append(coverage)
+                else:
+                    relevant[edge_idx] = False
+
+        copies_results = list()
+
+        hap_cov = interval_data['readcount'].sum() / interval_data['length'].sum()
+
+        for edge_idx, coverage_path in enumerate(coverage_paths):
+
+            if bg.edges[edge_idx].edge_type != 'variant':
+                continue
+            
+            coverage_path = np.array(coverage_path)
+            
+            coverage_path = coverage_path[coverage_path > 0]
+            
+            relevance_score = float(len(coverage_path)) / float(len(ldas))
+            
+            if len(coverage_path) == 0:
+                coverage_path = np.array([0])
+
+            coverage_mean = np.mean(coverage_path)
+            
+            copies_mean = coverage_mean / hap_cov
+            
+            copies_results.append((bg.edges[edge_idx].id, coverage_mean, copies_mean, relevance_score))
+
+        copies_results = pd.DataFrame(copies_results, columns=['cluster_id', 'coverage', 'copies', 'relevance'])
+
+        copies_results = pd.merge(destruct_results, copies_results, left_on='cluster_id', right_on='cluster_id')
+
+        copies_results.to_csv(results_filename, sep='\t', index=False)
+
 
