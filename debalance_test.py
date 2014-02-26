@@ -10,6 +10,7 @@ import argparse
 import string
 import pandas as pd
 import numpy as np
+import scipy
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.metrics import roc_curve, auc
@@ -161,11 +162,23 @@ if __name__ == '__main__':
         '-l', pyp.sch.ifile('gcloess'),
         '>', pyp.sch.output(os.path.join(cfg.outdir, 'interval.readcounts.lengths')))
 
-    pyp.sch.transform('plot', (), ctx, debalance_test.infer_break_copies,
+    pyp.sch.transform('infer_break_copies', (), ctx, debalance_test.infer_break_copies,
         None,
         pyp.sch.input(os.path.join(cfg.outdir, 'interval.readcounts.lengths')),
         pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints.tsv')),
         pyp.sch.output(os.path.join(cfg.outdir, 'breakpoints_copies.tsv')))
+
+    pyp.sch.transform('annotate_true', (), ctx, debalance_test.annotate_true,
+        None,
+        pyp.sch.input(os.path.join(cfg.outdir, 'breakpoint_info.tsv')),
+        pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints_copies.tsv')),
+        pyp.sch.output(os.path.join(cfg.outdir, 'breakpoints_copies_annotated.tsv')))
+
+    pyp.sch.transform('plot_copies', (), ctx, debalance_test.plot_copies,
+        None,
+        pyp.sch.input(os.path.join(cfg.outdir, 'breakpoint_info.tsv')),
+        pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints_copies_annotated.tsv')),
+        pyp.sch.output(os.path.join(cfg.outdir, 'breakpoints_copies.pdf')))
 
     pyp.run()
 
@@ -215,6 +228,10 @@ else:
 
         # Read destruct results for variant data
         destruct_results = pd.read_csv(destruct_filename, sep='\t', converters={'chromosome_1':str, 'chromosome_2':str})
+
+        # Remove balanced rearrangements since they we cannot reliably predict copies
+        destruct_results = destruct_results[destruct_results['cycle_score'].isnull()]
+
         variant_data = destruct_results[['cluster_id', 'chromosome_1', 'strand_1', 'break_1', 'chromosome_2', 'strand_2', 'break_2']]
         variant_data.columns = ['id', 'chromosome1', 'strand1', 'position1', 'chromosome2', 'strand2', 'position2']
 
@@ -254,14 +271,14 @@ else:
             
             bg.clear_disabled_edges()
 
-            solution = eulerian.solve_lasso(bg, lda, 1000.0 + 10.0 * lda)
+            solution = eulerian.solve_lasso(bg, 0.0, lda)
             
             for edge_idx, coverage in enumerate(list(solution.edge_copies)):
                 edge_type = bg.edges[edge_idx].edge_type
-                if coverage <= 0.0 and (edge_type == 'variant' or edge_type == 'telomere'):
+                if coverage <= 0.0 and edge_type == 'telomere':
                     bg.set_disabled_edge(edge_idx)
 
-            solution = eulerian.solve_lasso(bg, 0.0, 1000.0)
+            solution = eulerian.solve_lasso(bg, 0.0, 1.0)
 
             if len(coverage_paths) == 0:
                 num_edges = len(solution.edge_copies)
@@ -303,6 +320,114 @@ else:
 
         copies_results = pd.merge(destruct_results, copies_results, left_on='cluster_id', right_on='cluster_id')
 
+        copies_results['hap_cov'] = hap_cov
+
         copies_results.to_csv(results_filename, sep='\t', index=False)
+
+
+    def annotate_true(breakpoint_info_filename, destruct_filename, annotated_filename):
+
+        breakpoint_info = pd.read_csv(breakpoint_info_filename, sep='\t', header=None, 
+                                      converters={'chromosome1':str, 'chromosome2':str},
+                                      names=['chromosome_id', 'proportion', 'breakpoint_id',
+                                             'chromosome1', 'strand1', 'position1',
+                                             'chromosome2', 'strand2', 'position2'])
+
+        destruct_results = pd.read_csv(destruct_filename, sep='\t', converters={'chromosome_1':str, 'chromosome_2':str})
+
+        min_dist = 300
+
+        def match(region, breakpoint):
+            for side in (0, 1):
+                if region[0][0] != breakpoint[side][0] or region[0][1] != breakpoint[side][1] or region[1][0] != breakpoint[1-side][0] or region[1][1] != breakpoint[1-side][1]:
+                    continue
+                if breakpoint[side][2] > region[0][3] + min_dist or breakpoint[side][2] < region[0][2] - min_dist or breakpoint[1-side][2] > region[1][3] + min_dist or breakpoint[1-side][2] < region[1][2] - min_dist:
+                    continue
+                return True
+            return False
+
+        destruct_results['tp_chromosome_id'] = None
+        destruct_results['tp_proportion'] = None
+        destruct_results['tp_breakpoint_id'] = None
+
+        for idx, row in destruct_results.iterrows():
+            prediction = [[row['chromosome_1'], row['strand_1'], int(row['start_1']), int(row['end_1'])],
+                          [row['chromosome_2'], row['strand_2'], int(row['start_2']), int(row['end_2'])]]
+            for tp_idx, tp_row in breakpoint_info.iterrows():
+                true_pos = [[tp_row['chromosome1'], tp_row['strand1'], int(tp_row['position1'])],
+                            [tp_row['chromosome2'], tp_row['strand2'], int(tp_row['position2'])]]
+                if match(prediction, true_pos):
+                    destruct_results.loc[idx,'tp_chromosome_id'] = tp_row['chromosome_id']
+                    destruct_results.loc[idx,'tp_proportion'] = tp_row['proportion']
+                    destruct_results.loc[idx,'tp_breakpoint_id'] = tp_row['breakpoint_id']
+                    break
+
+        destruct_results.to_csv(annotated_filename, sep='\t', index=False)
+
+
+    def plot_copies(breakpoint_info_filename, destruct_filename, plot_filename):
+
+        breakpoint_info = pd.read_csv(breakpoint_info_filename, sep='\t', header=None, 
+                                      converters={'chromosome1':str, 'chromosome2':str},
+                                      names=['chromosome_id', 'proportion', 'breakpoint_id',
+                                             'chromosome1', 'strand1', 'position1',
+                                             'chromosome2', 'strand2', 'position2'])
+
+        destruct_results = pd.read_csv(destruct_filename, sep='\t', converters={'chromosome_1':str, 'chromosome_2':str})
+
+        class gaussian_kde_set_covariance(scipy.stats.gaussian_kde):
+            def __init__(self, dataset, covariance):
+                self.covariance = covariance
+                scipy.stats.gaussian_kde.__init__(self, dataset)
+            def _compute_covariance(self):
+                self.inv_cov = 1.0 / self.covariance
+                self._norm_factor = np.sqrt(2*np.pi*self.covariance) * self.n
+
+        def filled_density(ax, data, c, a, xmin, xmax, cov):
+            density = gaussian_kde_set_covariance(data, cov)
+            xs = [xmin] + list(np.linspace(xmin, xmax, 2000)) + [xmax]
+            ys = density(xs)
+            ys[0] = 0.0
+            ys[-1] = 0.0
+            ax.plot(xs, ys, color=c, alpha=a)
+            ax.fill(xs, ys, color=c, alpha=a)
+
+        predictions = pd.merge(breakpoint_info, destruct_results, left_on=['chromosome_id', 'breakpoint_id'], right_on=['tp_chromosome_id', 'tp_breakpoint_id'], how='left')
+
+        # Remove balanced true events
+        predictions = predictions[predictions['strand1'] != predictions['strand2']]
+
+        hap_cov = destruct_results['hap_cov'].iloc[0]
+
+        predictions = predictions[['chromosome_id', 'breakpoint_id', 'copies', 'proportion', 'simulated_count']]
+
+        predictions['copies'] = predictions['copies'].fillna(0.0)
+        predictions['simulated_count'] = predictions['simulated_count'].fillna(0.0)
+        predictions['unnormalized'] = predictions['simulated_count'] / hap_cov
+
+        nonzero_predictions = predictions[predictions['simulated_count'] != 0.0]
+
+        # Best estimate of capture efficiency of a breakpoint as a length
+        break_capture = np.sum(nonzero_predictions['proportion'] * nonzero_predictions['unnormalized']) / np.sum(nonzero_predictions['unnormalized'] * nonzero_predictions['unnormalized'])
+
+        fig = plt.figure(figsize=(20,16))
+
+        min_proportion = -0.1
+        max_proportion = max(predictions['proportion'].unique()) * 1.5
+
+        num_plots = len(predictions['chromosome_id'].unique())
+        plt_count = 1
+        for chromosome_id, data in predictions.groupby('chromosome_id'):
+            ax = plt.subplot(num_plots, 1, plt_count)
+            plt_count += 1
+            filled_density(ax, data['copies'].values, 'r', 1.0, min_proportion, max_proportion, 0.00001)
+            filled_density(ax, break_capture * data['simulated_count'].values / hap_cov, 'b', 0.5, min_proportion, max_proportion, 0.0001)
+            ylim = ax.get_ylim()
+            proportion = data.iloc[0]['proportion']
+            ax.plot([proportion, proportion], [-1000.0, 1000.0], 'k--')
+            ax.set_xlim((min_proportion, max_proportion))
+            ax.set_ylim(ylim)
+
+        fig.savefig(plot_filename, format='pdf')
 
 
