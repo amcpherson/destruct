@@ -15,6 +15,7 @@ boost_sentinal = os.path.join(boost_dir, 'sentinal')
 if not os.path.exists(boost_sentinal):
     subprocess.check_call('wget -c ' + boost_url, shell=True)
     subprocess.check_call('tar -C ' + external_dir + ' -xzvf ' + boost_tgz_filename, shell=True)
+    os.remove(boost_tgz_filename)
     with open(boost_sentinal, 'w'):
         pass
 
