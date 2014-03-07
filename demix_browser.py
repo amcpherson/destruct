@@ -6,14 +6,19 @@ import numpy as np
 import random
 import itertools
 import seaborn
+import argparse
 
+argparser = argparse.ArgumentParser()
+argparser.add_argument('preds_filename', help='deMix Predictions Filename')
+argparser.add_argument('library_id', help='library id to view')
+args = argparser.parse_args()
 
 chromosomes = [str(a) for a in range(1, 23)] + ['X']
 chromosome_indices = dict([(chromosome, idx) for idx, chromosome in enumerate(chromosomes)])
 
-cnv = pd.read_csv('/Users/amcphers/Analysis/demix_interactive/patient_3.preds.tsv', sep='\t', converters={'chr':str})
+cnv = pd.read_csv(args.preds_filename, sep='\t', converters={'chr':str})
 
-cnv = cnv.loc[(cnv['library_id'] == 'adnexa_site_1')]
+cnv = cnv.loc[(cnv['library_id'] == args.library_id)]
 cnv = cnv.loc[(cnv['chr'].isin(chromosomes))]
 
 cnv['chr_index'] = cnv['chr'].apply(lambda a: chromosome_indices[a])
@@ -37,11 +42,7 @@ cnv['end'] += cnv['chromosome_start']
 
 mingap = 1000
 
-copies_max = 4.0
-
-
-
-
+copies_max = 5.0
 
 fig = plt.figure(figsize=(16,16))
 
@@ -53,11 +54,11 @@ ax2 = plt.subplot(gs[1])
 color_set = plt.get_cmap('Set1')
 color_set = [color_set(float(i)/len(chromosomes)) for i in range(len(chromosomes))]
 chromosome_color = lambda c: color_set[chromosomes.index(c)]
-cs = [chromosome_color(c) for c in cnv['chr'].values]
+scatter_colors = [chromosome_color(c) for c in cnv['chr'].values]
             
 major_minor_scatter = ax1.scatter(cnv['major_raw'], cnv['minor_raw'],
                                   s=cnv['length']/20000.0, 
-                                  facecolor=cs, edgecolor=cs, linewidth=0.0,
+                                  facecolor=scatter_colors, edgecolor=scatter_colors, linewidth=0.0,
                                   picker=True)
 
 ax1.set_xlim((-0.5, copies_max))
@@ -89,19 +90,11 @@ minor_connectors = matplotlib.collections.LineCollection(minor_connectors, color
 major_segments.set_picker(True)
 minor_segments.set_picker(True)
 
-linewidths = np.array([1] * len(cnv.index))
-major_minor_scatter.set_linewidths(linewidths)
-major_segments.set_linewidths(linewidths)
-minor_segments.set_linewidths(linewidths)
-
-scatter_edgecolors = np.array(['b'] * len(cnv.index))
-major_minor_scatter.set_edgecolors(scatter_edgecolors)
-major_minor_scatter.set_zorder(list(xrange(len(cnv.index))))
-
 ax2.add_collection(major_segments)
 ax2.add_collection(minor_segments)
 ax2.add_collection(major_connectors)
 ax2.add_collection(minor_connectors)
+
 ax2.set_xlim((cnv['start'].min(), cnv['end'].max()))
 ax2.set_ylim((-0.2, copies_max + 0.2))
 
@@ -135,24 +128,56 @@ class Picker(object):
                 self.select_chromosome(chromosome)
 
         elif isinstance(event.artist, matplotlib.collections.PathCollection) or isinstance(event.artist, matplotlib.collections.LineCollection):
-            linewidths = np.array([1] * len(cnv.index))
-            linewidths[event.ind] = 4
-            scatter_edgecolors = np.array(['b'] * len(cnv.index))
-            scatter_edgecolors[event.ind] = 'yellow'
-            major_minor_scatter.set_edgecolors(scatter_edgecolors)
-            major_minor_scatter.set_linewidths(linewidths)
-            major_segments.set_linewidths(linewidths)
-            minor_segments.set_linewidths(linewidths)
+
+            self.select_segment(event.ind)
 
         event.canvas.draw()
 
+    def select_segment(self, ind):
+
+        # Mask index if we have a selected chromosome
+        if self.selected_chromosome is not None:
+            ind_bool = np.array([False] * len(cnv.index))
+            ind_bool[ind] = True
+            ind_bool[(cnv['chr'] != self.selected_chromosome).values] = False
+            ind = np.where(ind_bool)
+
+        # Highlight scatter points
+        scatter_linewidths = np.array([0] * len(cnv.index))
+        scatter_linewidths[ind] = 4
+        scatter_edgecolors = np.array(['k'] * len(cnv.index))
+        scatter_edgecolors[ind] = 'yellow'
+        major_minor_scatter.set_linewidths(scatter_linewidths)
+        major_minor_scatter.set_edgecolors(scatter_edgecolors)
+
+        # Highlight segment lines
+        lines_linewidths = np.array([1] * len(cnv.index))
+        lines_linewidths[ind] = 4
+        major_segments.set_linewidths(lines_linewidths)
+        minor_segments.set_linewidths(lines_linewidths)
+
+    def unselect_segments(self):
+
+        # Unhighlight segment lines
+        lines_linewidths = np.array([1] * len(cnv.index))
+        major_segments.set_linewidths(lines_linewidths)
+        minor_segments.set_linewidths(lines_linewidths)
+
     def select_chromosome(self, chromosome):
+
+        self.unselect_segments()
 
         ind = chromosomes.index(chromosome)
 
         # Highlight currently selected chromosome 
         lgnd_patches[ind].set_edgecolor('yellow')
         lgnd_patches[ind].set_linewidth(2)
+
+        # Make other chromosomes invisible
+        selected_colors = np.array(scatter_colors)
+        selected_colors[(cnv['chr'] != chromosome).values] = (0, 0, 0, 0)
+        major_minor_scatter.set_edgecolors(selected_colors)
+        major_minor_scatter.set_facecolors(selected_colors)
 
         # Restrict x axis to current chromosome view
         ax2.set_xlim((chromosome_start[chromosome], chromosome_end[chromosome]))
@@ -163,6 +188,12 @@ class Picker(object):
         self.selected_chromosome = chromosome
 
     def unselect_chromosome(self):
+
+        self.unselect_segments()
+
+        # Make all chromosomes visible
+        major_minor_scatter.set_edgecolors(scatter_colors)
+        major_minor_scatter.set_facecolors(scatter_colors)
 
         # Redo xaxis for full view
         ax2.set_xlim((cnv['start'].min(), cnv['end'].max()))
