@@ -96,7 +96,7 @@ minor_segments.set_linewidths(linewidths)
 
 scatter_edgecolors = np.array(['b'] * len(cnv.index))
 major_minor_scatter.set_edgecolors(scatter_edgecolors)
-major_minor_scatter.set_zorder([1] * len(cnv.index))
+major_minor_scatter.set_zorder(list(xrange(len(cnv.index))))
 
 ax2.add_collection(major_segments)
 ax2.add_collection(minor_segments)
