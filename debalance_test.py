@@ -294,7 +294,15 @@ else:
 
         copies_results = list()
 
-        hap_cov = interval_data['readcount'].sum() / interval_data['length'].sum()
+        def weighted_median(values, weights):
+            order = np.argsort(values)
+            values = values[order]
+            weights = weights[order]
+            cum_weights = np.cumsum(weights)
+            median_idx = np.argmax(cum_weights>cum_weights[-1]/2.)
+            return values[median_idx]
+
+        hap_cov = weighted_median(interval_data['readcount'].values.astype(float) / interval_data['length'].values.astype(float), interval_data['length'].values.astype(float))
 
         for edge_idx, coverage_path in enumerate(coverage_paths):
 
