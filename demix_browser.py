@@ -11,6 +11,7 @@ import argparse
 argparser = argparse.ArgumentParser()
 argparser.add_argument('preds_filename', help='deMix Predictions Filename')
 argparser.add_argument('library_id', help='library id to view')
+argparser.add_argument('candidate_id', help='candidate id to view', type=int)
 args = argparser.parse_args()
 
 chromosomes = [str(a) for a in range(1, 23)] + ['X']
@@ -19,6 +20,7 @@ chromosome_indices = dict([(chromosome, idx) for idx, chromosome in enumerate(ch
 cnv = pd.read_csv(args.preds_filename, sep='\t', converters={'chr':str})
 
 cnv = cnv.loc[(cnv['library_id'] == args.library_id)]
+cnv = cnv.loc[(cnv['candidate_id'] == args.candidate_id)]
 cnv = cnv.loc[(cnv['chr'].isin(chromosomes))]
 
 cnv['chr_index'] = cnv['chr'].apply(lambda a: chromosome_indices[a])
