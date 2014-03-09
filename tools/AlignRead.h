@@ -123,8 +123,8 @@ private:
 			end[1] = 0;
 		}
 		
-		int start[2];
-		int end[2];
+		size_t start[2];
+		size_t end[2];
 	};
 	
 	string mReadSequences;
