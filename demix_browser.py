@@ -63,6 +63,11 @@ major_minor_scatter = ax1.scatter(cnv['major_raw'], cnv['minor_raw'],
                                   facecolor=scatter_colors, edgecolor=scatter_colors, linewidth=0.0,
                                   picker=True)
 
+major_minor_scatter_highlight = ax1.scatter(cnv['major_raw'], cnv['minor_raw'],
+                                            s=cnv['length']/20000.0, 
+                                            facecolor=(0,0,0,0), edgecolor=(0,0,0,0), linewidth=0.0,
+                                            picker=True)
+
 ax1.set_xlim((-0.5, copies_max))
 ax1.set_ylim((-0.5, 0.8*copies_max))
 
@@ -137,20 +142,25 @@ class Picker(object):
 
     def select_segment(self, ind):
 
+        # Convert indices to mask
+        mask = np.array([False] * len(cnv.index))
+        mask[ind] = True
+        ind = mask
+
         # Mask index if we have a selected chromosome
         if self.selected_chromosome is not None:
-            ind_bool = np.array([False] * len(cnv.index))
-            ind_bool[ind] = True
-            ind_bool[(cnv['chr'] != self.selected_chromosome).values] = False
-            ind = np.where(ind_bool)
+            ind[(cnv['chr'] != self.selected_chromosome).values] = False
 
         # Highlight scatter points
         scatter_linewidths = np.array([0] * len(cnv.index))
         scatter_linewidths[ind] = 4
         scatter_edgecolors = np.array(['k'] * len(cnv.index))
         scatter_edgecolors[ind] = 'yellow'
-        major_minor_scatter.set_linewidths(scatter_linewidths)
-        major_minor_scatter.set_edgecolors(scatter_edgecolors)
+        scatter_facecolors = np.array(scatter_colors)
+        scatter_facecolors[~ind] = (0, 0, 0, 0)
+        major_minor_scatter_highlight.set_linewidths(scatter_linewidths)
+        major_minor_scatter_highlight.set_edgecolors(scatter_edgecolors)
+        major_minor_scatter_highlight.set_facecolors(scatter_facecolors)
 
         # Highlight segment lines
         lines_linewidths = np.array([1] * len(cnv.index))
@@ -158,16 +168,9 @@ class Picker(object):
         major_segments.set_linewidths(lines_linewidths)
         minor_segments.set_linewidths(lines_linewidths)
 
-    def unselect_segments(self):
-
-        # Unhighlight segment lines
-        lines_linewidths = np.array([1] * len(cnv.index))
-        major_segments.set_linewidths(lines_linewidths)
-        minor_segments.set_linewidths(lines_linewidths)
-
     def select_chromosome(self, chromosome):
 
-        self.unselect_segments()
+        self.select_segment([])
 
         ind = chromosomes.index(chromosome)
 
@@ -191,7 +194,7 @@ class Picker(object):
 
     def unselect_chromosome(self):
 
-        self.unselect_segments()
+        self.select_segment([])
 
         # Make all chromosomes visible
         major_minor_scatter.set_edgecolors(scatter_colors)
