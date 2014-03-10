@@ -555,44 +555,37 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
         allele_data = allele_data.groupby(level=[0])[['hap_length', 'major_readcount', 'minor_readcount']].sum()
         interval_data = interval_data.merge(allele_data, left_index=True, right_index=True)
 
+        # Classify as high or low confidence depending on length and haplotype length
+        interval_data['high_conf'] = 0
+        interval_data.loc[(interval_data['length'] > high_confidence_length) & (interval_data['hap_length'] > 0), 'high_conf'] = 1
+
+        # Split off the low confidence intervals
+        interval_data_low_conf = interval_data.loc[interval_data['high_conf'] == 0]
+        interval_data = interval_data.loc[interval_data['high_conf'] == 1]
+
+        # Sort by chromosome / position, required for variance estimates
+        interval_data = interval_data.sort(['chromosome1', 'position1'])
+
+        # Calculate coverages
+        interval_data['minor_cov'] = interval_data['minor_readcount'] / interval_data['hap_length']
+        interval_data['major_cov'] = interval_data['major_readcount'] / interval_data['hap_length']
+        interval_data['total_cov'] = interval_data['readcount'] / interval_data['length']
+
         # Obtain major and minor allele depth for high confidence intervals
-        minor = list()
-        major = list()
-        total = list()
-        lengths = list()
-        chrs = list()
-        minor_by_pos = OrderedDict()
-        major_by_pos = OrderedDict()
-        length_by_pos = OrderedDict()
-        starts = list()
-        ends = list()
-        for idx, row in interval_data.iterrows():
-            if row['length'] < high_confidence_length:
-                continue
-            if row['hap_length'] <= 0.0:
-                continue
-            minor.append(row['minor_readcount'] / row['hap_length'])
-            major.append(row['major_readcount'] / row['hap_length'])
-            total.append(row['readcount'] / row['length'])
-            lengths.append(row['length'])
-            chrs.append(row['chromosome1'])
-            minor_by_pos[(row['chromosome1'], row['position1'])] = minor[-1]
-            major_by_pos[(row['chromosome1'], row['position1'])] = major[-1]
-            length_by_pos[(row['chromosome1'], row['position1'])] = lengths[-1]
-            starts.append(row['position1'])
-            ends.append(row['position2'])
-        minor = np.array(minor)
-        major = np.array(major)
-        total = np.array(total)
-        lengths = np.array(lengths)
+        minor = interval_data['minor_cov'].values
+        major = interval_data['major_cov'].values
+        total = interval_data['total_cov'].values
+
+        # Other parameters from high confidence intervals
+        chrs = interval_data['chromosome1'].values
+        starts = interval_data['position1'].values
+        ends = interval_data['position2'].values
+        lengths = interval_data['length'].values
 
         # Calculate difference between adjacent intervals
-        minor_adj = np.array(minor_by_pos.values())
-        major_adj = np.array(major_by_pos.values())
-        length_adj = np.array(length_by_pos.values())
-        minor_sq_diffs = np.square(minor_adj[1:] - minor_adj[:-1])
-        major_sq_diffs = np.square(major_adj[1:] - major_adj[:-1])
-        length_sums = length_adj[1:] + length_adj[:-1]
+        minor_sq_diffs = np.square(minor[1:] - minor[:-1])
+        major_sq_diffs = np.square(major[1:] - major[:-1])
+        length_sums = lengths[1:] + lengths[:-1]
 
         # Resample squared differences by sum of lengths of adjacent intervals
         samples_length_sums = np.array(list(itertools.chain(*[itertools.repeat(idx, cnt) for idx, cnt in enumerate(np.random.multinomial(100000, length_sums / length_sums.sum()))])))
