@@ -106,7 +106,7 @@ if __name__ == '__main__':
         pyp.sch.commandline('gc_interval_'+lib_info.id, (), ctx_general, cfg.estimategc_tool, '-m', cfg.mappability_filename, '-g', cfg.genome_fasta,
                 '-c', pyp.sch.ifile('interval.readcounts.'+lib_info.id), '-i', '-o', '4', '-u', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_mean'), '-s', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_stddev'),
                 '-a', cfg.mappability_length, '-l', pyp.sch.ifile('gcloess.'+lib_info.id), '>', pyp.sch.ofile('interval.readcounts.lengths.'+lib_info.id))
-        pyp.sch.transform('solve_and_plot_'+lib_info.id, (), ctx_general, demix.solve_and_plot, None, cfg, lib_info.id,
+        pyp.sch.transform('solve_and_plot_'+lib_info.id, (), ctx_general, demix.solve_and_plot, None, lib_info.id,
                 pyp.sch.ifile('interval.readcounts.lengths.'+lib_info.id), pyp.sch.ifile('alleles.readcounts.{0}'.format(lib_info.id)),
                 pyp.sch.ofile('stats.{0}'.format(lib_info.id)), pyp.sch.ofile('preds.{0}'.format(lib_info.id)),
                 pyp.sch.ofile('plots.{0}'.format(lib_info.id)), cfg.plots_prefix)
@@ -525,7 +525,7 @@ def savefig_tar(tar, fig, filename):
     tar.addfile(tarinfo=info, fileobj=plot_buffer)
 
 
-def solve_and_plot(cfg, library_id, intervals_filename, alleles_filename, stats_filename, pred_filename, plots_tar_filename, plots_prefix):
+def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filename, pred_filename, plots_tar_filename, plots_prefix):
 
     with tarfile.open(plots_tar_filename, 'w') as plots_tar:
 
