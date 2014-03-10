@@ -12,6 +12,7 @@ argparser = argparse.ArgumentParser()
 argparser.add_argument('preds_filename', help='deMix Predictions Filename')
 argparser.add_argument('library_id', help='library id to view')
 argparser.add_argument('--candidate_id', help='candidate id to view', type=int, default=None)
+argparser.add_argument('--positions', help='annotate positions')
 args = argparser.parse_args()
 
 chromosomes = [str(a) for a in range(1, 23)] + ['X']
@@ -104,6 +105,15 @@ ax2.add_collection(major_segments)
 ax2.add_collection(minor_segments)
 ax2.add_collection(major_connectors)
 ax2.add_collection(minor_connectors)
+
+if args.positions is not None:
+
+    positions = pd.read_csv(args.positions, sep='\t', converters={'chrom':str})
+
+    for idx, row in positions.iterrows():
+        pos = chromosome_start[row['chrom']] + row['coord']
+        markerline, stemlines, baseline = ax2.stem([pos, pos], [-10, 0.5], linefmt='-', markerfmt='-o', color='k')
+        plt.setp(markerline, 'markerfacecolor', 'orange', 'markeredgecolor', 'k', 'zorder', 2)
 
 ax2.set_xlim((cnv['start'].min(), cnv['end'].max()))
 ax2.set_ylim((-0.2, copies_max + 0.2))
