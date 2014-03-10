@@ -151,8 +151,8 @@ def estimate_model_prob(major, minor, length, s, t, v_major, v_minor):
     fs = list()
     avg_z = np.zeros(len(major))
 
-    burnin = 1
-    num_iter = 3
+    burnin = 5
+    num_iter = 100
 
     z = np.zeros(len(major))
     
