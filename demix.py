@@ -772,6 +772,7 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
 
             # Create copy number predictions
             preds = pd.DataFrame({'chr':chrs, 'start':starts, 'end':ends, 'length':lengths, 'major_raw':tumour_major, 'minor_raw':tumour_minor, 'major':pred_major, 'minor':pred_minor, 'major_sub':pred_major_sub, 'minor_sub':pred_minor_sub, 'subclonal':avg_z})
+            preds['high_conf'] = 1
 
             # Predictions for low confidence intervals
             low_conf_preds = list()
@@ -784,6 +785,7 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
             low_conf_preds['length'] = interval_data_low_conf['length'].values
             low_conf_preds['major_raw'] = ((interval_data_low_conf['major_cov'] - normal_contam) / haploid_coverage).values
             low_conf_preds['minor_raw'] = ((interval_data_low_conf['minor_cov'] - normal_contam) / haploid_coverage).values
+            low_conf_preds['high_conf'] = 0
 
             # Combine low and high confidence
             preds = pd.concat([preds, low_conf_preds], axis=0, ignore_index=True).sort(['chr', 'start'])
@@ -791,7 +793,7 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
             # Add lib id and candidate id and append to list of tables
             preds['library_id'] = library_id
             preds['candidate_id'] = candidate_idx
-            preds = preds[['library_id', 'candidate_id', 'chr', 'start', 'end', 'length', 'major', 'minor', 'major_sub', 'minor_sub', 'subclonal', 'major_raw', 'minor_raw']]
+            preds = preds[['library_id', 'candidate_id', 'chr', 'start', 'end', 'length', 'major', 'minor', 'major_sub', 'minor_sub', 'subclonal', 'major_raw', 'minor_raw', 'high_conf']]
             preds_tables.append(preds)
 
         pd.concat(stats_tables, ignore_index=True).to_csv(stats_filename, sep='\t', na_rep='NA', index=False, header=True)
