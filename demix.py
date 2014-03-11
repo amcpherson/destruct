@@ -555,6 +555,12 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
         allele_data = allele_data.groupby(level=[0])[['hap_length', 'major_readcount', 'minor_readcount']].sum()
         interval_data = interval_data.merge(allele_data, left_index=True, right_index=True)
 
+        # Calculate coverages
+        interval_data['minor_cov'] = interval_data['minor_readcount'] / interval_data['hap_length']
+        interval_data['major_cov'] = interval_data['major_readcount'] / interval_data['hap_length']
+        interval_data['total_cov'] = interval_data['readcount'] / interval_data['length']
+        interval_data = interval_data.fillna(0.0)
+
         # Classify as high or low confidence depending on length and haplotype length
         interval_data['high_conf'] = 0
         interval_data.loc[(interval_data['length'] > high_confidence_length) & (interval_data['hap_length'] > 0), 'high_conf'] = 1
@@ -565,11 +571,6 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
 
         # Sort by chromosome / position, required for variance estimates
         interval_data = interval_data.sort(['chromosome1', 'position1'])
-
-        # Calculate coverages
-        interval_data['minor_cov'] = interval_data['minor_readcount'] / interval_data['hap_length']
-        interval_data['major_cov'] = interval_data['major_readcount'] / interval_data['hap_length']
-        interval_data['total_cov'] = interval_data['readcount'] / interval_data['length']
 
         # Obtain major and minor allele depth for high confidence intervals
         minor = interval_data['minor_cov'].values
@@ -771,11 +772,28 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
 
             # Create copy number predictions
             preds = pd.DataFrame({'chr':chrs, 'start':starts, 'end':ends, 'length':lengths, 'major_raw':tumour_major, 'minor_raw':tumour_minor, 'major':pred_major, 'minor':pred_minor, 'major_sub':pred_major_sub, 'minor_sub':pred_minor_sub, 'subclonal':avg_z})
+
+            # Predictions for low confidence intervals
+            low_conf_preds = list()
+            for idx, row in interval_data_low_conf.iterrows():
+                low_conf_preds.append(subclonal_sampling.max_major_minor_posterior(row['major_cov'], row['minor_cov'], normal_contam, haploid_coverage, 0.0, major_variance_estimate, minor_variance_estimate))
+            low_conf_preds = pd.DataFrame(low_conf_preds, columns=['major', 'minor', 'major_sub', 'minor_sub'])
+            low_conf_preds['chr'] = interval_data_low_conf['chromosome1'].values
+            low_conf_preds['start'] = interval_data_low_conf['position1'].values
+            low_conf_preds['end'] = interval_data_low_conf['position2'].values
+            low_conf_preds['length'] = interval_data_low_conf['length'].values
+            low_conf_preds['major_raw'] = ((interval_data_low_conf['major_cov'] - normal_contam) / haploid_coverage).values
+            low_conf_preds['minor_raw'] = ((interval_data_low_conf['minor_cov'] - normal_contam) / haploid_coverage).values
+
+            # Combine low and high confidence
+            preds = pd.concat([preds, low_conf_preds], axis=0, ignore_index=True).sort(['chr', 'start'])
+
+            # Add lib id and candidate id and append to list of tables
             preds['library_id'] = library_id
             preds['candidate_id'] = candidate_idx
             preds = preds[['library_id', 'candidate_id', 'chr', 'start', 'end', 'length', 'major', 'minor', 'major_sub', 'minor_sub', 'subclonal', 'major_raw', 'minor_raw']]
             preds_tables.append(preds)
 
-        pd.concat(stats_tables, ignore_index=True).to_csv(stats_filename, sep='\t', index=False, header=True)
-        pd.concat(preds_tables, ignore_index=True).to_csv(pred_filename, sep='\t', index=False, header=True)
+        pd.concat(stats_tables, ignore_index=True).to_csv(stats_filename, sep='\t', na_rep='NA', index=False, header=True)
+        pd.concat(preds_tables, ignore_index=True).to_csv(pred_filename, sep='\t', na_rep='NA', index=False, header=True)
 
