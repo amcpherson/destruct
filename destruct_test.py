@@ -5,6 +5,8 @@ import os
 import ConfigParser
 import re
 import itertools
+import collections
+import bisect
 import subprocess
 import argparse
 import string
@@ -93,6 +95,7 @@ if __name__ == '__main__':
         pyp.sch.input(os.path.join(cfg.outdir, 'simulated.tsv')),
         pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints.tsv')),
         pyp.sch.output(os.path.join(cfg.outdir, 'annotated.tsv')),
+        pyp.sch.output(os.path.join(cfg.outdir, 'identified.tsv')),
         pyp.sch.output(os.path.abspath(cfg.results)))
 
     pyp.run()
@@ -128,44 +131,70 @@ else:
                 bam_list_file.write(lib_id + '\t' + bam_filename + '\n')
 
 
-    def create_roc_plot(sim_info, simulated_filename, predicted_filename, annotated_filename, plot_filename):
+    class BreakpointDatabase(object):
+        def __init__(self, breakpoints):
+            self.positions = collections.defaultdict(list)
+            self.break_ids = collections.defaultdict(set)
+            for idx, row in breakpoints.iterrows():
+                for side in ('1', '2'):
+                    self.positions[(row['chromosome_'+side], row['strand_'+side])].append(row['position_'+side])
+                    self.break_ids[(row['chromosome_'+side], row['strand_'+side], row['position_'+side])].add((row['break_id'], side))
+            for key in self.positions.iterkeys():
+                self.positions[key] = sorted(self.positions[key])
+        def query(self, row, extend=0):
+            matched_ids = list()
+            for side in ('1', '2'):
+                chrom_strand_positions = self.positions[(row['chromosome_'+side], row['strand_'+side])]
+                idx = bisect.bisect_left(chrom_strand_positions, row['break_'+side] - extend)
+                side_matched_ids = list()
+                while idx < len(chrom_strand_positions):
+                    pos = chrom_strand_positions[idx]
+                    dist = abs(pos - row['break_'+side])
+                    if pos >= row['break_'+side] - extend and pos <= row['break_'+side] + extend:
+                        for break_id in self.break_ids[(row['chromosome_'+side], row['strand_'+side], pos)]:
+                            side_matched_ids.append((break_id, dist))
+                    if pos > row['break_'+side] + extend:
+                        break
+                    idx += 1
+                matched_ids.append(side_matched_ids)
+            matched_ids_bypos = list()
+            for matched_id_1, dist_1 in matched_ids[0]:
+                for matched_id_2, dist_2 in matched_ids[1]:
+                    if matched_id_1[0] == matched_id_2[0] and matched_id_1[1] != matched_id_2[1]:
+                        matched_ids_bypos.append((dist_1 + dist_2, matched_id_1[0]))
+            if len(matched_ids_bypos) == 0:
+                return ''
+            return sorted(matched_ids_bypos)[0][1]
+
+
+    def create_roc_plot(sim_info, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
 
         breakpoints = pd.read_csv(simulated_filename, sep='\t', header=None,
-                          converters={'chromosome1':str, 'chromosome2':str},
+                          converters={'break_id':str, 'chromosome_1':str, 'chromosome_2':str},
                           names=['break_id',
-                                 'chromosome1', 'strand1', 'position1',
-                                 'chromosome2', 'strand2', 'position2',
+                                 'chromosome_1', 'strand_1', 'position_1',
+                                 'chromosome_2', 'strand_2', 'position_2',
                                  'inserted', 'homology'])
 
+        breakpoints_db = BreakpointDatabase(breakpoints)
+
         results = pd.read_csv(predicted_filename, sep='\t',
-                              converters={'chromosome_1':str, 'chromosome_2':str})
+                              converters={'cluster_id':str, 'chromosome_1':str, 'chromosome_2':str})
 
         min_dist = 200
 
-        def match(region, breakpoint):
-            for side in (0, 1):
-                if region[0][0] != breakpoint[side][0] or region[0][1] != breakpoint[side][1] or region[1][0] != breakpoint[1-side][0] or region[1][1] != breakpoint[1-side][1]:
-                    continue
-                if breakpoint[side][2] > region[0][3] + min_dist or breakpoint[side][2] < region[0][2] - min_dist or breakpoint[1-side][2] > region[1][3] + min_dist or breakpoint[1-side][2] < region[1][2] - min_dist:
-                    continue
-                return True
-            return False
-
         def identify_true_positive(row):
-            pred_region = [[row['chromosome_1'], row['strand_1'], row['start_1'], row['end_1']],
-                           [row['chromosome_2'], row['strand_2'], row['start_2'], row['end_2']]]
-            true_pos_id = None
-            for idx, true_pos in breakpoints.iterrows():
-                true_pos_region = [[true_pos['chromosome1'], true_pos['strand1'], true_pos['position1']],
-                                   [true_pos['chromosome2'], true_pos['strand2'], true_pos['position2']]]
-                if match(pred_region, true_pos_region):
-                    true_pos_id = true_pos['break_id']
-                    break
-            return true_pos_id
+            return breakpoints_db.query(row, min_dist)
 
         results['true_pos_id'] = results.apply(identify_true_positive, axis=1)
 
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
+
+        identified = breakpoints[['break_id']]
+        identified = identified.merge(results[['cluster_id', 'true_pos_id']], left_on='break_id', right_on='true_pos_id', how='left')
+        identified = identified.drop('true_pos_id', axis=1)
+
+        identified.to_csv(identified_filename, sep='\t', index=False, na_rep='NA')
 
         num_positive = int(sim_info['num_breakpoints'])
 
