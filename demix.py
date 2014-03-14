@@ -316,12 +316,15 @@ def create_counts(chromosome, changepoints_filename, haps_filename, reads_filena
 
 def infer_haps(cfg, temps_directory, library, chromosome, snps_filename, normal_alleles_filename, hets_filename, haps_filename):
     
-    accepted_chromosomes = [str(a) for a in range(1, 23)] + ['X']
-    if str(chromosome) not in accepted_chromosomes:
+    def write_null():
         with open(hets_filename, 'w') as hets_file:
             pass
         with open(haps_filename, 'w') as haps_file:
             haps_file.write('pos\tallele\tchangepoint_confidence\thap_label\tallele_id\tallele_label\n')
+
+    accepted_chromosomes = [str(a) for a in range(1, 23)] + ['X']
+    if str(chromosome) not in accepted_chromosomes:
+        write_null()
         return
     
     # Temporary directory for impute2 files
@@ -349,6 +352,10 @@ def infer_haps(cfg, temps_directory, library, chromosome, snps_filename, normal_
     snp_counts_df = pd.concat(snp_counts_df)
     snp_counts_df = snp_counts_df.groupby(level=0).sum()
     snp_counts_df.sort_index(inplace=True)
+
+    if len(snp_counts_df) == 0:
+        write_null()
+        return
 
     snp_counts_df['total_count'] = snp_counts_df['ref_count'] + snp_counts_df['alt_count']
 
