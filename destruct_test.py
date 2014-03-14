@@ -163,7 +163,7 @@ else:
                     if matched_id_1[0] == matched_id_2[0] and matched_id_1[1] != matched_id_2[1]:
                         matched_ids_bypos.append((dist_1 + dist_2, matched_id_1[0]))
             if len(matched_ids_bypos) == 0:
-                return ''
+                return None
             return sorted(matched_ids_bypos)[0][1]
 
 
@@ -190,8 +190,10 @@ else:
 
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
+        identified_columns = ['align_prob', 'valid_prob', 'chimeric_prob', 'simulated_count', 'num_split']
+
         identified = breakpoints[['break_id']]
-        identified = identified.merge(results[['cluster_id', 'true_pos_id']], left_on='break_id', right_on='true_pos_id', how='left')
+        identified = identified.merge(results[['cluster_id', 'true_pos_id'] + identified_columns], left_on='break_id', right_on='true_pos_id', how='outer')
         identified = identified.drop('true_pos_id', axis=1)
 
         identified.to_csv(identified_filename, sep='\t', index=False, na_rep='NA')
