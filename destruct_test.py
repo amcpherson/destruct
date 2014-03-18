@@ -87,7 +87,7 @@ if __name__ == '__main__':
         pyp.sch.output(os.path.join(cfg.outdir, 'breakreads.tsv')),
         '--config', pyp.sch.input(cfg.config),
         '--tmp', pyp.sch.tmpfile('destruct_tmp'),
-        '--nocleanup')
+        '--nocleanup', '--repopulate')
 
     pyp.sch.transform('plot', (), ctx, destruct_test.create_roc_plot,
         None,
