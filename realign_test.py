@@ -8,7 +8,8 @@ import itertools
 import subprocess
 import argparse
 import string
-from collections import *
+import collections
+import pandas as pd
 
 import pypeliner
 
@@ -63,6 +64,9 @@ if __name__ == '__main__':
     sch.commandline('bwtseed', axes, medmem, cfg.bowtie_bin, cfg.genome_fasta, sch.ifile('reads.seed', axes), '--chunkmbs', '512', '-k', '1000', '-m', '1000', '--strata', '--best', '-S', '>', sch.ofile('reads.seed.sam', axes))
     sch.commandline('realign', axes, medmem, cfg.realign2_tool, '-a', sch.ifile('reads.seed.sam', axes), '-s', sch.ifile('reads', axes), '-r', cfg.genome_fasta, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmin', sch.iobj('stats', axes).prop('fragment_length_min'), '--flmax', sch.iobj('stats', axes).prop('fragment_length_max'), '--tchimer', cfg.chimeric_threshold, '--talign', cfg.alignment_threshold, '--pchimer', cfg.chimeric_prior, '--pvalid', cfg.readvalid_prior, '--tvalid', cfg.readvalid_threshold, '-z', sch.ifile('score.stats', axes), '--span', sch.ofile('spanning.alignments', axes), '--split', sch.ofile('split.alignments', axes))
 
+    sch.transform('eval_span_align', axes, medmem, eval_span_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('spanning.alignments', axes), sch.ofile('spanning.alignments.eval', axes))
+    sch.transform('eval_split_align', axes, medmem, eval_split_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('split.alignments', axes), sch.ifile('split.alignments.eval', axes))
+
     sch.commandline('cluster', axes, himem, cfg.clustermatepairs_tool, '-a', sch.ifile('spanning.alignments', axes), '-m', '1', '-u', sch.iobj('stats', axes).prop('fragment_length_mean'), '-d', sch.iobj('stats', axes).prop('fragment_length_stddev'), '-o', sch.ofile('clusters', axes))
     sch.commandline('breaks', axes, himem, cfg.predictbreaks_tool, '-s', sch.ifile('split.alignments', axes), '-c', sch.ifile('clusters', axes), '-r', cfg.genome_fasta, '-b', sch.ofile('breakpoints', axes))
     sch.transform('results', axes, lowmem, compile_results, None, sch.ifile('simulated.info', axes), sch.ifile('breakpoints', axes), sch.ifile('clusters', axes), sch.ofile('identified', axes), sch.ofile('classify', axes))
@@ -102,6 +106,121 @@ else:
             sim_params[sim_id]['homology'] = homology
             sim_id += 1
         return sim_params
+
+
+    def create_sim_read_table(reads_filename):
+        sim_reads = list()
+        with open(reads_filename, 'r') as reads_file:
+                for name, seq, comment, qual in itertools.izip_longest(*[reads_file]*4):
+                        assert name[0] == '@'
+                        read_id = int(name[1:].split('/')[0])
+                        assert comment[:2] == '+@'
+                        sim_id = int(comment[2:].split('_')[0])
+                        sim_reads.append((sim_id, read_id))
+        sim_reads = pd.DataFrame(sim_reads, columns=['sim_id', 'read_id'])
+        return sim_reads
+
+
+    def read_simulated_table(simulated_filename):
+        simulated = pd.read_csv(simulated_filename, sep='\t', header=None,
+                                converters={'chromosome_1':str, 'chromosome_2':str},
+                                names=['sim_id',
+                                       'chromosome_1', 'strand_1', 'position_1',
+                                       'chromosome_2', 'strand_2', 'position_2',
+                                       'inserted', 'homology'])
+        return simulated
+
+
+    def eval_span_align(simulated_filename, reads_filename, spanning_filename, eval_filename):
+
+        max_diff = 1000
+
+        sim_reads = create_sim_read_table(reads_filename)
+        simulated = read_simulated_table(simulated_filename)
+
+        spanning = pd.read_csv(spanning_filename, sep='\t', header=None,
+                               converters={'chromosome':str},
+                               names=['read_id', 'read_end',
+                                      'chromosome', 'strand', 'start', 'end',
+                                      'read_length', 'matched_length', 'score',
+                                      'p_align', 'p_chrimeric', 'p_valid'])
+
+        spanning['approx_break'] = (spanning['strand'] == '+') * spanning['end'] + (spanning['strand'] != '+') * spanning['start']
+
+        spanning.set_index(['read_id', 'read_end'], inplace=True)
+        spanning['max_p_align'] = spanning.groupby(level=[0,1])['p_align'].max()
+        spanning.reset_index(inplace=True)
+        spanning['is_best'] = spanning['max_p_align'] == spanning['p_align']
+
+        spanning = spanning.merge(sim_reads, left_on='read_id', right_on='read_id')
+        spanning = spanning.merge(simulated, left_on='sim_id', right_on='sim_id')
+
+        for side in ('1', '2'):
+            spanning['is_side_'+side] = (spanning['chromosome'] == spanning['chromosome_'+side]) & \
+                                        (spanning['strand'] == spanning['strand_'+side]) & \
+                                        (spanning['approx_break'] - max_diff <= spanning['position_'+side]) & \
+                                        (spanning['approx_break'] + max_diff >= spanning['position_'+side])
+
+        spanning['is_true'] = spanning['is_side_1'] | spanning['is_side_2']
+
+        spanning = spanning[['read_id', 'read_end', 'chromosome', 'strand', 'start', 'end', 'read_length', 'matched_length', 'score', 'p_align', 'p_chrimeric', 'p_valid', 'sim_id', 'is_best', 'is_true']]
+
+        spanning.to_csv(eval_filename, sep='\t', index=False)
+
+
+    def eval_split_align(simulated_filename, reads_filename, split_filename, eval_filename):
+
+        sim_reads = create_sim_read_table(reads_filename)
+        simulated = read_simulated_table(simulated_filename)
+
+        split = pd.read_csv(split_filename, sep='\t', header=None,
+                            converters={'chromosome_1':str, 'chromosome_2':str},
+                            names=['read_id', 'read_end',
+                                   'chromosome_1', 'strand_1', 'position_1',
+                                   'chromosome_2', 'strand_2', 'position_2',
+                                   'inserted', 'length_1', 'length_2',
+                                   'score_1', 'score_2', 'score', 'p_align'])
+
+        split.set_index(['read_id', 'read_end'], inplace=True)
+        split['max_p_align'] = split.groupby(level=[0,1])['p_align'].max()
+        split.reset_index(inplace=True)
+        split['is_best'] = split['max_p_align'] == split['p_align']
+
+        split = split.merge(sim_reads, left_on='read_id', right_on='read_id')
+
+        merge_columns = ['sim_id']
+        for side in ('1', '2'):
+            merge_columns.append('chromosome_'+side)
+            merge_columns.append('strand_'+side)
+            merge_columns.append('position_'+side)
+
+        sim_side_1 = simulated[merge_columns]
+        sim_side_1['is_side_1'] = True
+
+        split = split.merge(sim_side_1, left_on=merge_columns, right_on=merge_columns, how='left')
+
+        def flip_side(col):
+            if col.endswith('_2'):
+                return col[:-2]+'_1'
+            elif col.endswith('_1'):
+                return col[:-2]+'_2'
+            else:
+                return col
+
+        sim_side_2 = simulated[merge_columns]
+        sim_side_2 = sim_side_2.rename(columns=flip_side)
+        sim_side_2['is_side_2'] = True
+
+        split = split.merge(sim_side_2, left_on=merge_columns, right_on=merge_columns, how='left')
+
+        split['is_side_1'] = split['is_side_1'].fillna(False)
+        split['is_side_2'] = split['is_side_2'].fillna(False)
+
+        split.to_csv('test1.tsv', sep='\t', index=False)
+
+        split['is_true'] = split['is_side_1'] | split['is_side_2']
+
+        split.to_csv(eval_filename, sep='\t', index=False)
 
 
     def collate_results(sim_params, identified_filenames, classify_filenames, results_filename):
