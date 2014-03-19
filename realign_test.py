@@ -70,9 +70,9 @@ if __name__ == '__main__':
     sch.commandline('cluster', axes, himem, cfg.clustermatepairs_tool, '-a', sch.ifile('spanning.alignments', axes), '-m', '1', '-u', sch.iobj('stats', axes).prop('fragment_length_mean'), '-d', sch.iobj('stats', axes).prop('fragment_length_stddev'), '-o', sch.ofile('clusters', axes))
     sch.commandline('breaks', axes, himem, cfg.predictbreaks_tool, '-s', sch.ifile('split.alignments', axes), '-c', sch.ifile('clusters', axes), '-r', cfg.genome_fasta, '-b', sch.ofile('breakpoints', axes))
 
-    sch.transform('results', axes, lowmem, compile_results, None, sch.ifile('simulated.info', axes), sch.ifile('breakpoints', axes), sch.ifile('clusters', axes), sch.ifile('spanning.alignments.eval', axes), sch.ifile('split.alignments.eval', axes), sch.ofile('identified', axes), sch.ofile('classify', axes))
+    sch.transform('results', axes, lowmem, compile_results, None, sch.ifile('simulated.info', axes), sch.ifile('breakpoints', axes), sch.ifile('clusters', axes), sch.ifile('spanning.alignments.eval', axes), sch.ifile('split.alignments.eval', axes), sch.ofile('identified', axes), sch.ofile('classified', axes))
 
-    sch.transform('collate', (), lowmem, collate_results, None, sch.iobj('simulation.params', axes), sch.ifile('identified', axes), sch.ifile('classify', axes), sch.output(args.results))
+    sch.transform('collate', (), lowmem, collate_results, None, sch.iobj('simulation.params', axes), sch.ifile('identified', axes), sch.ifile('classified', axes), sch.output(args.results))
 
     pyp.run()
 
@@ -234,38 +234,39 @@ else:
         split_eval.to_csv(eval_filename, sep='\t', index=True)
 
 
-    def collate_results(sim_params, identified_filenames, classify_filenames, results_filename):
+    def collate_results(sim_params, identified_filenames, classified_filenames, results_filename):
+
         with open(results_filename, 'w') as results_file:
+
             fields = list(set([field for sim in sim_params.values() for field in sim.keys()]))
-            results_file.write('\t'.join(['sim_id'] + fields + ['sensitivity_exact', 'sensitivity_approx', 'homology_sensitivity', 'specificity']) + '\n')
+            
+            results_file.write('\t'.join(['sim_id'] + fields + ['sensitivity_exact', 'sensitivity_approx', 'homology_sensitivity', 'specificity', 'span_true_align', 'span_true_best_align', 'split_true_align', 'split_true_best_align']) + '\n')
+            
             for sim_id in sim_params.keys():
+
                 results_file.write(str(sim_id) + '\t')
-                results_file.write('\t'.join((sim_params[sim_id][field] for field in fields)))
-                with open(identified_filenames[sim_id], 'r') as identified_file:
-                    total = 0.0
-                    identified_exact = 0.0
-                    identified_approx = 0.0
-                    homology_identified = 0.0
-                    for row in csv.reader(identified_file, delimiter='\t'):
-                        total += 1.0
-                        if row[1] != 'N':
-                            identified_exact += 1.0
-                        if row[2] != 'N':
-                            identified_approx += 1.0
-                        if row[3] != 'N':
-                            homology_identified += 1.0
-                    sensitivity_exact = identified_exact / total
-                    sensitivity_approx = identified_approx / total
-                    homology_sensitivity = homology_identified / identified_exact
-                with open(classify_filenames[sim_id], 'r') as classify_file:
-                    total_clusters = 0.0
-                    total_true = 0.0
-                    for row in csv.reader(classify_file, delimiter='\t'):
-                        total_clusters += 1.0
-                        if row[1] == '1':
-                            total_true += 1.0
-                    specificity = total_true / total_clusters
-                results_file.write('\t' + '\t'.join([str(sensitivity_exact), str(sensitivity_approx), str(homology_sensitivity), str(specificity)]) + '\n')
+                results_file.write('\t'.join((sim_params[sim_id][field] for field in fields)) + '\t')
+
+                identified = pd.read_csv(identified_filenames[sim_id], sep='\t')
+                sensitivity_exact = identified['exact_cluster_id'].notnull().mean()
+                sensitivity_approx = identified['approx_cluster_id'].notnull().mean()
+                homology_sensitivity = identified['homology_correct'].mean()
+                span_true_align = identified['span_true_align'].mean()
+                span_true_best_align = identified['span_true_best_align'].mean()
+                split_true_align = identified['split_true_align'].mean()
+                split_true_best_align = identified['split_true_best_align'].mean()
+
+                classified = pd.read_csv(classified_filenames[sim_id], sep='\t')
+                specificity = classified['is_true'].mean()
+
+                results_file.write(str(sensitivity_exact) + '\t')
+                results_file.write(str(sensitivity_approx) + '\t')
+                results_file.write(str(homology_sensitivity) + '\t')
+                results_file.write(str(specificity) + '\t')
+                results_file.write(str(span_true_align) + '\t')
+                results_file.write(str(span_true_best_align) + '\t')
+                results_file.write(str(split_true_align) + '\t')
+                results_file.write(str(split_true_best_align) + '\n')
 
 
     def read_sim(input_file):
@@ -333,37 +334,47 @@ else:
         return False
 
 
-    def compile_results(sim_filename, breakpoints_filename, clusters_filename, span_eval_filename, split_eval_filename, identified_filename, classify_filename):
+    def compile_results(sim_filename, breakpoints_filename, clusters_filename, span_eval_filename, split_eval_filename, identified_filename, classified_filename):
+
         predictions = collections.defaultdict(list)
         with open(breakpoints_filename, 'r') as breakpoints_file:
             for prediction_id, cluster_id, breakends in read_breakends(breakpoints_file):
                 predictions[breakends].append(cluster_id)
+        
         predicted_homology = dict()
         with open(breakpoints_filename, 'r') as breakpoints_file:
             for cluster_id, homology in read_homology(breakpoints_file):
                 predicted_homology[cluster_id] = homology
+        
         cluster_regions = dict()
         with open(clusters_filename, 'r') as clusters_file:
             for cluster_id, region in read_cluster_regions(clusters_file):
                 cluster_regions[cluster_id] = region
-        span_eval = pd.read_csv(split_eval_filename, sep='\t', index_col='sim_id')
+        
+        span_eval = pd.read_csv(span_eval_filename, sep='\t', index_col='sim_id')
+        
         split_eval = pd.read_csv(split_eval_filename, sep='\t', index_col='sim_id')
-        with open(sim_filename, 'r') as sim_file, open(identified_filename, 'w') as identified_file, open(classify_filename, 'w') as classify_file:
+        
+        with open(sim_filename, 'r') as sim_file, open(identified_filename, 'w') as identified_file, open(classified_filename, 'w') as classified_file:
+
             true_cluster_ids = set()
-            identified_file.write('\t'.join(['sim_id', 'exact_cluster_id', 'approx_cluster_id', 'homology_correct', 'span_true_align', 'span_true_best_align', 'split_true_align', 'split_true_best_align']))
+            identified_file.write('\t'.join(['sim_id', 'exact_cluster_id', 'approx_cluster_id', 'homology_correct', 'span_true_align', 'span_true_best_align', 'split_true_align', 'split_true_best_align']) + '\n')
+
             for sim_id, breakends, homology in read_sim(sim_file):
-                exact_cluster_id = 'N'
-                approx_cluster_id = 'N'
-                homology_correct = 'N'
+
+                exact_cluster_id = 'NA'
+                approx_cluster_id = 'NA'
+                homology_correct = '0'
                 for cluster_id in predictions[breakends]:
                     exact_cluster_id = cluster_id
                     true_cluster_ids.add(cluster_id)
                     if predicted_homology[cluster_id] == homology:
-                        homology_correct = 'Y'
+                        homology_correct = '1'
                 for cluster_id, region in cluster_regions.iteritems():
                     if match(region, list(breakends)):
                         approx_cluster_id = cluster_id
                         true_cluster_ids.add(approx_cluster_id)
+
                 identified_file.write(str(sim_id) + '\t')
                 identified_file.write(str(exact_cluster_id) + '\t')
                 identified_file.write(str(approx_cluster_id) + '\t')
@@ -372,8 +383,10 @@ else:
                 identified_file.write(str(span_eval['true_best_align'].get(sim_id, default=0.0)) + '\t')
                 identified_file.write(str(split_eval['true_align'].get(sim_id, default=0.0)) + '\t')
                 identified_file.write(str(split_eval['true_best_align'].get(sim_id, default=0.0)) + '\n')
+            
+            classified_file.write('\t'.join(['cluster_id', 'is_true']) + '\n')
             for cluster_id, region in cluster_regions.iteritems():
-                classify_file.write('\t'.join([str(cluster_id), str(int(cluster_id in true_cluster_ids))]) + '\n')
+                classified_file.write('\t'.join([str(cluster_id), str(int(cluster_id in true_cluster_ids))]) + '\n')
 
 
     class ConcordantReadStatsAccumulator(object):
