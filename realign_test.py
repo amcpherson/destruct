@@ -371,7 +371,7 @@ else:
                 identified_file.write(str(span_eval['true_align'].get(sim_id, default=0.0)) + '\t')
                 identified_file.write(str(span_eval['true_best_align'].get(sim_id, default=0.0)) + '\t')
                 identified_file.write(str(split_eval['true_align'].get(sim_id, default=0.0)) + '\t')
-                identified_file.write(str(split_eval['true_best_align'].get(sim_id, default=0.0)) + '\t')
+                identified_file.write(str(split_eval['true_best_align'].get(sim_id, default=0.0)) + '\n')
             for cluster_id, region in cluster_regions.iteritems():
                 classify_file.write('\t'.join([str(cluster_id), str(int(cluster_id in true_cluster_ids))]) + '\n')
 
