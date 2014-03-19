@@ -69,7 +69,8 @@ if __name__ == '__main__':
 
     sch.commandline('cluster', axes, himem, cfg.clustermatepairs_tool, '-a', sch.ifile('spanning.alignments', axes), '-m', '1', '-u', sch.iobj('stats', axes).prop('fragment_length_mean'), '-d', sch.iobj('stats', axes).prop('fragment_length_stddev'), '-o', sch.ofile('clusters', axes))
     sch.commandline('breaks', axes, himem, cfg.predictbreaks_tool, '-s', sch.ifile('split.alignments', axes), '-c', sch.ifile('clusters', axes), '-r', cfg.genome_fasta, '-b', sch.ofile('breakpoints', axes))
-    sch.transform('results', axes, lowmem, compile_results, None, sch.ifile('simulated.info', axes), sch.ifile('breakpoints', axes), sch.ifile('clusters', axes), sch.ofile('identified', axes), sch.ofile('classify', axes))
+
+    sch.transform('results', axes, lowmem, compile_results, None, sch.ifile('simulated.info', axes), sch.ifile('breakpoints', axes), sch.ifile('clusters', axes), sch.ifile('spanning.alignments.eval', axes), sch.ifile('split.alignments.eval', axes), sch.ofile('identified', axes), sch.ofile('classify', axes))
 
     sch.transform('collate', (), lowmem, collate_results, None, sch.iobj('simulation.params', axes), sch.ifile('identified', axes), sch.ifile('classify', axes), sch.output(args.results))
 
@@ -162,13 +163,13 @@ else:
                                         (spanning['approx_break'] + max_diff >= spanning['position_'+side])
 
         spanning['is_true'] = spanning['is_side_1'] | spanning['is_side_2']
-        spanning['true_and_best'] = spanning['is_true'] & spanning['is_best']
+        spanning['is_true_best'] = spanning['is_true'] & spanning['is_best']
 
         spanning = spanning.set_index(['sim_id', 'read_id', 'read_end'])
         true_alignment = spanning['is_true'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1).groupby(level=0).mean()
-        true_and_best_alignment = spanning['true_and_best'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1).groupby(level=0).mean()
+        true_and_best_alignment = spanning['is_true_best'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1).groupby(level=0).mean()
 
-        span_eval = pd.concat([true_alignment, true_and_best_alignment], axis=1, keys=['true_align', 'true_and_best_align'])
+        span_eval = pd.concat([true_alignment, true_and_best_alignment], axis=1, keys=['true_align', 'true_best_align'])
 
         span_eval.to_csv(eval_filename, sep='\t', index=True)
 
@@ -222,13 +223,13 @@ else:
         split['is_side_2'] = split['is_side_2'].fillna(False)
 
         split['is_true'] = split['is_side_1'] | split['is_side_2']
-        split['true_and_best'] = split['is_true'] & split['is_best']
+        split['is_true_best'] = split['is_true'] & split['is_best']
 
         split = split.set_index(['sim_id', 'read_id', 'read_end'])
         true_alignment = split['is_true'].groupby(level=[0,1,2]).apply(any).groupby(level=0).mean()
-        true_and_best_alignment = split['true_and_best'].groupby(level=[0,1,2]).apply(any).groupby(level=0).mean()
+        true_and_best_alignment = split['is_true_best'].groupby(level=[0,1,2]).apply(any).groupby(level=0).mean()
 
-        split_eval = pd.concat([true_alignment, true_and_best_alignment], axis=1, keys=['true_align', 'true_and_best_align'])
+        split_eval = pd.concat([true_alignment, true_and_best_alignment], axis=1, keys=['true_align', 'true_best_align'])
 
         split_eval.to_csv(eval_filename, sep='\t', index=True)
 
@@ -332,8 +333,8 @@ else:
         return False
 
 
-    def compile_results(sim_filename, breakpoints_filename, clusters_filename, identified_filename, classify_filename):
-        predictions = defaultdict(list)
+    def compile_results(sim_filename, breakpoints_filename, clusters_filename, span_eval_filename, split_eval_filename, identified_filename, classify_filename):
+        predictions = collections.defaultdict(list)
         with open(breakpoints_filename, 'r') as breakpoints_file:
             for prediction_id, cluster_id, breakends in read_breakends(breakpoints_file):
                 predictions[breakends].append(cluster_id)
@@ -345,8 +346,11 @@ else:
         with open(clusters_filename, 'r') as clusters_file:
             for cluster_id, region in read_cluster_regions(clusters_file):
                 cluster_regions[cluster_id] = region
+        span_eval = pd.read_csv(split_eval_filename, sep='\t', index_col='sim_id')
+        split_eval = pd.read_csv(split_eval_filename, sep='\t', index_col='sim_id')
         with open(sim_filename, 'r') as sim_file, open(identified_filename, 'w') as identified_file, open(classify_filename, 'w') as classify_file:
             true_cluster_ids = set()
+            identified_file.write('\t'.join(['sim_id', 'exact_cluster_id', 'approx_cluster_id', 'homology_correct', 'span_true_align', 'span_true_best_align', 'split_true_align', 'split_true_best_align']))
             for sim_id, breakends, homology in read_sim(sim_file):
                 exact_cluster_id = 'N'
                 approx_cluster_id = 'N'
@@ -360,7 +364,14 @@ else:
                     if match(region, list(breakends)):
                         approx_cluster_id = cluster_id
                         true_cluster_ids.add(approx_cluster_id)
-                identified_file.write('\t'.join((str(sim_id), str(exact_cluster_id), str(approx_cluster_id), homology_correct)) + '\n')
+                identified_file.write(str(sim_id) + '\t')
+                identified_file.write(str(exact_cluster_id) + '\t')
+                identified_file.write(str(approx_cluster_id) + '\t')
+                identified_file.write(str(homology_correct) + '\t')
+                identified_file.write(str(span_eval['true_align'].get(sim_id, default=0.0)) + '\t')
+                identified_file.write(str(span_eval['true_best_align'].get(sim_id, default=0.0)) + '\t')
+                identified_file.write(str(split_eval['true_align'].get(sim_id, default=0.0)) + '\t')
+                identified_file.write(str(split_eval['true_best_align'].get(sim_id, default=0.0)) + '\t')
             for cluster_id, region in cluster_regions.iteritems():
                 classify_file.write('\t'.join([str(cluster_id), str(int(cluster_id in true_cluster_ids))]) + '\n')
 
