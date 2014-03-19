@@ -65,7 +65,7 @@ if __name__ == '__main__':
     sch.commandline('realign', axes, medmem, cfg.realign2_tool, '-a', sch.ifile('reads.seed.sam', axes), '-s', sch.ifile('reads', axes), '-r', cfg.genome_fasta, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmin', sch.iobj('stats', axes).prop('fragment_length_min'), '--flmax', sch.iobj('stats', axes).prop('fragment_length_max'), '--tchimer', cfg.chimeric_threshold, '--talign', cfg.alignment_threshold, '--pchimer', cfg.chimeric_prior, '--pvalid', cfg.readvalid_prior, '--tvalid', cfg.readvalid_threshold, '-z', sch.ifile('score.stats', axes), '--span', sch.ofile('spanning.alignments', axes), '--split', sch.ofile('split.alignments', axes))
 
     sch.transform('eval_span_align', axes, medmem, eval_span_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('spanning.alignments', axes), sch.ofile('spanning.alignments.eval', axes))
-    sch.transform('eval_split_align', axes, medmem, eval_split_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('split.alignments', axes), sch.ifile('split.alignments.eval', axes))
+    sch.transform('eval_split_align', axes, medmem, eval_split_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('split.alignments', axes), sch.ofile('split.alignments.eval', axes))
 
     sch.commandline('cluster', axes, himem, cfg.clustermatepairs_tool, '-a', sch.ifile('spanning.alignments', axes), '-m', '1', '-u', sch.iobj('stats', axes).prop('fragment_length_mean'), '-d', sch.iobj('stats', axes).prop('fragment_length_stddev'), '-o', sch.ofile('clusters', axes))
     sch.commandline('breaks', axes, himem, cfg.predictbreaks_tool, '-s', sch.ifile('split.alignments', axes), '-c', sch.ifile('clusters', axes), '-r', cfg.genome_fasta, '-b', sch.ofile('breakpoints', axes))
@@ -162,10 +162,15 @@ else:
                                         (spanning['approx_break'] + max_diff >= spanning['position_'+side])
 
         spanning['is_true'] = spanning['is_side_1'] | spanning['is_side_2']
+        spanning['true_and_best'] = spanning['is_true'] & spanning['is_best']
 
-        spanning = spanning[['read_id', 'read_end', 'chromosome', 'strand', 'start', 'end', 'read_length', 'matched_length', 'score', 'p_align', 'p_chrimeric', 'p_valid', 'sim_id', 'is_best', 'is_true']]
+        spanning = spanning.set_index(['sim_id', 'read_id', 'read_end'])
+        true_alignment = spanning['is_true'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1).groupby(level=0).mean()
+        true_and_best_alignment = spanning['true_and_best'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1).groupby(level=0).mean()
 
-        spanning.to_csv(eval_filename, sep='\t', index=False)
+        span_eval = pd.concat([true_alignment, true_and_best_alignment], axis=1, keys=['true_align', 'true_and_best_align'])
+
+        span_eval.to_csv(eval_filename, sep='\t', index=True)
 
 
     def eval_split_align(simulated_filename, reads_filename, split_filename, eval_filename):
@@ -216,11 +221,16 @@ else:
         split['is_side_1'] = split['is_side_1'].fillna(False)
         split['is_side_2'] = split['is_side_2'].fillna(False)
 
-        split.to_csv('test1.tsv', sep='\t', index=False)
-
         split['is_true'] = split['is_side_1'] | split['is_side_2']
+        split['true_and_best'] = split['is_true'] & split['is_best']
 
-        split.to_csv(eval_filename, sep='\t', index=False)
+        split = split.set_index(['sim_id', 'read_id', 'read_end'])
+        true_alignment = split['is_true'].groupby(level=[0,1,2]).apply(any).groupby(level=0).mean()
+        true_and_best_alignment = split['true_and_best'].groupby(level=[0,1,2]).apply(any).groupby(level=0).mean()
+
+        split_eval = pd.concat([true_alignment, true_and_best_alignment], axis=1, keys=['true_align', 'true_and_best_align'])
+
+        split_eval.to_csv(eval_filename, sep='\t', index=True)
 
 
     def collate_results(sim_params, identified_filenames, classify_filenames, results_filename):
