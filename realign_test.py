@@ -252,7 +252,7 @@ else:
 
             fields = list(set([field for sim in sim_params.values() for field in sim.keys()]))
             
-            results_file.write('\t'.join(['sim_id'] + fields + ['sensitivity_exact', 'sensitivity_approx', 'homology_sensitivity', 'specificity', 'span_true_align', 'span_true_best_align', 'split_true_align', 'split_true_best_align']) + '\n')
+            results_file.write('\t'.join(['sim_id'] + fields + ['sensitivity_exact', 'sensitivity_approx', 'homology_sensitivity', 'specificity', 'read_count', 'span_true_align', 'span_true_best_align', 'split_true_align', 'split_true_best_align']) + '\n')
             
             for sim_id in sim_params.keys():
 
@@ -263,6 +263,7 @@ else:
                 sensitivity_exact = identified['exact_cluster_id'].notnull().mean()
                 sensitivity_approx = identified['approx_cluster_id'].notnull().mean()
                 homology_sensitivity = identified['homology_correct'].mean()
+                read_count = identified['read_count'].mean()
                 span_true_align = identified['span_true_align'].mean()
                 span_true_best_align = identified['span_true_best_align'].mean()
                 split_true_align = identified['split_true_align'].mean()
@@ -275,6 +276,7 @@ else:
                 results_file.write(str(sensitivity_approx) + '\t')
                 results_file.write(str(homology_sensitivity) + '\t')
                 results_file.write(str(specificity) + '\t')
+                results_file.write(str(read_count) + '\t')
                 results_file.write(str(span_true_align) + '\t')
                 results_file.write(str(span_true_best_align) + '\t')
                 results_file.write(str(split_true_align) + '\t')
@@ -300,6 +302,7 @@ else:
 
     def read_homology(input_file):
         for cluster_id, rows in itertools.groupby(csv.reader(input_file, delimiter='\t'), lambda row: int(row[0])):
+            cluster_id = int(cluster_id)
             rows = list(rows)
             homology = 0
             prev_pos = None
@@ -322,17 +325,20 @@ else:
 
     def read_cluster_regions(input_file):
         for cluster_id, rows in itertools.groupby(csv.reader(input_file, delimiter='\t'), lambda row: row[0]):
+            cluster_id = int(cluster_id)
             region = [[None, None, [], []], [None, None, [], []]]
+            read_ids = set()
             for row in rows:
                 cluster_end = int(row[1])
                 region[cluster_end][0] = row[4]
                 region[cluster_end][1] = row[5]
                 region[cluster_end][2].append(int(row[6]))
                 region[cluster_end][3].append(int(row[7]))
+                read_ids.add(row[2])
             for cluster_end in (0, 1):
                 region[cluster_end][2] = min(region[cluster_end][2])
                 region[cluster_end][3] = max(region[cluster_end][3])
-            yield cluster_id, region
+            yield cluster_id, region, len(read_ids)
 
 
     def match(region, breakpoint):
@@ -359,9 +365,11 @@ else:
                 predicted_homology[cluster_id] = homology
         
         cluster_regions = dict()
+        cluster_read_counts = dict()
         with open(clusters_filename, 'r') as clusters_file:
-            for cluster_id, region in read_cluster_regions(clusters_file):
+            for cluster_id, region, read_count in read_cluster_regions(clusters_file):
                 cluster_regions[cluster_id] = region
+                cluster_read_counts[cluster_id] = read_count
         
         span_eval = pd.read_csv(span_eval_filename, sep='\t', index_col='sim_id')
         
@@ -370,7 +378,7 @@ else:
         with open(sim_filename, 'r') as sim_file, open(identified_filename, 'w') as identified_file, open(classified_filename, 'w') as classified_file:
 
             true_cluster_ids = set()
-            identified_file.write('\t'.join(['sim_id', 'exact_cluster_id', 'approx_cluster_id', 'homology_correct', 'span_true_align', 'span_true_best_align', 'split_true_align', 'split_true_best_align']) + '\n')
+            identified_file.write('\t'.join(['sim_id', 'exact_cluster_id', 'approx_cluster_id', 'homology_correct', 'read_count', 'span_true_align', 'span_true_best_align', 'split_true_align', 'split_true_best_align']) + '\n')
 
             for sim_id, breakends, homology in read_sim(sim_file):
 
@@ -387,10 +395,17 @@ else:
                         approx_cluster_id = cluster_id
                         true_cluster_ids.add(approx_cluster_id)
 
+                read_count = 'NA'
+                if exact_cluster_id != 'NA':
+                    read_count = cluster_read_counts[exact_cluster_id]
+                elif approx_cluster_id != 'NA':
+                    read_count = cluster_read_counts[approx_cluster_id]
+
                 identified_file.write(str(sim_id) + '\t')
                 identified_file.write(str(exact_cluster_id) + '\t')
                 identified_file.write(str(approx_cluster_id) + '\t')
                 identified_file.write(str(homology_correct) + '\t')
+                identified_file.write(str(read_count) + '\t')
                 identified_file.write(str(span_eval['true_align'].get(sim_id, default=0.0)) + '\t')
                 identified_file.write(str(span_eval['true_best_align'].get(sim_id, default=0.0)) + '\t')
                 identified_file.write(str(split_eval['true_align'].get(sim_id, default=0.0)) + '\t')
