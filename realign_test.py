@@ -166,8 +166,14 @@ else:
         spanning['is_true_best'] = spanning['is_true'] & spanning['is_best']
 
         spanning = spanning.set_index(['sim_id', 'read_id', 'read_end'])
-        true_alignment = spanning['is_true'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1).groupby(level=0).mean()
-        true_and_best_alignment = spanning['is_true_best'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1).groupby(level=0).mean()
+
+        true_alignment = spanning['is_true'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1)
+        true_alignment = true_alignment * 1
+        true_alignment = true_alignment.groupby(level=0).mean()
+
+        true_and_best_alignment = spanning['is_true_best'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1)
+        true_and_best_alignment = true_and_best_alignment * 1
+        true_and_best_alignment = true_and_best_alignment.groupby(level=0).mean()
 
         span_eval = pd.concat([true_alignment, true_and_best_alignment], axis=1, keys=['true_align', 'true_best_align'])
 
@@ -226,8 +232,14 @@ else:
         split['is_true_best'] = split['is_true'] & split['is_best']
 
         split = split.set_index(['sim_id', 'read_id', 'read_end'])
-        true_alignment = split['is_true'].groupby(level=[0,1,2]).apply(any).groupby(level=0).mean()
-        true_and_best_alignment = split['is_true_best'].groupby(level=[0,1,2]).apply(any).groupby(level=0).mean()
+
+        true_alignment = split['is_true'].groupby(level=[0,1,2]).apply(any)
+        true_alignment = true_alignment * 1
+        true_alignment = true_alignment.groupby(level=0).mean()
+
+        true_and_best_alignment = split['is_true_best'].groupby(level=[0,1,2]).apply(any)
+        true_and_best_alignment = true_and_best_alignment * 1
+        true_and_best_alignment = true_and_best_alignment.groupby(level=0).mean()
 
         split_eval = pd.concat([true_alignment, true_and_best_alignment], axis=1, keys=['true_align', 'true_best_align'])
 
