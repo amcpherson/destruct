@@ -362,7 +362,7 @@ int main(int argc, char* argv[])
 					swap(seq2Length, splitSeq2Length[readEnd][*selfAlignmentIter]);
 
 					alignPosteriorsFull[readEnd].AddAlignment(score);
-					//bestSelfScoreFull[selfAlignment.readEnd] = max(bestSelfScoreFull[selfAlignment.readEnd], score);
+					bestSelfScoreFull[selfAlignment.readEnd] = max(bestSelfScoreFull[selfAlignment.readEnd], score);
 				}
 			}
 		}
@@ -384,8 +384,8 @@ int main(int argc, char* argv[])
 		double lDiscTrue = alignProbability.ProbTrue(preppedReads.ReadLength(0), bestSelfScoreFull[0]) * alignProbability.ProbTrue(preppedReads.ReadLength(1), bestSelfScoreFull[1]);
 		double lDiscFalse = alignProbability.ProbFalse(preppedReads.ReadLength(0), bestSelfScoreFull[0]) * alignProbability.ProbFalse(preppedReads.ReadLength(1), bestSelfScoreFull[1]);
 
-		// Calculate probability for best concordant score
-		double bestChimericPosterior = -1.0;
+		// Calculate probability for worst concordant score
+		double worstChimericPosterior = 1.0;
 		for (int alignmentIndex = 0; alignmentIndex < alignments.size(); alignmentIndex++)
 		{
 			const RawAlignment& alignment = alignments[alignmentIndex];
@@ -404,18 +404,13 @@ int main(int argc, char* argv[])
 
 				double chimericPosterior = lDiscTrue * lConcFalse * chimericPrior / (lDiscTrue * lConcFalse * chimericPrior + lDiscFalse * lConcTrue * (1.0 - chimericPrior));
 
-				bestChimericPosterior = max(bestChimericPosterior, chimericPosterior);
+
+				worstChimericPosterior = min(worstChimericPosterior, chimericPosterior);
 			}
 		}
 
-		// No alignments to use for calculation
-		if (bestChimericPosterior == -1.0)
-		{
-			bestChimericPosterior = 1.0;
-		}
-		
 		// Apply threshold on chimeric posterior
-		if (bestChimericPosterior >= 0.0 and bestChimericPosterior < chimericThreshold)
+		if (worstChimericPosterior < chimericThreshold)
 		{
 			continue;
 		}
@@ -509,7 +504,7 @@ int main(int argc, char* argv[])
 			spanningFile << seqLength << "\t";
 			spanningFile << score << "\t";
 			spanningFile << alignmentPosterior << "\t";
-			spanningFile << bestChimericPosterior << "\t";
+			spanningFile << worstChimericPosterior << "\t";
 			spanningFile << validReadPosterior[alignment.readEnd] << endl;
 		}
 		
