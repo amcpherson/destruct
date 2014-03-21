@@ -692,7 +692,7 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
         haploid_tumours = np.array(haploid_tumours)[filtered]
         subclone_freqs = np.array(subclone_freqs)[filtered]
         avg_zs = np.array(avg_zs)[filtered]
-        pred = np.array(preds)[filtered]
+        preds = np.array(preds)[filtered]
 
         stats_tables = list()
         preds_tables = list()
