@@ -259,9 +259,9 @@ int main(int argc, char* argv[])
 		}
 		
 		//
-		// Initialize posterior calculation for all alignments
-		//  alignPosteriors: alignment length of best alignment
-		//  alignPosteriorsFull: full length of read
+		// Initialize posterior calculation for all alignments:
+		//  - alignPosteriorsPart: alignment length of best alignment
+		//  - alignPosteriorsFull: full length of read
 		//
 		int alignedLength[2] = {0, 0};
 		AlignmentPosterior alignPosteriorsPart[2];
@@ -276,7 +276,9 @@ int main(int argc, char* argv[])
 		//
 		// Identify best partial and full alignment scores
 		//
-		// Add alignment scores to posterior calculation
+		// Add alignment scores to posterior calculation including:
+		//  - self alignments, partial and full
+		//  - reverse mate alignments, partial and full, if they exist
 		//
 		int bestSelfScorePart[2] = {0, 0};
 		int bestSelfScoreFull[2] = {0, 0};
@@ -307,9 +309,8 @@ int main(int argc, char* argv[])
 		}
 		
 		//
-		// Create list of alignment indices for each end
-		//
-		// Filter based on partial alignment posterior
+		// Create list of alignment indices for each end, filter
+		// based on partial alignment posterior
 		//
 		vector<int> alignmentIndices[2];
 		for (int alignmentIndex = 0; alignmentIndex < alignments.size(); alignmentIndex++)
