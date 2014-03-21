@@ -207,7 +207,22 @@ int main(int argc, char* argv[])
 			continue;
 		}
 		
+		//
 		// Realignments
+		//
+		// Calculate the 'self' alignment, the alignment of the read
+		// to its seed match location
+		//
+		// Calculate the 'mate' seed alignment, the alignment of a 16 nt seed
+		// from the mate read to the region near the self seed location
+		//
+		// Given a reasonable mate seed alignment, calculate the 'forward'
+		// mate alignment, the alignment of the mate read forward from the
+		// seed match location
+		//
+		// Also calculate the 'reverse' mate alignment, the alignment of the
+		// mate starting from the ending point of the forward mate alignment
+		//
 		pair<int,int> bestAlignment[2] = {pair<int,int>(0,0),pair<int,int>(0,0)};
 		vector<AlignInfo> selfAlignments;
 		unordered_map<int,AlignInfo> mateFwdAlignments;
