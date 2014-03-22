@@ -22,6 +22,8 @@ if __name__ == '__main__':
 
     import create_breakpoint_simulation
 
+    import score_stats
+
     parser = argparse.ArgumentParser()
     pypeliner.easypypeliner.add_arguments(parser)
     parser.add_argument('simconfig', help='Simulation Configuration filename')
@@ -52,7 +54,7 @@ if __name__ == '__main__':
     sch.commandline('prepsample', axes, medmem, 'cat', sch.ifile('sample1', axes), sch.ifile('sample2', axes), '>', sch.ofile('sample', axes))
     sch.commandline('bwtsamplek2', axes, medmem, cfg.bowtie2_bin, '--very-sensitive', '-k', '2', '-x', cfg.genome_fasta, sch.ifile('sample', axes), '>', sch.ofile('sample.k2.sam', axes))
     sch.commandline('alignnull', axes, medmem, cfg.alignnull_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-c', sch.ifile('sample.sam', axes), '-a', sch.ifile('sample.k2.sam', axes), '-s', sch.ifile('sample', axes), '-r', cfg.genome_fasta, '>', sch.ofile('samples.align.null', axes))
-    sch.commandline('scorestats', axes, medmem, cfg.rscript_bin, cfg.score_stats_rscript, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), cfg.match_score, sch.ofile('score.stats', axes))
+    sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), int(cfg.match_score), sch.ofile('score.stats', axes))
 
     sch.transform('readstats', axes, medmem, calculate_concordant_stats, sch.oobj('stats', axes), sch.ifile('sample.sam', axes))
 
@@ -63,9 +65,9 @@ if __name__ == '__main__':
 
     sch.commandline('cluster', axes, himem, cfg.clustermatepairs_tool, '-a', sch.ifile('spanning.alignments', axes), '-m', '1', '-u', sch.iobj('stats', axes).prop('fragment_length_mean'), '-d', sch.iobj('stats', axes).prop('fragment_length_stddev'), '-o', sch.ofile('clusters', axes))
     sch.commandline('breaks', axes, himem, cfg.predictbreaks_tool, '-s', sch.ifile('split.alignments', axes), '-c', sch.ifile('clusters', axes), '-r', cfg.genome_fasta, '-b', sch.ofile('breakpoints', axes))
-    sch.transform('results', axes, lowmem, compile_results, None, sch.ifile('simulated.info', axes), sch.ifile('breakpoints', axes), sch.ifile('clusters', axes), sch.ofile('identified', axes))
+    sch.transform('results', axes, lowmem, compile_results, None, sch.ifile('simulated.info', axes), sch.ifile('breakpoints', axes), sch.ifile('clusters', axes), sch.ofile('identified', axes), sch.ofile('classify', axes))
 
-    sch.transform('collate', (), lowmem, collate_results, None, sch.iobj('simulation.params', axes), sch.ifile('identified', axes), sch.output(args.results))
+    sch.transform('collate', (), lowmem, collate_results, None, sch.iobj('simulation.params', axes), sch.ifile('identified', axes), sch.ifile('classify', axes), sch.output(args.results))
 
     pyp.run()
 
@@ -102,10 +104,10 @@ else:
         return sim_params
 
 
-    def collate_results(sim_params, identified_filenames, results_filename):
+    def collate_results(sim_params, identified_filenames, classify_filenames, results_filename):
         with open(results_filename, 'w') as results_file:
             fields = list(set([field for sim in sim_params.values() for field in sim.keys()]))
-            results_file.write('\t'.join(['sim_id'] + fields + ['sensitivity_exact', 'sensitivity_approx', 'homology_sensitivity']) + '\n')
+            results_file.write('\t'.join(['sim_id'] + fields + ['sensitivity_exact', 'sensitivity_approx', 'homology_sensitivity', 'specificity']) + '\n')
             for sim_id in sim_params.keys():
                 results_file.write(str(sim_id) + '\t')
                 results_file.write('\t'.join((sim_params[sim_id][field] for field in fields)))
@@ -125,7 +127,15 @@ else:
                     sensitivity_exact = identified_exact / total
                     sensitivity_approx = identified_approx / total
                     homology_sensitivity = homology_identified / identified_exact
-                    results_file.write('\t' + '\t'.join([str(sensitivity_exact), str(sensitivity_approx), str(homology_sensitivity)]) + '\n')
+                with open(classify_filenames[sim_id], 'r') as classify_file:
+                    total_clusters = 0.0
+                    total_true = 0.0
+                    for row in csv.reader(classify_file, delimiter='\t'):
+                        total_clusters += 1.0
+                        if row[1] == '1':
+                            total_true += 1.0
+                    specificity = total_true / total_clusters
+                results_file.write('\t' + '\t'.join([str(sensitivity_exact), str(sensitivity_approx), str(homology_sensitivity), str(specificity)]) + '\n')
 
 
     def read_sim(input_file):
@@ -193,7 +203,7 @@ else:
         return False
 
 
-    def compile_results(sim_filename, breakpoints_filename, clusters_filename, identified_filename):
+    def compile_results(sim_filename, breakpoints_filename, clusters_filename, identified_filename, classify_filename):
         predictions = defaultdict(list)
         with open(breakpoints_filename, 'r') as breakpoints_file:
             for prediction_id, cluster_id, breakends in read_breakends(breakpoints_file):
@@ -206,19 +216,24 @@ else:
         with open(clusters_filename, 'r') as clusters_file:
             for cluster_id, region in read_cluster_regions(clusters_file):
                 cluster_regions[cluster_id] = region
-        with open(sim_filename, 'r') as sim_file, open(identified_filename, 'w') as identified_file:
+        with open(sim_filename, 'r') as sim_file, open(identified_filename, 'w') as identified_file, open(classify_filename, 'w') as classify_file:
+            true_cluster_ids = set()
             for sim_id, breakends, homology in read_sim(sim_file):
                 exact_cluster_id = 'N'
                 approx_cluster_id = 'N'
                 homology_correct = 'N'
                 for cluster_id in predictions[breakends]:
                     exact_cluster_id = cluster_id
+                    true_cluster_ids.add(cluster_id)
                     if predicted_homology[cluster_id] == homology:
                         homology_correct = 'Y'
                 for cluster_id, region in cluster_regions.iteritems():
                     if match(region, list(breakends)):
                         approx_cluster_id = cluster_id
+                        true_cluster_ids.add(approx_cluster_id)
                 identified_file.write('\t'.join((str(sim_id), str(exact_cluster_id), str(approx_cluster_id), homology_correct)) + '\n')
+            for cluster_id, region in cluster_regions.iteritems():
+                classify_file.write('\t'.join([str(cluster_id), str(int(cluster_id in true_cluster_ids))]) + '\n')
 
 
     class ConcordantReadStatsAccumulator(object):

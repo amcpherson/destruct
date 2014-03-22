@@ -106,7 +106,7 @@ if __name__ == '__main__':
         pyp.sch.commandline('gc_interval_'+lib_info.id, (), ctx_general, cfg.estimategc_tool, '-m', cfg.mappability_filename, '-g', cfg.genome_fasta,
                 '-c', pyp.sch.ifile('interval.readcounts.'+lib_info.id), '-i', '-o', '4', '-u', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_mean'), '-s', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_stddev'),
                 '-a', cfg.mappability_length, '-l', pyp.sch.ifile('gcloess.'+lib_info.id), '>', pyp.sch.ofile('interval.readcounts.lengths.'+lib_info.id))
-        pyp.sch.transform('solve_and_plot_'+lib_info.id, (), ctx_general, demix.solve_and_plot, None, cfg, lib_info.id,
+        pyp.sch.transform('solve_and_plot_'+lib_info.id, (), ctx_general, demix.solve_and_plot, None, lib_info.id,
                 pyp.sch.ifile('interval.readcounts.lengths.'+lib_info.id), pyp.sch.ifile('alleles.readcounts.{0}'.format(lib_info.id)),
                 pyp.sch.ofile('stats.{0}'.format(lib_info.id)), pyp.sch.ofile('preds.{0}'.format(lib_info.id)),
                 pyp.sch.ofile('plots.{0}'.format(lib_info.id)), cfg.plots_prefix)
@@ -525,7 +525,7 @@ def savefig_tar(tar, fig, filename):
     tar.addfile(tarinfo=info, fileobj=plot_buffer)
 
 
-def solve_and_plot(cfg, library_id, intervals_filename, alleles_filename, stats_filename, pred_filename, plots_tar_filename, plots_prefix):
+def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filename, pred_filename, plots_tar_filename, plots_prefix):
 
     with tarfile.open(plots_tar_filename, 'w') as plots_tar:
 
@@ -555,44 +555,38 @@ def solve_and_plot(cfg, library_id, intervals_filename, alleles_filename, stats_
         allele_data = allele_data.groupby(level=[0])[['hap_length', 'major_readcount', 'minor_readcount']].sum()
         interval_data = interval_data.merge(allele_data, left_index=True, right_index=True)
 
+        # Calculate coverages
+        interval_data['minor_cov'] = interval_data['minor_readcount'] / interval_data['hap_length']
+        interval_data['major_cov'] = interval_data['major_readcount'] / interval_data['hap_length']
+        interval_data['total_cov'] = interval_data['readcount'] / interval_data['length']
+        interval_data = interval_data.fillna(0.0)
+
+        # Classify as high or low confidence depending on length and haplotype length
+        interval_data['high_conf'] = 0
+        interval_data.loc[(interval_data['length'] > high_confidence_length) & (interval_data['hap_length'] > 0), 'high_conf'] = 1
+
+        # Split off the low confidence intervals
+        interval_data_low_conf = interval_data.loc[interval_data['high_conf'] == 0]
+        interval_data = interval_data.loc[interval_data['high_conf'] == 1]
+
+        # Sort by chromosome / position, required for variance estimates
+        interval_data = interval_data.sort(['chromosome1', 'position1'])
+
         # Obtain major and minor allele depth for high confidence intervals
-        minor = list()
-        major = list()
-        total = list()
-        lengths = list()
-        chrs = list()
-        minor_by_pos = OrderedDict()
-        major_by_pos = OrderedDict()
-        length_by_pos = OrderedDict()
-        starts = list()
-        ends = list()
-        for idx, row in interval_data.iterrows():
-            if row['length'] < high_confidence_length:
-                continue
-            if row['hap_length'] <= 0.0:
-                continue
-            minor.append(row['minor_readcount'] / row['hap_length'])
-            major.append(row['major_readcount'] / row['hap_length'])
-            total.append(row['readcount'] / row['length'])
-            lengths.append(row['length'])
-            chrs.append(row['chromosome1'])
-            minor_by_pos[(row['chromosome1'], row['position1'])] = minor[-1]
-            major_by_pos[(row['chromosome1'], row['position1'])] = major[-1]
-            length_by_pos[(row['chromosome1'], row['position1'])] = lengths[-1]
-            starts.append(row['position1'])
-            ends.append(row['position2'])
-        minor = np.array(minor)
-        major = np.array(major)
-        total = np.array(total)
-        lengths = np.array(lengths)
+        minor = interval_data['minor_cov'].values
+        major = interval_data['major_cov'].values
+        total = interval_data['total_cov'].values
+
+        # Other parameters from high confidence intervals
+        chrs = interval_data['chromosome1'].values
+        starts = interval_data['position1'].values
+        ends = interval_data['position2'].values
+        lengths = interval_data['length'].values
 
         # Calculate difference between adjacent intervals
-        minor_adj = np.array(minor_by_pos.values())
-        major_adj = np.array(major_by_pos.values())
-        length_adj = np.array(length_by_pos.values())
-        minor_sq_diffs = np.square(minor_adj[1:] - minor_adj[:-1])
-        major_sq_diffs = np.square(major_adj[1:] - major_adj[:-1])
-        length_sums = length_adj[1:] + length_adj[:-1]
+        minor_sq_diffs = np.square(minor[1:] - minor[:-1])
+        major_sq_diffs = np.square(major[1:] - major[:-1])
+        length_sums = lengths[1:] + lengths[:-1]
 
         # Resample squared differences by sum of lengths of adjacent intervals
         samples_length_sums = np.array(list(itertools.chain(*[itertools.repeat(idx, cnt) for idx, cnt in enumerate(np.random.multinomial(100000, length_sums / length_sums.sum()))])))
@@ -633,11 +627,11 @@ def solve_and_plot(cfg, library_id, intervals_filename, alleles_filename, stats_
         tumour_means = means[weight_filter & (means != normal_mean)] - normal_mean
         unique_tumour_means = np.unique(np.around(tumour_means, 6))
         unique_tumour_means = unique_tumour_means[unique_tumour_means > 0.0]
-        haploid_coverage_candidates = np.concatenate((unique_tumour_means, 0.5*unique_tumour_means))
+        haploid_tumour_candidates = np.concatenate((unique_tumour_means, 0.5*unique_tumour_means))
 
         # Fallback if no significant second mode
-        if len(haploid_coverage_candidates) == 0:
-            haploid_coverage_candidates = np.array([normal_mean * 0.5])
+        if len(haploid_tumour_candidates) == 0:
+            haploid_tumour_candidates = np.array([normal_mean * 0.5])
 
         # Plot raw alleles density with GMM modes
         fig = plt.figure(figsize=(16,8))
@@ -660,21 +654,21 @@ def solve_and_plot(cfg, library_id, intervals_filename, alleles_filename, stats_
         plt.clf()
 
         model_probs = list()
-        normal_contams = list()
-        haploid_coverages = list()
+        haploid_normals = list()
+        haploid_tumours = list()
         subclone_freqs = list()
         avg_zs = list()
         preds = list()
 
         # Iterate over potential haploid coverage candidates
-        for candidate_mean in haploid_coverage_candidates:
+        for candidate_mean in haploid_tumour_candidates:
 
             # Estimate normal contamination and haploid tumour coverage
-            model_prob, normal_contam, haploid_coverage, subclone_freq, avg_z, pred = subclonal_sampling.estimate_model_prob(major, minor, lengths, normal_mean, candidate_mean, major_variance_estimate, minor_variance_estimate)
+            model_prob, haploid_normal, haploid_tumour, subclone_freq, avg_z, pred = subclonal_sampling.estimate_model_prob(major, minor, lengths, normal_mean, candidate_mean, major_variance_estimate, minor_variance_estimate)
 
             model_probs.append(model_prob)
-            normal_contams.append(normal_contam)
-            haploid_coverages.append(haploid_coverage)
+            haploid_normals.append(haploid_normal)
+            haploid_tumours.append(haploid_tumour)
             subclone_freqs.append(subclone_freq)
             avg_zs.append(avg_z)
             preds.append(pred)
@@ -686,7 +680,7 @@ def solve_and_plot(cfg, library_id, intervals_filename, alleles_filename, stats_
         filtered = list(range(len(model_probs)))
         for idx1 in xrange(len(model_probs)):
             for idx2 in xrange(len(model_probs)):
-                if close_enough(normal_contams[idx1], normal_contams[idx2]) and close_enough(haploid_coverages[idx1], haploid_coverages[idx2]) and model_probs[idx1] > model_probs[idx2]:
+                if close_enough(haploid_normals[idx1], haploid_normals[idx2]) and close_enough(haploid_tumours[idx1], haploid_tumours[idx2]) and model_probs[idx1] > model_probs[idx2]:
                     try:
                         filtered.remove(idx2)
                     except:
@@ -694,23 +688,23 @@ def solve_and_plot(cfg, library_id, intervals_filename, alleles_filename, stats_
 
         # Filter non unique predictions
         model_probs = np.array(model_probs)[filtered]
-        normal_contams = np.array(normal_contams)[filtered]
-        haploid_coverages = np.array(haploid_coverages)[filtered]
+        haploid_normals = np.array(haploid_normals)[filtered]
+        haploid_tumours = np.array(haploid_tumours)[filtered]
         subclone_freqs = np.array(subclone_freqs)[filtered]
         avg_zs = np.array(avg_zs)[filtered]
-        pred = np.array(preds)[filtered]
+        preds = np.array(preds)[filtered]
 
         stats_tables = list()
         preds_tables = list()
 
-        for candidate_idx, (model_prob, normal_contam, haploid_coverage, subclone_freq, avg_z, pred) in enumerate(zip(model_probs, normal_contams, haploid_coverages, subclone_freqs, avg_zs, preds)):
+        for candidate_idx, (model_prob, haploid_normal, haploid_tumour, subclone_freq, avg_z, pred) in enumerate(zip(model_probs, haploid_normals, haploid_tumours, subclone_freqs, avg_zs, preds)):
 
             # Shift modes by estimated normal contamination and scale by haploid coverage
-            tumour_minor_samples = (minor_samples - normal_contam) / haploid_coverage
-            tumour_major_samples = (major_samples - normal_contam) / haploid_coverage
-            tumour_depth_max = (depth_max - normal_contam) / haploid_coverage
-            tumour_minor = (minor - normal_contam) / haploid_coverage
-            tumour_major = (major - normal_contam) / haploid_coverage
+            tumour_minor_samples = (minor_samples - haploid_normal) / haploid_tumour
+            tumour_major_samples = (major_samples - haploid_normal) / haploid_tumour
+            tumour_depth_max = (depth_max - haploid_normal) / haploid_tumour
+            tumour_minor = (minor - haploid_normal) / haploid_tumour
+            tumour_major = (major - haploid_normal) / haploid_tumour
 
             # Extract predictions
             pred_major = pred[0]
@@ -769,20 +763,46 @@ def solve_and_plot(cfg, library_id, intervals_filename, alleles_filename, stats_
             major_size = np.sum(tumour_major * lengths) * 3e9 / np.sum(lengths)
 
             # Create stats table
-            stats = pd.DataFrame({'library_id':[library_id], 'candidate_id':[candidate_idx], 'likelihood':[model_prob], 'normal_contam':[normal_contam], 'haploid_coverage':[haploid_coverage], 'minor_size':[minor_size], 'major_size':[major_size]})
-            stats['tumour_cell_proportion'] = stats['haploid_coverage'] / (stats['haploid_coverage'] + stats['normal_contam'])
+            stats = pd.DataFrame({'library_id':[library_id]})
+            stats['candidate_id'] = candidate_idx
+            stats['likelihood'] = model_prob
+            stats['haploid_normal'] = haploid_normal
+            stats['haploid_tumour'] = haploid_tumour
+            stats['minor_size'] = minor_size
+            stats['major_size'] = major_size
+            stats['minor_variance'] = minor_variance_estimate
+            stats['major_variance'] = major_variance_estimate
+            stats['tumour_cell_proportion'] = stats['haploid_tumour'] / (stats['haploid_tumour'] + stats['haploid_normal'])
             stats['normal_cell_proportion'] = 1.0 - stats['tumour_cell_proportion']
             stats['subclone_frequency'] = subclone_freq
-            stats = stats[['library_id', 'candidate_id', 'likelihood', 'normal_contam', 'haploid_coverage', 'minor_size', 'major_size', 'tumour_cell_proportion', 'normal_cell_proportion', 'subclone_frequency']]
             stats_tables.append(stats)
 
             # Create copy number predictions
             preds = pd.DataFrame({'chr':chrs, 'start':starts, 'end':ends, 'length':lengths, 'major_raw':tumour_major, 'minor_raw':tumour_minor, 'major':pred_major, 'minor':pred_minor, 'major_sub':pred_major_sub, 'minor_sub':pred_minor_sub, 'subclonal':avg_z})
+            preds['high_conf'] = 1
+
+            # Predictions for low confidence intervals
+            low_conf_preds = list()
+            for idx, row in interval_data_low_conf.iterrows():
+                low_conf_preds.append(subclonal_sampling.max_major_minor_posterior(row['major_cov'], row['minor_cov'], haploid_normal, haploid_tumour, 0.0, major_variance_estimate, minor_variance_estimate))
+            low_conf_preds = pd.DataFrame(low_conf_preds, columns=['major', 'minor', 'major_sub', 'minor_sub'])
+            low_conf_preds['chr'] = interval_data_low_conf['chromosome1'].values
+            low_conf_preds['start'] = interval_data_low_conf['position1'].values
+            low_conf_preds['end'] = interval_data_low_conf['position2'].values
+            low_conf_preds['length'] = interval_data_low_conf['length'].values
+            low_conf_preds['major_raw'] = ((interval_data_low_conf['major_cov'] - haploid_normal) / haploid_tumour).values
+            low_conf_preds['minor_raw'] = ((interval_data_low_conf['minor_cov'] - haploid_normal) / haploid_tumour).values
+            low_conf_preds['high_conf'] = 0
+
+            # Combine low and high confidence
+            preds = pd.concat([preds, low_conf_preds], axis=0, ignore_index=True).sort(['chr', 'start'])
+
+            # Add lib id and candidate id and append to list of tables
             preds['library_id'] = library_id
             preds['candidate_id'] = candidate_idx
-            preds = preds[['library_id', 'candidate_id', 'chr', 'start', 'end', 'length', 'major', 'minor', 'major_sub', 'minor_sub', 'subclonal', 'major_raw', 'minor_raw']]
+            preds = preds[['library_id', 'candidate_id', 'chr', 'start', 'end', 'length', 'major', 'minor', 'major_sub', 'minor_sub', 'subclonal', 'major_raw', 'minor_raw', 'high_conf']]
             preds_tables.append(preds)
 
-        pd.concat(stats_tables, ignore_index=True).to_csv(stats_filename, sep='\t', index=False, header=True)
-        pd.concat(preds_tables, ignore_index=True).to_csv(pred_filename, sep='\t', index=False, header=True)
+        pd.concat(stats_tables, ignore_index=True).to_csv(stats_filename, sep='\t', na_rep='NA', index=False, header=True)
+        pd.concat(preds_tables, ignore_index=True).to_csv(pred_filename, sep='\t', na_rep='NA', index=False, header=True)
 

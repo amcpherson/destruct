@@ -13,7 +13,9 @@ from collections import *
 import pygenes
 import pypeliner
 
-__version__ = '0.0.4'
+import score_stats
+
+__version__ = '0.1.0'
 
 if __name__ == '__main__':
 
@@ -118,7 +120,7 @@ else:
         sch.commandline('aligntrue', axes, medmem, cfg.aligntrue_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-r', cfg.genome_fasta, '-a', sch.ifile('sample.sam', axes), '>', sch.ofile('samples.align.true', axes))
         sch.commandline('prepsample', axes, medmem, 'cat', sch.ifile('sample1', axes), sch.ifile('sample2', axes), '>', sch.ofile('sample', axes))
         sch.commandline('alignnull', axes, medmem, cfg.bowtie2_bin, '--very-sensitive', '-k', '2', '-x', cfg.genome_fasta, sch.ifile('sample', axes), '|', cfg.alignnull_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-c', sch.ifile('sample.sam', axes), '-a', '-', '-s', sch.ifile('sample', axes), '-r', cfg.genome_fasta, '>', sch.ofile('samples.align.null', axes))
-        sch.commandline('scorestats', axes, medmem, cfg.rscript_bin, cfg.score_stats_rscript, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), cfg.match_score, sch.ofile('score.stats', axes))
+        sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), int(cfg.match_score), sch.ofile('score.stats', axes))
 
 
     def align_reads(sch, cfg, axes):
