@@ -8,6 +8,7 @@ import itertools
 import subprocess
 import argparse
 import string
+import tarfile
 from collections import *
 
 import pygenes
@@ -27,13 +28,14 @@ if __name__ == '__main__':
     argparser.add_argument('libraries', help='Libraries list filename')
     argparser.add_argument('breakpoints', help='Breakpoints table filename')
     argparser.add_argument('breakreads', help='Breakpoint reads table filename')
+    argparser.add_argument('plots_tar', help='Diagnostic plots tar filename')
 
     cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
     pyp = pypeliner.easypypeliner.EasyPypeliner([destruct], cfg)
 
     pyp.sch.transform('readlibs', (), destruct.lowmem, destruct.link_libraries, None, cfg.libraries, pyp.sch.ofile('bam', ('bylibrary',)))
 
-    destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads))
+    destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads), pyp.sch.output(cfg.plots_tar))
 
     pyp.run()
 
@@ -43,7 +45,7 @@ else:
     medmem = {'mem':8}
     himem = {'mem':32}
 
-    def multilib_predict_breakpoints(sch, cfg, bams, breakpoints, breakreads):
+    def multilib_predict_breakpoints(sch, cfg, bams, breakpoints, breakreads, plots_tar):
 
         '''
         inputs: 'bam', ('bylibrary',)
@@ -75,6 +77,8 @@ else:
         sch.commandline('sortreads', (), medmem, 'sort', '-n', sch.ifile('breakreads.table.unsorted'), '>', breakreads)
 
         sch.transform('tabulate', (), himem, multilib_tabulate, None, breakpoints, sch.ifile('clusters.filtered'), sch.ifile('clusters.prob'), sch.ifile('clusters.nodup'), sch.ifile('breakpoints'), cfg.genome_fasta, cfg.gtf_filename, cfg.dgv_filename, sch.ifile('cycles'), sch.iobj('stats', ('bylibrary',)))
+        
+        sch.transform('merge_plots', (), lowmem, merge_tars, None, plots_tar, sch.ifile('score.stats.plots', ('bylibrary',)))
 
 
     def split_align_merge(sch, cfg, axes):
@@ -120,7 +124,7 @@ else:
         sch.commandline('aligntrue', axes, medmem, cfg.aligntrue_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-r', cfg.genome_fasta, '-a', sch.ifile('sample.sam', axes), '>', sch.ofile('samples.align.true', axes))
         sch.commandline('prepsample', axes, medmem, 'cat', sch.ifile('sample1', axes), sch.ifile('sample2', axes), '>', sch.ofile('sample', axes))
         sch.commandline('alignnull', axes, medmem, cfg.bowtie2_bin, '--very-sensitive', '-k', '2', '-x', cfg.genome_fasta, sch.ifile('sample', axes), '|', cfg.alignnull_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-c', sch.ifile('sample.sam', axes), '-a', '-', '-s', sch.ifile('sample', axes), '-r', cfg.genome_fasta, '>', sch.ofile('samples.align.null', axes))
-        sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), int(cfg.match_score), sch.ofile('score.stats', axes))
+        sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), int(cfg.match_score), sch.ofile('score.stats', axes), sch.ofile('score.stats.plots', axes), sch.inst('bylibrary'))
 
 
     def align_reads(sch, cfg, axes):
@@ -639,3 +643,13 @@ else:
                 breakpoint_info = breakpoint_infos.get(cluster_id, (0, 0, 0, None))
                 cycle_info = cycle_infos.get(cluster_id, ('NA', []))
                 clusters_table_file.write(clusters_table_row(lib_names, cluster_id, cluster_info, probs, setcover_ratio, breakpoint_info, dgv_info, cycle_info, sequences, gene_models))
+
+
+    def merge_tars(output_filename, score_stats_plots):
+        with tarfile.open(output_filename, 'w') as output_tar:
+            for input_filename in score_stats_plots.itervalues():
+                with tarfile.open(input_filename, 'r') as in_tar:
+                    for tarinfo in in_tar:
+                        output_tar.addfile(tarinfo, in_tar.extractfile(tarinfo))
+
+

@@ -23,6 +23,7 @@ if __name__ == '__main__':
     argparser.add_argument('libraries', help='Libraries list filename')
     argparser.add_argument('breakpoints', help='Breakpoints table filename')
     argparser.add_argument('breakreads', help='Breakpoint reads table filename')
+    argparser.add_argument('plots_tar', help='Diagnostic plots tar filename')
 
     cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
     pyp = pypeliner.easypypeliner.EasyPypeliner([], cfg)
@@ -47,7 +48,7 @@ if __name__ == '__main__':
 
     pyp.sch.transform('readlibs', (), destruct.lowmem, destruct_genesis.read_libraries, pyp.sch.oobj('bamremote', ('bylibrary',)), pyp.sch.input(cfg.libraries))
     pyp.sch.commandline('copybam', ('bylibrary',), txfer, 'cp', pyp.sch.iobj('bamremote', ('bylibrary',)), pyp.sch.ofile('bam', ('bylibrary',)))
-    destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads))
+    destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads), pyp.sch.output(cfg.plots_tar))
 
     pyp.run()
 
