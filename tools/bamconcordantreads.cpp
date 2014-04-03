@@ -81,24 +81,33 @@ struct SNPInfo
 
 struct AlleleReader : PileupVisitor, DiscardAlignmentVisitor
 {
-	AlleleReader(ostream& readsFile, ostream& allelesFile, int maxFragmentLength, int maxSoftClipped) : mReadsFile(readsFile), mAllelesFile(allelesFile), mMaxFragmentLength(maxFragmentLength), mMaxSoftClipped(maxSoftClipped), mSNPStageRefID(-1), mNextReadID(0)
-	{}
-	
-	void Read(BamReader& bamReader, const string& snpFilename)
+	AlleleReader(BamReader& bamReader, ostream& readsFile, ostream& allelesFile, int maxFragmentLength, int maxSoftClipped)
+		: mBamReader(bamReader),
+		  mReadsFile(readsFile),
+		  mAllelesFile(allelesFile),
+		  mMaxFragmentLength(maxFragmentLength),
+		  mMaxSoftClipped(maxSoftClipped),
+		  mSNPStageRefID(-1),
+		  mNextReadID(0)
 	{
 		// Fill list of reference names, create map from name to index
-		mRefNames.clear();
-		unordered_map<string,int> mRefIDMap;
 		for (int refID = 0; refID < bamReader.GetReferenceCount(); refID++)
 		{
 			mRefNames.push_back(bamReader.GetReferenceData()[refID].RefName);
 			mRefIDMap[bamReader.GetReferenceData()[refID].RefName] = refID;
 		}
 		
+		// SNPs table is indexed by bam ref id
+		mSNPs.resize(mRefNames.size());
+	}
+
+	void ReadSNPs(const string& snpFilename)
+	{
 		// Read list of snps
 		ifstream snpFile(snpFilename.c_str());
 		CheckFile(snpFile, snpFilename);
 		
+		// SNPs table is indexed by bam ref id
 		mSNPs.clear();
 		mSNPs.resize(mRefNames.size());
 		
@@ -130,18 +139,22 @@ struct AlleleReader : PileupVisitor, DiscardAlignmentVisitor
 			mSNPs[refIDIter->second].push_back(snp);
 		}
 		
+		// Sorting required for streaming 
 		for (int refID = 0; refID < mSNPs.size(); refID++)
 		{
 			sort(mSNPs[refID].begin(), mSNPs[refID].end());
 		}
-		
+	}
+	
+	void ProcessBam()
+	{
 		PileupEngine pileupEngine;
 		
 		pileupEngine.AddVisitor(dynamic_cast<PileupVisitor*>(this));
 		pileupEngine.AddVisitor(dynamic_cast<DiscardAlignmentVisitor*>(this));
 		
 		BamAlignment alignment;
-		while (bamReader.GetNextAlignment(alignment))
+		while (mBamReader.GetNextAlignment(alignment))
 		{
 			// Classify reads pairs as discordant and ignore
 			if (IsReadPairDiscordant(alignment, mMaxFragmentLength))
@@ -334,6 +347,7 @@ struct AlleleReader : PileupVisitor, DiscardAlignmentVisitor
 		mReadID[GetReadEnd(alignment)].erase(alignment.Name);
 	}
 	
+	BamReader& mBamReader;
 	ostream& mReadsFile;
 	ostream& mAllelesFile;
 	
@@ -341,6 +355,7 @@ struct AlleleReader : PileupVisitor, DiscardAlignmentVisitor
 	int mMaxSoftClipped;
 	
 	vector<string> mRefNames;
+	unordered_map<string,int> mRefIDMap;
 	
 	deque<BamAlignment> mReadQueue;
 	unordered_map<string,BamAlignment> mReadBuffer[2];
@@ -370,7 +385,7 @@ int main(int argc, char* argv[])
 	{
 		TCLAP::CmdLine cmd("Bam Concordant Read Extractor");
 		TCLAP::ValueArg<string> bamFilenameArg("b","bam","Bam Filename",true,"","string",cmd);
-		TCLAP::ValueArg<string> snpFilenameArg("s","snp","SNP Filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> snpFilenameArg("s","snp","SNP Filename",false,"","string",cmd);
 		TCLAP::ValueArg<int> maxFragmentLengthArg("","flen","Maximum Fragment Length",false,1000,"integer",cmd);
 		TCLAP::ValueArg<int> maxSoftClippedArg("","clipmax","Maximum Allowable Soft Clipped",false,8,"integer",cmd);
 		TCLAP::ValueArg<string> chromosomeArg("c","chr","Restrict to Specific Chromosome",true,"","string",cmd);
@@ -425,9 +440,14 @@ int main(int argc, char* argv[])
 	readsFilter.component<iostreams::gzip_compressor>(0)->write(readsFile, &dummy, 0);
 	allelesFilter.component<iostreams::gzip_compressor>(0)->write(allelesFile, &dummy, 0);
 	
-	AlleleReader alleleReader(readsFilter, allelesFilter, maxFragmentLength, maxSoftClipped);
+	AlleleReader alleleReader(bamReader, readsFilter, allelesFilter, maxFragmentLength, maxSoftClipped);
+
+	if (!snpFilename.empty())
+	{
+		alleleReader.ReadSNPs(snpFilename);
+	}
 	
-	alleleReader.Read(bamReader, snpFilename);
+	alleleReader.ProcessBam();
 }
 
 

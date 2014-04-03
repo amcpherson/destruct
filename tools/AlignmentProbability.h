@@ -28,6 +28,7 @@ private:
 	DoubleMap mNBProbTrue;
 	DoubleMap mNBSizeInvalid;
 	DoubleMap mNBProbInvalid;
+	unordered_map<int,pair<double,int> > mProbTrueMode;
 };
 
 

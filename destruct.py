@@ -8,12 +8,16 @@ import itertools
 import subprocess
 import argparse
 import string
+import tarfile
 from collections import *
+import pandas as pd
+import matplotlib.pyplot as plt
 
 import pygenes
 import pypeliner
 
 import score_stats
+import utils.plots
 
 __version__ = '0.1.0'
 
@@ -27,13 +31,14 @@ if __name__ == '__main__':
     argparser.add_argument('libraries', help='Libraries list filename')
     argparser.add_argument('breakpoints', help='Breakpoints table filename')
     argparser.add_argument('breakreads', help='Breakpoint reads table filename')
+    argparser.add_argument('plots_tar', help='Diagnostic plots tar filename')
 
     cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
     pyp = pypeliner.easypypeliner.EasyPypeliner([destruct], cfg)
 
     pyp.sch.transform('readlibs', (), destruct.lowmem, destruct.link_libraries, None, cfg.libraries, pyp.sch.ofile('bam', ('bylibrary',)))
 
-    destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads))
+    destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads), pyp.sch.output(cfg.plots_tar))
 
     pyp.run()
 
@@ -43,7 +48,7 @@ else:
     medmem = {'mem':8}
     himem = {'mem':32}
 
-    def multilib_predict_breakpoints(sch, cfg, bams, breakpoints, breakreads):
+    def multilib_predict_breakpoints(sch, cfg, bams, breakpoints, breakreads, plots_tar):
 
         '''
         inputs: 'bam', ('bylibrary',)
@@ -75,6 +80,8 @@ else:
         sch.commandline('sortreads', (), medmem, 'sort', '-n', sch.ifile('breakreads.table.unsorted'), '>', breakreads)
 
         sch.transform('tabulate', (), himem, multilib_tabulate, None, breakpoints, sch.ifile('clusters.filtered'), sch.ifile('clusters.prob'), sch.ifile('clusters.nodup'), sch.ifile('breakpoints'), cfg.genome_fasta, cfg.gtf_filename, cfg.dgv_filename, sch.ifile('cycles'), sch.iobj('stats', ('bylibrary',)))
+        
+        sch.transform('merge_plots', (), lowmem, merge_tars, None, plots_tar, sch.ifile('score.stats.plots', ('bylibrary',)), sch.ifile('flen.plots', ('bylibrary',)))
 
 
     def split_align_merge(sch, cfg, axes):
@@ -104,7 +111,7 @@ else:
 
         sch.commandline('bamdisc', axes, medmem, cfg.bamdiscordantfastq_tool, '-r', '-c', cfg.bam_max_soft_clipped, '-f', cfg.bam_max_fragment_length, '-b', bams, '-s', sch.ofile('stats.file', axes), '-1', sch.ofile('reads1.unfiltered', axes), '-2', sch.ofile('reads2.unfiltered', axes), '-t', sch.tmpfile('bamdisc.tempspace', axes))
         sch.commandline('bamsample', axes, medmem, cfg.bamsamplefastq_tool, '-r', '-b', bams, '-n', cfg.num_read_samples, '-1', sch.ofile('sample1.unfiltered', axes), '-2', sch.ofile('sample2.unfiltered', axes))
-        sch.transform('readstats', axes, lowmem, read_stats, sch.oobj('stats', axes), sch.ifile('stats.file', axes))
+        sch.transform('readstats', axes, lowmem, read_stats, sch.oobj('stats', axes), sch.ifile('stats.file', axes), sch.ofile('flen.plots', axes), sch.inst('bylibrary'))
         sch.commandline('qtrimdisc', axes, lowmem, cfg.qualtrimfastq_tool, '-o', cfg.base_quality_offset, '-l', '36', '-q', '5', sch.ifile('reads1.unfiltered', axes), sch.ifile('reads2.unfiltered', axes), sch.ofile('reads1', axes), sch.ofile('reads2', axes))
         sch.commandline('qtrimsample', axes, lowmem, cfg.qualtrimfastq_tool, '-o', cfg.base_quality_offset, '-l', '36', '-q', '5', sch.ifile('sample1.unfiltered', axes), sch.ifile('sample2.unfiltered', axes), sch.ofile('sample1', axes), sch.ofile('sample2', axes))
 
@@ -120,7 +127,7 @@ else:
         sch.commandline('aligntrue', axes, medmem, cfg.aligntrue_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-r', cfg.genome_fasta, '-a', sch.ifile('sample.sam', axes), '>', sch.ofile('samples.align.true', axes))
         sch.commandline('prepsample', axes, medmem, 'cat', sch.ifile('sample1', axes), sch.ifile('sample2', axes), '>', sch.ofile('sample', axes))
         sch.commandline('alignnull', axes, medmem, cfg.bowtie2_bin, '--very-sensitive', '-k', '2', '-x', cfg.genome_fasta, sch.ifile('sample', axes), '|', cfg.alignnull_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-c', sch.ifile('sample.sam', axes), '-a', '-', '-s', sch.ifile('sample', axes), '-r', cfg.genome_fasta, '>', sch.ofile('samples.align.null', axes))
-        sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), int(cfg.match_score), sch.ofile('score.stats', axes))
+        sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), int(cfg.match_score), sch.ofile('score.stats', axes), sch.ofile('score.stats.plots', axes), sch.inst('bylibrary'))
 
 
     def align_reads(sch, cfg, axes):
@@ -168,11 +175,21 @@ else:
             return int(self.fragment_length_mean + 3 * self.fragment_length_stddev)
 
 
-    def read_stats(stats_filename):
-        with open(stats_filename, 'r') as stats_file:
-            header = stats_file.readline().rstrip().split('\t')
-            values = stats_file.readline().rstrip().split('\t')
-            return ConcordantReadStats(dict(zip(header,values)))
+    def read_stats(stats_filename, plots_tar_filename, library_id):
+        stats = pd.read_csv(stats_filename, sep='\t')
+        flen_stats = stats.loc[stats['type'] == 'fragment_length'].drop('type', axis=1)
+        flen_stats = flen_stats.astype(float)
+        fragment_count = flen_stats['value'].sum()
+        fragment_mean = (flen_stats['key'] * flen_stats['value']).sum() / fragment_count
+        fragment_variance = ((flen_stats['key'] - fragment_mean) * (flen_stats['key'] - fragment_mean) * flen_stats['value']).sum() / (fragment_count - 1)
+        fragment_stddev = fragment_variance**0.5
+        with tarfile.open(plots_tar_filename, 'w') as plots_tar:
+            fig = plt.figure(figsize=(8,8))
+            utils.plots.filled_density_weighted(plt.gca(), flen_stats['key'].values, flen_stats['value'].values, 'b', 0.5, 0, flen_stats['key'].max(), 4)
+            plt.title('fragment lengths for library {0}'.format(library_id))
+            utils.plots.savefig_tar(plots_tar, fig, 'fragment_length_{0}.pdf'.format(library_id))
+            plt.clf()
+        return ConcordantReadStats({'fragment_mean':fragment_mean, 'fragment_stddev':fragment_stddev})
 
 
     def split_file_byline(in_filename, lines_per_file, out_filename_callback):
@@ -395,6 +412,7 @@ else:
             header += 'break_' + cluster_end + '\t'
         for lib_name in lib_names:
             header += lib_name + '_count' + '\t'
+        header += 'exact_break' + '\t'
         header += 'align_prob' + '\t'
         header += 'chimeric_prob' + '\t'
         header += 'valid_prob' + '\t'
@@ -414,6 +432,13 @@ else:
 
 
     def clusters_table_row(lib_names, cluster_id, cluster_info, probs, setcover_ratio, breakpoint_info, dgv_info, cycle_info, sequences, gene_models):
+        exact_break = 1
+        break_positions = breakpoint_info[3]
+        if break_positions is None:
+            exact_break = 0
+            break_positions = []
+            for cluster_end in (0, 1):
+                break_positions.append((cluster_info[0][cluster_end].start, cluster_info[0][cluster_end].end)[cluster_info[0][cluster_end].strand == '+'])
         row = cluster_id + '\t'
         for cluster_end in (0, 1):
             row += cluster_info[0][cluster_end].chromosome + '\t'
@@ -432,9 +457,10 @@ else:
             row += gene_id + '\t'
             row += gene_name + '\t'
             row += gene_location + '\t'
-            row += str(breakpoint_info[3][cluster_end]) + '\t'
+            row += str(break_positions[cluster_end]) + '\t'
         for lib_name in lib_names:
             row += str(cluster_info[1].get(lib_name, 0)) + '\t'
+        row += str(exact_break) + '\t'
         row += str(probs[cluster_id][0]) + '\t'
         row += str(probs[cluster_id][1]) + '\t'
         row += str(probs[cluster_id][2]) + '\t'
@@ -627,6 +653,17 @@ else:
             clusters_table_file.write(clusters_table_header(lib_names))
             for cluster_id, cluster_info in cluster_infos.iteritems():
                 setcover_ratio = setcover_ratios[cluster_id]
-                breakpoint_info = breakpoint_infos.get(cluster_id, (0, 0, 0, ('NA', 'NA')))
+                breakpoint_info = breakpoint_infos.get(cluster_id, (0, 0, 0, None))
                 cycle_info = cycle_infos.get(cluster_id, ('NA', []))
                 clusters_table_file.write(clusters_table_row(lib_names, cluster_id, cluster_info, probs, setcover_ratio, breakpoint_info, dgv_info, cycle_info, sequences, gene_models))
+
+
+    def merge_tars(output_filename, *input_filename_sets):
+        with tarfile.open(output_filename, 'w') as output_tar:
+            for input_filenames in input_filename_sets:
+                for input_filename in input_filenames.itervalues():
+                    with tarfile.open(input_filename, 'r') as in_tar:
+                        for tarinfo in in_tar:
+                            output_tar.addfile(tarinfo, in_tar.extractfile(tarinfo))
+
+
