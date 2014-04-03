@@ -61,7 +61,8 @@ if __name__ == '__main__':
 
     sch.transform('prepseed', axes, medmem, prepare_seed_fastq, None, sch.ifile('reads1', axes), sch.ifile('reads2', axes), 36, sch.ofile('reads.seed', axes))
     sch.commandline('prepreads', axes, medmem, 'cat', sch.ifile('reads1', axes), sch.ifile('reads2', axes), '>', sch.ofile('reads', axes))
-    sch.commandline('bwtseed', axes, medmem, cfg.bowtie_bin, cfg.genome_fasta, sch.ifile('reads.seed', axes), '--chunkmbs', '512', '-k', '1000', '-m', '1000', '--strata', '--best', '-S', '>', sch.ofile('reads.seed.sam', axes))
+    sch.commandline('mrsfastseed', axes, medmem, cfg.mrsfast_bin, '--search', cfg.genome_fasta, '--seq', sch.ifile('reads.seed', axes), '-n', '1000', '--disable-sam-header', '-o', sch.ofile('reads.seed.unsorted.sam', axes))
+    sch.commandline('sortmrsfast', axes, medmem, 'sort', '-t', '/', '-k' '1,1', '-n', sch.ifile('reads.seed.unsorted.sam', axes), '>', sch.ofile('reads.seed.sam', axes))
     sch.commandline('realign', axes, medmem, cfg.realign2_tool, '-a', sch.ifile('reads.seed.sam', axes), '-s', sch.ifile('reads', axes), '-r', cfg.genome_fasta, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmin', sch.iobj('stats', axes).prop('fragment_length_min'), '--flmax', sch.iobj('stats', axes).prop('fragment_length_max'), '--tchimer', cfg.chimeric_threshold, '--talign', cfg.alignment_threshold, '--pchimer', cfg.chimeric_prior, '--pvalid', cfg.readvalid_prior, '--tvalid', cfg.readvalid_threshold, '-z', sch.ifile('score.stats', axes), '--span', sch.ofile('spanning.alignments', axes), '--split', sch.ofile('split.alignments', axes))
 
     sch.transform('eval_span_align', axes, medmem, eval_span_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('spanning.alignments', axes), sch.ofile('spanning.alignments.anno', axes), sch.ofile('spanning.alignments.eval', axes))

@@ -130,6 +130,10 @@ if __name__ == '__main__':
         pypeliner.commandline.execute(cfg.bowtie2_build_bin, cfg.genome_fasta, cfg.genome_fasta)
     auto_sentinal.run(bowtie2_build)
 
+    def mrsfast_index():
+        pypeliner.commandline.execute(cfg.mrsfast_bin, '--index', cfg.genome_fasta)
+    auto_sentinal.run(mrsfast_index)
+
     def samtools_faidx():
         pypeliner.commandline.execute(cfg.samtools_bin, 'faidx', cfg.genome_fasta)
     auto_sentinal.run(samtools_faidx)
