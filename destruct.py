@@ -10,6 +10,7 @@ import argparse
 import string
 import tarfile
 from collections import *
+import pandas as pd
 
 import pygenes
 import pypeliner
@@ -173,10 +174,14 @@ else:
 
 
     def read_stats(stats_filename):
-        with open(stats_filename, 'r') as stats_file:
-            header = stats_file.readline().rstrip().split('\t')
-            values = stats_file.readline().rstrip().split('\t')
-            return ConcordantReadStats(dict(zip(header,values)))
+        stats = pd.read_csv(stats_filename, sep='\t')
+        flen_stats = stats.loc[stats['type'] == 'fragment_length'].drop('type', axis=1)
+        flen_stats = flen_stats.astype(float)
+        fragment_count = flen_stats['value'].sum()
+        fragment_mean = (flen_stats['key'] * flen_stats['value']).sum() / fragment_count
+        fragment_variance = ((flen_stats['key'] - fragment_mean) * (flen_stats['key'] - fragment_mean) * flen_stats['value']).sum() / (fragment_count - 1)
+        fragment_stddev = fragment_variance**0.5
+        return ConcordantReadStats({'fragment_mean':fragment_mean, 'fragment_stddev':fragment_stddev})
 
 
     def split_file_byline(in_filename, lines_per_file, out_filename_callback):
