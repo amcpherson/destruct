@@ -39,6 +39,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('config', help='Configuration filename')
+    parser.add_argument('-d', '--demix', action='store_true', help='Download additional demix data')
     args = parser.parse_args()
 
     args.config = os.path.abspath(args.config)
@@ -65,6 +66,7 @@ if __name__ == '__main__':
         pass
 
     auto_sentinal = AutoSentinal(cfg.dataset_directory + '/sentinal.')
+
 
     def wget_genome_fasta():
         assembly_prefix = cfg.dataset_directory + '/dna.assembly.'
@@ -132,30 +134,34 @@ if __name__ == '__main__':
         pypeliner.commandline.execute(cfg.samtools_bin, 'faidx', cfg.genome_fasta)
     auto_sentinal.run(samtools_faidx)
 
-    def wget_thousand_genomes():
-        tar_filename = os.path.join(cfg.dataset_directory, 'thousand_genomes_download.tar.gz')
-        wget(cfg.thousand_genomes_impute_url, tar_filename)
-        pypeliner.commandline.execute('tar', '-C', cfg.dataset_directory, '-xzvf', tar_filename)
-        os.remove(tar_filename)
-    auto_sentinal.run(wget_thousand_genomes)
 
-    def create_snp_positions():
-        with open(cfg.snp_positions, 'w') as snp_positions_file:
-            for chromosome in cfg.chromosomes.split():
-                phased_chromosome = chromosome
-                if chromosome == 'X':
-                    phased_chromosome = cfg.phased_chromosome_x
-                legend_filename = cfg.legend_template.format(phased_chromosome)
-                with gzip.open(legend_filename, 'r') as legend_file:
-                    for line in legend_file:
-                        if line.startswith('id'):
-                            continue
-                        row = line.split()
-                        rs_id = row[0]
-                        position = row[1]
-                        a0 = row[2]
-                        a1 = row[3]
-                        if len(a0) != 1 or len(a1) != 1:
-                            continue
-                        snp_positions_file.write('\t'.join([chromosome, position, a0, a1]) + '\n')
-    auto_sentinal.run(create_snp_positions)
+    if args.demix:
+
+        def wget_thousand_genomes():
+            tar_filename = os.path.join(cfg.dataset_directory, 'thousand_genomes_download.tar.gz')
+            wget(cfg.thousand_genomes_impute_url, tar_filename)
+            pypeliner.commandline.execute('tar', '-C', cfg.dataset_directory, '-xzvf', tar_filename)
+            os.remove(tar_filename)
+        auto_sentinal.run(wget_thousand_genomes)
+
+        def create_snp_positions():
+            with open(cfg.snp_positions, 'w') as snp_positions_file:
+                for chromosome in cfg.chromosomes.split():
+                    phased_chromosome = chromosome
+                    if chromosome == 'X':
+                        phased_chromosome = cfg.phased_chromosome_x
+                    legend_filename = cfg.legend_template.format(phased_chromosome)
+                    with gzip.open(legend_filename, 'r') as legend_file:
+                        for line in legend_file:
+                            if line.startswith('id'):
+                                continue
+                            row = line.split()
+                            rs_id = row[0]
+                            position = row[1]
+                            a0 = row[2]
+                            a1 = row[3]
+                            if len(a0) != 1 or len(a1) != 1:
+                                continue
+                            snp_positions_file.write('\t'.join([chromosome, position, a0, a1]) + '\n')
+        auto_sentinal.run(create_snp_positions)
+
