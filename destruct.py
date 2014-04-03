@@ -186,6 +186,7 @@ else:
         with tarfile.open(plots_tar_filename, 'w') as plots_tar:
             fig = plt.figure(figsize=(8,8))
             utils.plots.filled_density_weighted(plt.gca(), flen_stats['key'].values, flen_stats['value'].values, 'b', 0.5, 0, flen_stats['key'].max(), 4)
+            plt.title('fragment lengths for library {0}'.format(library_id))
             utils.plots.savefig_tar(plots_tar, fig, 'fragment_length_{0}.pdf'.format(library_id))
             plt.clf()
         return ConcordantReadStats({'fragment_mean':fragment_mean, 'fragment_stddev':fragment_stddev})

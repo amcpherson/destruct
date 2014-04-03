@@ -77,6 +77,7 @@ def create_score_stats(true_scores_filename, null_scores_filename, match_score, 
             utils.plots.filled_density_weighted(plt.gca(), null_scores['penalty'].values, null_scores['freq'].values, 'purple', 0.5, xmin, xmax, 4.0)
             plt.plot(plot_scores, nbinom.pmf(plot_scores, size_zd1, prob_zd1), 'blue')
             plt.plot(plot_scores, nbinom.pmf(plot_scores, size_zd0, prob_zd0), 'red')
+            plt.title('true/null alignment scores for library {0}, aligned length {1}'.format(library_id, aligned_length))
             utils.plots.savefig_tar(plots_tar, fig, 'score_stats_{0}_aligned_length_{1}.pdf'.format(library_id, aligned_length))
             plt.clf()
 
