@@ -272,9 +272,10 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 	
-	int readCount = 0;
-	unordered_set<int> readLengths;
-	accumulators::accumulator_set<double, accumulators::stats<accumulators::tag::count, accumulators::tag::mean, accumulators::tag::variance > > fragmentLengthAcc;
+	int concordantReadCount = 0;
+	int discordantReadCount = 0;
+	unordered_map<int,int> readLengthHist;
+	unordered_map<int,int> fragmentLengthHist;
 	
 	BamReader bamReader;
 	if (!bamReader.Open(bamFilename))
@@ -303,15 +304,16 @@ int main(int argc, char* argv[])
 			continue;
 		}
 
-		readCount++;
+		concordantReadCount++;
 
-		readLengths.insert(alignment1.Length);
-		readLengths.insert(alignment2.Length);
+		// Update read length histogram for all reads
+		readLengthHist.insert(make_pair(alignment1.Length, 0)).first->second++;
+		readLengthHist.insert(make_pair(alignment2.Length, 0)).first->second++;
 
 		if (IsConcordant(alignment1, maxFragmentLength, maxSoftClipped) && IsConcordant(alignment2, maxFragmentLength, maxSoftClipped))
 		{
-			// Update fragment length distribution for concordant reads
-			fragmentLengthAcc((double)(abs(alignment1.InsertSize)));
+			// Update fragment length histogram for concordant reads
+			fragmentLengthHist.insert(make_pair(abs(alignment1.InsertSize), 0)).first->second++;
 		}
 		else
 		{
@@ -350,10 +352,11 @@ int main(int argc, char* argv[])
 			continue;
 		}
 
-		readCount++;
+		discordantReadCount++;
 
-		readLengths.insert(alignment1.Length);
-		readLengths.insert(alignment2.Length);
+		// Update read length histogram for all reads
+		readLengthHist.insert(make_pair(alignment1.Length, 0)).first->second++;
+		readLengthHist.insert(make_pair(alignment2.Length, 0)).first->second++;
 
 		// Optionally change the fragment name
 		string fragment = discordantRead1.Name;
@@ -380,56 +383,46 @@ int main(int argc, char* argv[])
 	}
 
 	// Check for an empty bam file (fail, somethings wrong)
-	if (readCount == 0)
+	if (concordantReadCount + discordantReadCount == 0)
 	{
 		cerr << "Error: No reads" << endl;
 		exit(1);
 	}
 	
 	// Check for a bam file with no concordant reads (fail, somethings wrong)
-	int concordantCount = accumulators::count(fragmentLengthAcc);
-	if (concordantCount == 0)
+	if (concordantReadCount == 0)
 	{
 		cerr << "Error: No concordant reads" << endl;
 		exit(1);
 	}
 	
 	// Check for a bam file with no discordant reads (usually somethings wrong)
-	if (readCount == concordantCount)
+	if (discordantReadCount == 0)
 	{
 		cerr << "Error: No discordant reads" << endl;
 		exit(1);
 	}
 	
 	// Output stats
-	
 	ofstream statsFile(statsFilename.c_str());
-	
 	CheckFile(statsFile, statsFilename);
+	statsFile << "type\tkey\tvalue\n";
+
+	// Output read counts
+	statsFile << "read_count\ttotal\t" << concordantReadCount + discordantReadCount << endl;
+	statsFile << "read_count\tconcordant\t" << concordantReadCount << endl;
+	statsFile << "read_count\tdiscordant\t" << discordantReadCount << endl;
+
+	// Output read lengths
+	for (unordered_map<int,int>::const_iterator iter = readLengthHist.begin(); iter != readLengthHist.end(); iter++)
+	{
+		statsFile << "read_length\t" << iter->first << "\t" << iter->second << endl;
+	}
 	
-	double fragmentMean = accumulators::mean(fragmentLengthAcc);
-	double fragmentVariance = accumulators::variance(fragmentLengthAcc);
-	double fragmentStdDev = pow(fragmentVariance, 0.5);
-	int readLengthMin = *(min_element(readLengths.begin(), readLengths.end()));
-	int readLengthMax = *(max_element(readLengths.begin(), readLengths.end()));
-	stringstream readLengthListStream;
-	copy(readLengths.begin(), readLengths.end(), ostream_iterator<int>(readLengthListStream, ","));
-	string readLengthList = readLengthListStream.str().substr(0, readLengthListStream.str().size() - 1);
-	
-	statsFile << "read_count\t";
-	statsFile << "concordant_count\t";
-	statsFile << "fragment_mean\t";
-	statsFile << "fragment_stddev\t";
-	statsFile << "read_length_min\t";
-	statsFile << "read_length_max\t";
-	statsFile << "read_length_list" << endl;
-	
-	statsFile << readCount << "\t";
-	statsFile << concordantCount << "\t";
-	statsFile << fragmentMean << "\t";
-	statsFile << fragmentStdDev << "\t";
-	statsFile << readLengthMin << "\t";
-	statsFile << readLengthMax << "\t";
-	statsFile << readLengthList << endl;
+	// Output fragment lengths
+	for (unordered_map<int,int>::const_iterator iter = fragmentLengthHist.begin(); iter != fragmentLengthHist.end(); iter++)
+	{
+		statsFile << "fragment_length\t" << iter->first << "\t" << iter->second << endl;
+	}
 }
 
