@@ -11,11 +11,13 @@ import string
 import tarfile
 from collections import *
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import pygenes
 import pypeliner
 
 import score_stats
+import utils.plots
 
 __version__ = '0.1.0'
 
@@ -79,7 +81,7 @@ else:
 
         sch.transform('tabulate', (), himem, multilib_tabulate, None, breakpoints, sch.ifile('clusters.filtered'), sch.ifile('clusters.prob'), sch.ifile('clusters.nodup'), sch.ifile('breakpoints'), cfg.genome_fasta, cfg.gtf_filename, cfg.dgv_filename, sch.ifile('cycles'), sch.iobj('stats', ('bylibrary',)))
         
-        sch.transform('merge_plots', (), lowmem, merge_tars, None, plots_tar, sch.ifile('score.stats.plots', ('bylibrary',)))
+        sch.transform('merge_plots', (), lowmem, merge_tars, None, plots_tar, sch.ifile('score.stats.plots', ('bylibrary',)), sch.ifile('flen.plots', ('bylibrary',)))
 
 
     def split_align_merge(sch, cfg, axes):
@@ -109,7 +111,7 @@ else:
 
         sch.commandline('bamdisc', axes, medmem, cfg.bamdiscordantfastq_tool, '-r', '-c', cfg.bam_max_soft_clipped, '-f', cfg.bam_max_fragment_length, '-b', bams, '-s', sch.ofile('stats.file', axes), '-1', sch.ofile('reads1.unfiltered', axes), '-2', sch.ofile('reads2.unfiltered', axes), '-t', sch.tmpfile('bamdisc.tempspace', axes))
         sch.commandline('bamsample', axes, medmem, cfg.bamsamplefastq_tool, '-r', '-b', bams, '-n', cfg.num_read_samples, '-1', sch.ofile('sample1.unfiltered', axes), '-2', sch.ofile('sample2.unfiltered', axes))
-        sch.transform('readstats', axes, lowmem, read_stats, sch.oobj('stats', axes), sch.ifile('stats.file', axes))
+        sch.transform('readstats', axes, lowmem, read_stats, sch.oobj('stats', axes), sch.ifile('stats.file', axes), sch.ofile('flen.plots', axes), sch.inst('bylibrary'))
         sch.commandline('qtrimdisc', axes, lowmem, cfg.qualtrimfastq_tool, '-o', cfg.base_quality_offset, '-l', '36', '-q', '5', sch.ifile('reads1.unfiltered', axes), sch.ifile('reads2.unfiltered', axes), sch.ofile('reads1', axes), sch.ofile('reads2', axes))
         sch.commandline('qtrimsample', axes, lowmem, cfg.qualtrimfastq_tool, '-o', cfg.base_quality_offset, '-l', '36', '-q', '5', sch.ifile('sample1.unfiltered', axes), sch.ifile('sample2.unfiltered', axes), sch.ofile('sample1', axes), sch.ofile('sample2', axes))
 
@@ -173,7 +175,7 @@ else:
             return int(self.fragment_length_mean + 3 * self.fragment_length_stddev)
 
 
-    def read_stats(stats_filename):
+    def read_stats(stats_filename, plots_tar_filename, library_id):
         stats = pd.read_csv(stats_filename, sep='\t')
         flen_stats = stats.loc[stats['type'] == 'fragment_length'].drop('type', axis=1)
         flen_stats = flen_stats.astype(float)
@@ -181,6 +183,11 @@ else:
         fragment_mean = (flen_stats['key'] * flen_stats['value']).sum() / fragment_count
         fragment_variance = ((flen_stats['key'] - fragment_mean) * (flen_stats['key'] - fragment_mean) * flen_stats['value']).sum() / (fragment_count - 1)
         fragment_stddev = fragment_variance**0.5
+        with tarfile.open(plots_tar_filename, 'w') as plots_tar:
+            fig = plt.figure(figsize=(8,8))
+            utils.plots.filled_density_weighted(plt.gca(), flen_stats['key'].values, flen_stats['value'].values, 'b', 0.5, 0, flen_stats['key'].max(), 4)
+            utils.plots.savefig_tar(plots_tar, fig, 'fragment_length_{0}.pdf'.format(library_id))
+            plt.clf()
         return ConcordantReadStats({'fragment_mean':fragment_mean, 'fragment_stddev':fragment_stddev})
 
 
@@ -650,11 +657,12 @@ else:
                 clusters_table_file.write(clusters_table_row(lib_names, cluster_id, cluster_info, probs, setcover_ratio, breakpoint_info, dgv_info, cycle_info, sequences, gene_models))
 
 
-    def merge_tars(output_filename, score_stats_plots):
+    def merge_tars(output_filename, *input_filename_sets):
         with tarfile.open(output_filename, 'w') as output_tar:
-            for input_filename in score_stats_plots.itervalues():
-                with tarfile.open(input_filename, 'r') as in_tar:
-                    for tarinfo in in_tar:
-                        output_tar.addfile(tarinfo, in_tar.extractfile(tarinfo))
+            for input_filenames in input_filename_sets:
+                for input_filename in input_filenames.itervalues():
+                    with tarfile.open(input_filename, 'r') as in_tar:
+                        for tarinfo in in_tar:
+                            output_tar.addfile(tarinfo, in_tar.extractfile(tarinfo))
 
 
