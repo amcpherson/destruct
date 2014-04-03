@@ -2,6 +2,7 @@ import itertools
 import io
 import tarfile
 import scipy
+import scipy.stats
 import numpy as np
 
 
