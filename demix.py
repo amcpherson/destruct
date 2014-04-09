@@ -93,12 +93,19 @@ if __name__ == '__main__':
                               pyp.sch.ofile('interval.readcounts.{0}.{1}'.format(chromosome, lib_info.id)),
                               pyp.sch.ofile('alleles.readcounts.{0}.{1}'.format(chromosome, lib_info.id)),
                               pyp.sch.input(cfg.genome_fai))
+
+    for chromosome in cfg.chromosomes.split():
+        pyp.sch.transform('phase_intervals_{0}'.format(chromosome), (), ctx_general, demix.phase_intervals, None,
+            *([pyp.sch.ifile('alleles.readcounts.{0}.{1}'.format(chromosome, lib_info.id)) for lib_info in sorted(tumour_lib_infos.values())] + 
+              [pyp.sch.ofile('alleles.readcounts.phased.{0}.{1}'.format(chromosome, lib_info.id)) for lib_info in sorted(tumour_lib_infos.values())]))
+
+    for lib_info in tumour_lib_infos.values():
         pyp.sch.transform('merge_interval_readcounts_{0}'.format(lib_info.id), (), ctx_general, demix.merge_files, None,
                           pyp.sch.ofile('interval.readcounts.{0}'.format(lib_info.id)),
                           *[pyp.sch.ifile('interval.readcounts.{0}.{1}'.format(chromosome, lib_info.id)) for chromosome in cfg.chromosomes.split()])
         pyp.sch.transform('merge_allele_readcounts_{0}'.format(lib_info.id), (), ctx_general, demix.merge_files, None,
-                          pyp.sch.ofile('alleles.readcounts.{0}'.format(lib_info.id)),
-                          *[pyp.sch.ifile('alleles.readcounts.{0}.{1}'.format(chromosome, lib_info.id)) for chromosome in cfg.chromosomes.split()])
+                          pyp.sch.ofile('alleles.readcounts.phased.{0}'.format(lib_info.id)),
+                          *[pyp.sch.ifile('alleles.readcounts.phased.{0}.{1}'.format(chromosome, lib_info.id)) for chromosome in cfg.chromosomes.split()])
         pyp.sch.commandline('samplegc_'+lib_info.id, (), ctx_general, cfg.samplegc_tool, '-b', pyp.sch.input(lib_info.bam_filename), '-m', cfg.mappability_filename,
                 '-g', cfg.genome_fasta, '-o', '4', '-n', '10000000', '-f', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_length'), '>', pyp.sch.ofile('gcsamples.'+lib_info.id))
         pyp.sch.commandline('gcloess_'+lib_info.id, (), ctx_general, cfg.rscript_bin, cfg.gc_loess_rscript, pyp.sch.ifile('gcsamples.'+lib_info.id),
@@ -107,7 +114,7 @@ if __name__ == '__main__':
                 '-c', pyp.sch.ifile('interval.readcounts.'+lib_info.id), '-i', '-o', '4', '-u', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_mean'), '-s', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_stddev'),
                 '-a', cfg.mappability_length, '-l', pyp.sch.ifile('gcloess.'+lib_info.id), '>', pyp.sch.ofile('interval.readcounts.lengths.'+lib_info.id))
         pyp.sch.transform('solve_and_plot_'+lib_info.id, (), ctx_general, demix.solve_and_plot, None, lib_info.id,
-                pyp.sch.ifile('interval.readcounts.lengths.'+lib_info.id), pyp.sch.ifile('alleles.readcounts.{0}'.format(lib_info.id)),
+                pyp.sch.ifile('interval.readcounts.lengths.'+lib_info.id), pyp.sch.ifile('alleles.readcounts.phased.{0}'.format(lib_info.id)),
                 pyp.sch.ofile('stats.{0}'.format(lib_info.id)), pyp.sch.ofile('preds.{0}'.format(lib_info.id)),
                 pyp.sch.ofile('plots.{0}'.format(lib_info.id)), cfg.plots_prefix)
 
@@ -523,6 +530,74 @@ def savefig_tar(tar, fig, filename):
     info.size = plot_buffer.tell()
     plot_buffer.seek(0)
     tar.addfile(tarinfo=info, fileobj=plot_buffer)
+
+
+def phase_intervals(*args):
+
+    input_alleles_filenames = args[:len(args)/2]
+    output_alleles_filenames = args[len(args)/2:]
+
+    allele_phases = list()
+    allele_diffs = list()
+
+    for idx, input_alleles_filename in enumerate(input_alleles_filenames):
+
+        allele_data = pd.read_csv(input_alleles_filename, sep='\t', header=None, names=['interval_id', 'hap_label', 'allele_id', 'readcount'])
+        
+        # Allele readcount table
+        allele_data = allele_data.set_index(['interval_id', 'hap_label', 'allele_id'])['readcount'].unstack().fillna(0.0)
+        allele_data = allele_data.astype(int)
+        
+        # Create major allele call
+        allele_phase = allele_data.apply(np.argmax, axis=1)
+        allele_phase.name = 'major_allele_id'
+        allele_phase = allele_phase.reset_index()
+        allele_phase['library_idx'] = idx
+        allele_phases.append(allele_phase)
+
+        # Calculate major minor allele read counts, and diff between them
+        allele_data['major_readcount'] = allele_data.apply(np.max, axis=1)
+        allele_data['minor_readcount'] = allele_data.apply(np.min, axis=1)
+        allele_data['diff_readcount'] = allele_data['major_readcount'] - allele_data['minor_readcount']
+        allele_data['total_readcount'] = allele_data['major_readcount'] + allele_data['minor_readcount']
+
+        # Calculate normalized major and minor read counts difference per interval
+        allele_diff = allele_data.groupby(level=[0])[['diff_readcount', 'total_readcount']].sum()
+        allele_diff['norm_diff_readcount'] = allele_diff['diff_readcount'] / allele_diff['total_readcount']
+        allele_diff = allele_diff[['norm_diff_readcount']]
+
+        # Add to table for all librarys
+        allele_diff.reset_index(inplace=True)
+        allele_diff['library_idx'] = idx
+        allele_diffs.append(allele_diff)
+
+    allele_phases = pd.concat(allele_phases, ignore_index=True)
+    allele_diffs = pd.concat(allele_diffs, ignore_index=True)
+
+    def select_largest_diff(df):
+        largest_idx = np.argmax(df['norm_diff_readcount'].values)
+        return df['library_idx'].values[largest_idx]
+
+    # For each interval, select the library with the largest difference between major and minor
+    interval_library = allele_diffs.set_index('interval_id').groupby(level=0).apply(select_largest_diff)
+    interval_library.name = 'library_idx'
+    interval_library = interval_library.reset_index()
+
+    # For each haplotype block in each interval, take the major allele call of the library
+    # with the largest major minor difference and call it allele 'a'
+    allele_phases = allele_phases.merge(interval_library, left_on=['interval_id', 'library_idx'], right_on=['interval_id', 'library_idx'], how='right')
+    allele_phases = allele_phases[['interval_id', 'hap_label', 'major_allele_id']].rename(columns={'major_allele_id': 'allele_a_id'})
+
+    for idx, (input_alleles_filename, output_allele_filename) in enumerate(zip(input_alleles_filenames, output_alleles_filenames)):
+
+        allele_data = pd.read_csv(input_alleles_filename, sep='\t', header=None, names=['interval_id', 'hap_label', 'allele_id', 'readcount'])
+        
+        # Add a boolean column denoting which allele is allele 'a'
+        allele_data = allele_data.merge(allele_phases, left_on=['interval_id', 'hap_label'], right_on=['interval_id', 'hap_label'])
+        allele_data['is_allele_a'] = (allele_data['allele_id'] == allele_data['allele_a_id']) * 1
+        allele_data = allele_data[['interval_id', 'hap_label', 'allele_id', 'readcount', 'is_allele_a']]
+
+        allele_data.to_csv(output_allele_filename, sep='\t', header=False, index=False)
 
 
 def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filename, pred_filename, plots_tar_filename, plots_prefix):
