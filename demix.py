@@ -886,7 +886,7 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
             # Add lib id and candidate id and append to list of tables
             preds['library_id'] = library_id
             preds['candidate_id'] = candidate_idx
-            preds = preds[['library_id', 'candidate_id', 'chr', 'start', 'end', 'length', 'major', 'minor', 'major_sub', 'minor_sub', 'subclonal', 'major_raw', 'minor_raw', 'high_conf']]
+            preds = preds[['library_id', 'candidate_id', 'chr', 'start', 'end', 'length', 'major', 'minor', 'major_sub', 'minor_sub', 'subclonal', 'major_raw', 'minor_raw', 'high_conf', 'major_is_allele_a']]
             preds_tables.append(preds)
 
         pd.concat(stats_tables, ignore_index=True).to_csv(stats_filename, sep='\t', na_rep='NA', index=False, header=True)
