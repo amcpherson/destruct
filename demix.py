@@ -609,7 +609,7 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
         interval_data = pd.read_csv(intervals_filename, sep='\t', header=None, converters={'id':str, 'chromosome1':str, 'chromosome2':str},
                                     names=['id', 'chromosome1', 'position1', 'strand1', 'chromosome2', 'position2', 'strand2', 'readcount', 'length'])
 
-        allele_data = pd.read_csv(alleles_filename, sep='\t', header=None, names=['interval_id', 'hap_label', 'allele_id', 'readcount'])
+        allele_data = pd.read_csv(alleles_filename, sep='\t', header=None, names=['interval_id', 'hap_label', 'allele_id', 'readcount', 'is_allele_a'])
 
         # Create major minor alleles
         allele_data = allele_data.set_index(['interval_id', 'hap_label', 'allele_id'])['readcount'].unstack().fillna(0.0)
