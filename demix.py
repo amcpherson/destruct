@@ -611,23 +611,32 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
 
         allele_data = pd.read_csv(alleles_filename, sep='\t', header=None, names=['interval_id', 'hap_label', 'allele_id', 'readcount', 'is_allele_a'])
 
-        # Create major minor alleles
-        allele_data = allele_data.set_index(['interval_id', 'hap_label', 'allele_id'])['readcount'].unstack().fillna(0.0)
+        # Calculate allele a/b readcounts
+        allele_data = allele_data.set_index(['interval_id', 'hap_label', 'is_allele_a'])['readcount'].unstack().fillna(0.0)
         allele_data = allele_data.astype(int)
-        allele_data['major_readcount'] = allele_data.apply(max, axis=1)
-        allele_data['minor_readcount'] = allele_data.apply(min, axis=1)
-        allele_data = allele_data[['major_readcount', 'minor_readcount']]
+        allele_data = allele_data.rename(columns={0:'allele_b_readcount', 1:'allele_a_readcount'})
 
-        # Calculate hap length as total hap readcount over expected depth
+        # Calculate expected read depth based on total read count and total length
         allele_data.reset_index(inplace=True)
         allele_data.set_index('interval_id', inplace=True)
         interval_data.set_index('id', inplace=True)
         allele_data['expected_depth'] = (interval_data['readcount'] / interval_data['length'])
         allele_data.reset_index(inplace=True)
+
+        # Estimate effective haplotype block length based on expected depth and total allele readcounts
         allele_data.set_index(['interval_id', 'hap_label'], inplace=True)
-        allele_data['hap_length'] = (allele_data['minor_readcount'] + allele_data['major_readcount']) / allele_data['expected_depth']
+        allele_data['hap_length'] = (allele_data['allele_b_readcount'] + allele_data['allele_a_readcount']) / allele_data['expected_depth']
         allele_data = allele_data.replace([np.inf, -np.inf], np.nan).dropna()
-        allele_data = allele_data.groupby(level=[0])[['hap_length', 'major_readcount', 'minor_readcount']].sum()
+
+        # Merge haplotype blocks contained within the same interval
+        allele_data = allele_data.groupby(level=[0])[['hap_length', 'allele_a_readcount', 'allele_b_readcount']].sum()
+
+        # Calculate major and minor readcounts, and relationship to allele a/b
+        allele_data['major_readcount'] = allele_data[['allele_a_readcount', 'allele_b_readcount']].apply(max, axis=1)
+        allele_data['minor_readcount'] = allele_data[['allele_a_readcount', 'allele_b_readcount']].apply(min, axis=1)
+        allele_data['major_is_allele_a'] = (allele_data['major_readcount'] == allele_data['allele_a_readcount']) * 1
+
+        # Merge allele data with interval data
         interval_data = interval_data.merge(allele_data, left_index=True, right_index=True)
 
         # Calculate coverages
@@ -657,6 +666,7 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
         starts = interval_data['position1'].values
         ends = interval_data['position2'].values
         lengths = interval_data['length'].values
+        major_is_allele_a = interval_data['major_is_allele_a'].values
 
         # Calculate difference between adjacent intervals
         minor_sq_diffs = np.square(minor[1:] - minor[:-1])
@@ -853,7 +863,7 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
             stats_tables.append(stats)
 
             # Create copy number predictions
-            preds = pd.DataFrame({'chr':chrs, 'start':starts, 'end':ends, 'length':lengths, 'major_raw':tumour_major, 'minor_raw':tumour_minor, 'major':pred_major, 'minor':pred_minor, 'major_sub':pred_major_sub, 'minor_sub':pred_minor_sub, 'subclonal':avg_z})
+            preds = pd.DataFrame({'chr':chrs, 'start':starts, 'end':ends, 'length':lengths, 'major_raw':tumour_major, 'minor_raw':tumour_minor, 'major':pred_major, 'minor':pred_minor, 'major_sub':pred_major_sub, 'minor_sub':pred_minor_sub, 'subclonal':avg_z, 'major_is_allele_a':major_is_allele_a})
             preds['high_conf'] = 1
 
             # Predictions for low confidence intervals
@@ -867,6 +877,7 @@ def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filen
             low_conf_preds['length'] = interval_data_low_conf['length'].values
             low_conf_preds['major_raw'] = ((interval_data_low_conf['major_cov'] - haploid_normal) / haploid_tumour).values
             low_conf_preds['minor_raw'] = ((interval_data_low_conf['minor_cov'] - haploid_normal) / haploid_tumour).values
+            low_conf_preds['major_is_allele_a'] = interval_data_low_conf['major_is_allele_a'].values
             low_conf_preds['high_conf'] = 0
 
             # Combine low and high confidence
