@@ -546,7 +546,7 @@ def phase_intervals(*args):
         
         # Allele readcount table
         allele_data = allele_data.set_index(['interval_id', 'hap_label', 'allele_id'])['readcount'].unstack().fillna(0.0)
-        allele_data = allele_data.astype(int)
+        allele_data = allele_data.astype(float)
         
         # Create major allele call
         allele_phase = allele_data.apply(np.argmax, axis=1)
