@@ -366,6 +366,11 @@ sources = """
 env.Program(target='bamconcordantreads', source=common_sources+bamtools_sources+sources+boost_iostreams_sources+boost_serialization_sources)
 
 sources = """
+    bamextractsimreads.cpp
+""".split()
+env.Program(target='bamextractsimreads', source=common_sources+bamtools_sources+sources)
+
+sources = """
     Parsers.cpp
     bamstats.cpp
 """.split()
