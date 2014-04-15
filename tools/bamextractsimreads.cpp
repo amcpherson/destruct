@@ -62,18 +62,65 @@ inline string GetQualities(const BamAlignment& alignment)
 
 struct BamSimReader : PileupVisitor
 {
-	BamSimReader(int position, const string& refSequence, const string& simSequence) : mPosition(position), mRefSequence(refSequence), mSimSequence(simSequence)
-	{}
-	
-	void Read(BamReader& bamReader)
+	BamSimReader(const string& bamFilename, const string& fastaFilename)
 	{
+		if (!mBamReader.Open(bamFilename))
+		{
+			cerr << "Error: Unable to open bam file " << bamFilename << endl;
+			exit(1);
+		}
+		
+		if (!mBamReader.LocateIndex())
+		{
+			cerr << "Error: Unable to find index for bam file " << bamFilename << endl;
+			exit(1);
+		}
+
+		string fastaIndexFilename = "";
+		if (Utilities::FileExists(fastaFilename + ".fai"))
+		{
+			fastaIndexFilename = fastaFilename + ".fai";
+		}
+		
+		if (!mFasta.Open(fastaFilename, fastaIndexFilename))
+		{
+			cerr << "Error: Unable to open reference fasta file " << fastaFilename << endl;
+			exit(1);
+		}
+	}
+	
+	void Read(const string& chromosome, int position, const string& simSequence)
+	{
+		mStartPos = position;
+		mEndPos = position + simSequence.size();
+		mSimSequence = simSequence;
+
+		// Set the region for the bam index
+		int bamRefID = mBamReader.GetReferenceID(chromosome);
+		mBamReader.SetRegion(BamRegion(bamRefID, position, bamRefID, mEndPos));
+
+		// Get the fasta chromosome index
+		vector<string> fastaReferenceNames = mFasta.GetReferenceNames();
+		vector<string>::const_iterator faChrIter = find(fastaReferenceNames.begin(), fastaReferenceNames.end(), chromosome);
+		if (faChrIter == fastaReferenceNames.end())
+		{
+			cerr << "Error: Unable to find chromosome " << chromosome << " in fasta" << endl;
+			exit(1);
+		}
+		mFastaRefID = faChrIter - fastaReferenceNames.begin();
+
 		PileupEngine pileupEngine;
 		
 		pileupEngine.AddVisitor(dynamic_cast<PileupVisitor*>(this));
 
 		BamAlignment alignment;
-		while (bamReader.GetNextAlignment(alignment))
+		while (mBamReader.GetNextAlignment(alignment))
 		{
+			if (alignment.Position < mStartPos || alignment.GetEndPosition() >= mEndPos)
+			{
+				continue;
+			}
+
 			int readEnd = GetReadEnd(alignment);
 
 			mAlignments[readEnd][alignment.Name] = alignment;
@@ -94,15 +141,21 @@ struct BamSimReader : PileupVisitor
 
 	void Visit(const PileupPosition& pileupData)
 	{		
-		int localPosition = pileupData.Position - mPosition;
+		int localPosition = pileupData.Position - mStartPos;
 
-		if (localPosition < 0 || localPosition >= mRefSequence.size())
+		if (localPosition < 0 || localPosition >= mSimSequence.size())
 		{
+			assert(false);
 			return;
 		}
 
-		const char refBase = toupper(mRefSequence[localPosition]);
-		const char simBase = toupper(mSimSequence[localPosition]);
+		char refBase;
+		mFasta.GetBase(mFastaRefID, mStartPos, refBase);
+
+		char simBase = mSimSequence[localPosition];
+
+		refBase = toupper(refBase);
+		simBase = toupper(simBase);
 
 		for (vector<PileupAlignment>::const_iterator pileupIter = pileupData.PileupAlignments.begin(); pileupIter != pileupData.PileupAlignments.end(); ++pileupIter)
 		{
@@ -165,9 +218,14 @@ struct BamSimReader : PileupVisitor
 			fastq << GetQualities(alignment) << endl;
 		}
 	}
+
+	BamReader mBamReader;
+	Fasta mFasta;
 	
-	int mPosition;
-	string mRefSequence;
+	int mFastaRefID;
+	int mStartPos;
+	int mEndPos;
+
 	string mSimSequence;
 
 	vector<string> mReadNames;
@@ -215,52 +273,8 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 	
-	BamReader bamReader;
-	if (!bamReader.Open(bamFilename))
-	{
-		cerr << "Error: Unable to open bam file " << bamFilename << endl;
-		exit(1);
-	}
-	
-	if (!bamReader.LocateIndex())
-	{
-		cerr << "Error: Unable to find index for bam file " << bamFilename << endl;
-		exit(1);
-	}
-
-	int bamRefID = bamReader.GetReferenceID(chromosome);
-
-	bamReader.SetRegion(BamRegion(bamRefID, position, bamRefID+1, position+simSequence.size()));
-
-	string fastaIndexFilename = "";
-	if (Utilities::FileExists(fastaFilename + ".fai"))
-	{
-		fastaIndexFilename = fastaFilename + ".fai";
-    }
-	
-	Fasta fasta;
-	if (!fasta.Open(fastaFilename, fastaIndexFilename))
-	{
-		cerr << "Error: Unable to open reference fasta file " << fastaFilename << endl;
-		exit(1);
-	}
-
-	vector<string> fastaReferenceNames = fasta.GetReferenceNames();
-
-	vector<string>::const_iterator faChrIter = find(fastaReferenceNames.begin(), fastaReferenceNames.end(), chromosome);
-	if (faChrIter == fastaReferenceNames.end())
-	{
-		cerr << "Error: Unable to find chromosome " << chromosome << " in fasta " << fastaFilename << endl;
-		exit(1);
-	}
-
-	int fastaRefID = faChrIter - fastaReferenceNames.begin();
-
-	string refSequence;
-	fasta.GetSequence(fastaRefID, position, position+simSequence.size(), refSequence);
-
-	BamSimReader bamSimReader(position, refSequence, simSequence);
-	bamSimReader.Read(bamReader);
+	BamSimReader bamSimReader(bamFilename, fastaFilename);
+	bamSimReader.Read(chromosome, position, simSequence);
 
 	ofstream fastq1File(fastq1Filename.c_str());
 	ofstream fastq2File(fastq2Filename.c_str());
