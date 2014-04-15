@@ -228,9 +228,9 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	int refID = bamReader.GetReferenceID(chromosome);
+	int bamRefID = bamReader.GetReferenceID(chromosome);
 
-	bamReader.SetRegion(BamRegion(refID, position, refID+1, position+simSequence.size()));
+	bamReader.SetRegion(BamRegion(bamRefID, position, bamRefID+1, position+simSequence.size()));
 
 	string fastaIndexFilename = "";
 	if (Utilities::FileExists(fastaFilename + ".fai"))
@@ -245,8 +245,19 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
+	vector<string> fastaReferenceNames = fasta.GetReferenceNames();
+
+	vector<string>::const_iterator faChrIter = find(fastaReferenceNames.begin(), fastaReferenceNames.end(), chromosome);
+	if (faChrIter == fastaReferenceNames.end())
+	{
+		cerr << "Error: Unable to find chromosome " << chromosome << " in fasta " << fastaFilename << endl;
+		exit(1);
+	}
+
+	int fastaRefID = faChrIter - fastaReferenceNames.begin();
+
 	string refSequence;
-	fasta.GetSequence(refID, position, position+simSequence.size(), refSequence);
+	fasta.GetSequence(fastaRefID, position, position+simSequence.size(), refSequence);
 
 	BamSimReader bamSimReader(position, refSequence, simSequence);
 	bamSimReader.Read(bamReader);

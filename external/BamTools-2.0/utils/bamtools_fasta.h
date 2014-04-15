@@ -12,6 +12,7 @@
 
 #include "utils/utils_global.h"
 #include <string>
+#include <vector>
 
 namespace BamTools {
 
@@ -35,6 +36,8 @@ class UTILS_EXPORT Fasta {
     // index-handling methods
     public:
         bool CreateIndex(const std::string& indexFilename);
+        std::vector<std::string> GetReferenceNames();
+        std::vector<int> GetReferenceLengths();
 
     // internal implementation
     private:

@@ -49,6 +49,8 @@ struct Fasta::FastaPrivate {
     bool GetBase(const int& refId, const int& position, char& base);
     bool GetSequence(const int& refId, const int& start, const int& stop, string& sequence);
     bool Open(const string& filename, const string& indexFilename);
+    std::vector<std::string> GetReferenceNames();
+    std::vector<int> GetReferenceLengths();
     
     // internal methods
     private:
@@ -590,6 +592,32 @@ bool Fasta::FastaPrivate::WriteIndexData(void) {
     return success;
 }
 
+std::vector<std::string> Fasta::FastaPrivate::GetReferenceNames()
+{
+    std::vector<std::string> referenceNames;
+    
+    vector<FastaIndexData>::const_iterator indexIter = Index.begin();
+    vector<FastaIndexData>::const_iterator indexEnd  = Index.end();
+    for ( ; indexIter != indexEnd; ++indexIter ) {
+        referenceNames.push_back(indexIter->Name);
+    }
+    
+    return referenceNames;
+}
+
+std::vector<int> Fasta::FastaPrivate::GetReferenceLengths()
+{
+    std::vector<int> referenceLengths;
+    
+    vector<FastaIndexData>::const_iterator indexIter = Index.begin();
+    vector<FastaIndexData>::const_iterator indexEnd  = Index.end();
+    for ( ; indexIter != indexEnd; ++indexIter ) {
+        referenceLengths.push_back(indexIter->Length);
+    }
+    
+    return referenceLengths;
+}
+
 // --------------------------------
 // Fasta implementation
 
@@ -620,4 +648,12 @@ bool Fasta::GetSequence(const int& refId, const int& start, const int& stop, str
 
 bool Fasta::Open(const string& filename, const string& indexFilename) {
     return d->Open(filename, indexFilename);
+}
+
+std::vector<std::string> Fasta::GetReferenceNames() {
+    return d->GetReferenceNames();
+}
+
+std::vector<int> Fasta::GetReferenceLengths() {
+    return d->GetReferenceLengths();
 }
