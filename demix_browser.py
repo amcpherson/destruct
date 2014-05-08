@@ -75,6 +75,8 @@ major_minor_scatter_highlight = ax1.scatter(cnv['major_raw'], cnv['minor_raw'],
 ax1.set_xlim((-0.5, copies_max))
 ax1.set_ylim((-0.5, 0.8*copies_max))
 
+ax1.set_title(args.library_id)
+
 lgnd = ax1.legend([plt.Circle((0, 0), radius=1, color=chromosome_color(c), picker=True) for c in chromosomes], chromosomes, loc=2)
 lgnd_patches = list(lgnd.get_patches())
 
