@@ -25,28 +25,12 @@ if __name__ == '__main__':
     argparser.add_argument('breakreads', help='Breakpoint reads table filename')
 
     cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
-    pyp = pypeliner.easypypeliner.EasyPypeliner([], cfg)
+    pyp = pypeliner.easypypeliner.EasyPypeliner([destruct, destruct_genesis], cfg)
 
-    class GenesisQsubJob(pypeliner.execqueue.QsubJob):
-        def create_submit_command(self, ctx, name, script_filename, qsub_bin, native_spec, stdout_filename, stderr_filename):
-            if 'txfer' in ctx:
-                qsub = 'qsub -sync y -b y -P transfer -q thosts.q -S /bin/bash'
-                qsub += ' -N ' + name
-                qsub += ' ' + script_filename
-                return ['ssh', 'apollo', qsub]
-            else:
-                return super(GenesisQsubJob, self).create_submit_command(ctx, name, script_filename, qsub_bin, native_spec, stdout_filename, stderr_filename)
-
-    class GenesisQsubJobQueue(pypeliner.execqueue.QsubJobQueue):
-        def create(self, ctx, job):
-            return GenesisQsubJob(ctx, job, self.temps_dir, self.modules, self.qsub_bin, self.native_spec)
-
-    pyp.exec_queue = GenesisQsubJobQueue(pyp.exc_dir, [destruct, destruct_genesis], cfg.nativespec)
-
-    txfer = {'txfer':True}
+    txfer = {'local':True}
 
     pyp.sch.transform('readlibs', (), destruct.lowmem, destruct_genesis.read_libraries, pyp.sch.oobj('bamremote', ('bylibrary',)), pyp.sch.input(cfg.libraries))
-    pyp.sch.commandline('copybam', ('bylibrary',), txfer, 'cp', pyp.sch.iobj('bamremote', ('bylibrary',)), pyp.sch.ofile('bam', ('bylibrary',)))
+    pyp.sch.transform('copybam', ('bylibrary',), txfer, destruct_genesis.copy_bam, None, pyp.sch.iobj('bamremote', ('bylibrary',)), pyp.sch.ofile('bam', ('bylibrary',)))
     destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads))
 
     pyp.run()
@@ -61,4 +45,11 @@ else:
                 lib_bam = row[1]
                 libraries[lib_name] = lib_bam
         return libraries
+
+    def copy_bam(remote_path, local_path):
+        qsub = 'qsub -sync y -b y -P transfer -q thosts.q -S /bin/bash'
+        qsub += ' -N copybam'
+        qsub += ' -b yes'
+        qsub += ' cp ' + remote_path + ' ' + local_path
+        pypeliner.commandline.execute(['ssh', 'apollo', qsub])
 
