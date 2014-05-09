@@ -51,5 +51,5 @@ else:
         qsub += ' -N copybam'
         qsub += ' -b yes'
         qsub += ' cp ' + remote_path + ' ' + local_path
-        pypeliner.commandline.execute(['ssh', 'apollo', qsub])
+        pypeliner.commandline.execute(*['ssh', 'apollo', qsub])
 
