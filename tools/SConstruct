@@ -367,6 +367,8 @@ env.Program(target='bamconcordantreads', source=common_sources+bamtools_sources+
 
 sources = """
     bamextractsimreads.cpp
+    Parsers.cpp
+    Sequences.cpp
 """.split()
 env.Program(target='bamextractsimreads', source=common_sources+bamtools_sources+sources)
 

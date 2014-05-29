@@ -1,5 +1,5 @@
 /*
- *  bamconcordantcounts.cpp
+ *  bamextractsimreads.cpp
  *
  *  Created by Andrew McPherson on 28/09/09.
  *
@@ -10,6 +10,7 @@
 #include "AlignmentStream.h"
 #include "RegionDB.h"
 #include "Parsers.h"
+#include "Sequences.h"
 #include "api/BamReader.h"
 #include "utils/bamtools_pileup_engine.h"
 #include "utils/bamtools_utilities.h"
@@ -237,33 +238,24 @@ struct BamSimReader : PileupVisitor
 int main(int argc, char* argv[])
 {
 	string bamFilename;
-	string fastaFilename;
-	string chromosome;
-	int position;
-	string simSequence;
-	string namePrefix;
+	string refFasta;
+	string seqFasta;
 	string fastq1Filename;
 	string fastq2Filename;
 	
 	try
 	{
-		TCLAP::CmdLine cmd("Bam Concordant Read Extractor");
+		TCLAP::CmdLine cmd("Bam Read Simulator");
 		TCLAP::ValueArg<string> bamFilenameArg("b","bam","Bam Filename",true,"","string",cmd);
-		TCLAP::ValueArg<string> fastaFilenameArg("f","fasta","Reference Fasta Filename",true,"","string",cmd);
-		TCLAP::ValueArg<string> chromosomeArg("c","chr","Chromosome to simulate from",true,"","string",cmd);
-		TCLAP::ValueArg<int> positionArg("p","pos","Position to simulate from",true,0,"integer",cmd);
-		TCLAP::ValueArg<string> simSequenceArg("s","seq","Simulation sequence to match reads to",true,"","string",cmd);
-		TCLAP::ValueArg<string> namePrefixArg("n","name","Fastq name prefix",true,"","string",cmd);
+		TCLAP::ValueArg<string> refFastaArg("r","ref","Reference Fasta Filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> seqFastaArg("s","seq","Sequence to match reads to",true,"","string",cmd);
 		TCLAP::ValueArg<string> fastq1FilenameArg("1","fastq1","Fastq 1 filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> fastq2FilenameArg("2","fastq2","Fastq 2 filename",true,"","string",cmd);
 		cmd.parse(argc,argv);
 		
 		bamFilename = bamFilenameArg.getValue();
-		fastaFilename = fastaFilenameArg.getValue();
-		chromosome = chromosomeArg.getValue();
-		position = positionArg.getValue();
-		simSequence = simSequenceArg.getValue();
-		namePrefix = namePrefixArg.getValue();
+		refFasta = refFastaArg.getValue();
+		seqFasta = seqFastaArg.getValue();
 		fastq1Filename = fastq1FilenameArg.getValue();
 		fastq2Filename = fastq2FilenameArg.getValue();
 	}
@@ -273,8 +265,7 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 	
-	BamSimReader bamSimReader(bamFilename, fastaFilename);
-	bamSimReader.Read(chromosome, position, simSequence);
+	BamSimReader bamSimReader(bamFilename, refFasta);
 
 	ofstream fastq1File(fastq1Filename.c_str());
 	ofstream fastq2File(fastq2Filename.c_str());
@@ -282,8 +273,34 @@ int main(int argc, char* argv[])
 	CheckFile(fastq1File, fastq1Filename);
 	CheckFile(fastq2File, fastq2Filename);
 
-	bamSimReader.WriteFastq(namePrefix, 0, fastq1File);
-	bamSimReader.WriteFastq(namePrefix, 1, fastq2File);
+	Sequences simSequences;
+	simSequences.Read(seqFasta);
+
+	vector<long> chromosomeLengths;
+	for (int chrIdx = 0; chrIdx < bamSimReader.mBamReader.GetReferenceCount(); chrIdx++)
+	{
+		chromosomeLengths.push_back(bamSimReader.mBamReader.GetReferenceData()[chrIdx].RefLength);
+	}
+	
+	RandomGenomicPositionGenerator randomPosition(chromosomeLengths);
+	
+	const vector<string>& seqNames = simSequences.GetNames();
+	for (int nameIdx = 0; nameIdx < seqNames.size(); nameIdx++)
+	{
+		const string& seqName = seqNames[nameIdx];
+		const string& simSeq = simSequences.Get(seqName);
+
+		int chrIdx;
+		long position;
+		randomPosition.Next(chrIdx, position);
+		
+		const string& chromosome = bamSimReader.mBamReader.GetReferenceData()[chrIdx].RefName;
+
+		bamSimReader.Read(chromosome, position, simSeq);
+
+		bamSimReader.WriteFastq(seqName, 0, fastq1File);
+		bamSimReader.WriteFastq(seqName, 1, fastq2File);
+	}
 }
 
 

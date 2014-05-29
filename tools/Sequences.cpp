@@ -114,6 +114,17 @@ void Sequences::ReadMappabilityBedGraph(const string& bedGraphFilename)
 	}
 }
 
+const string& Sequences::Get(const string& id) const
+{
+	if (mSequences.find(id) == mSequences.end())
+	{
+		cerr << "Error: Unable to find sequence " << id << endl;
+		exit(1);
+	}
+	
+	return mSequences.find(id)->second;
+}
+
 void Sequences::Get(const string& id, int start, int end, string& sequence) const
 {
 	if (mSequences.find(id) == mSequences.end())
@@ -207,5 +218,10 @@ void Sequences::GetWithDefault(const string& id, int start, int end, uint8_t dva
 			sequence.push_back(dval);
 		}
 	}
+}
+
+const vector<string>& Sequences::GetNames() const
+{
+	return mNames;
 }
 
