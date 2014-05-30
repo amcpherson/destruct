@@ -3,6 +3,7 @@ aligntrue
 bamconcordantcounts
 bamconcordantreads
 bamdiscordantfastq
+bamextractsimreads
 bamfastq
 bammixture
 bamsamplefastq
