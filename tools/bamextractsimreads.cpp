@@ -146,12 +146,11 @@ struct BamSimReader : PileupVisitor
 
 		if (localPosition < 0 || localPosition >= mSimSequence.size())
 		{
-			assert(false);
 			return;
 		}
 
 		char refBase;
-		mFasta.GetBase(mFastaRefID, mStartPos, refBase);
+		mFasta.GetBase(mFastaRefID, pileupData.Position, refBase);
 
 		char simBase = mSimSequence[localPosition];
 
