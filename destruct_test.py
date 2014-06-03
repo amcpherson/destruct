@@ -85,6 +85,7 @@ if __name__ == '__main__':
         pyp.sch.input(os.path.join(cfg.outdir, 'bam_list.tsv')),
         pyp.sch.output(os.path.join(cfg.outdir, 'breakpoints.tsv')),
         pyp.sch.output(os.path.join(cfg.outdir, 'breakreads.tsv')),
+        pyp.sch.output(os.path.join(cfg.outdir, 'plots.tar')),
         '--config', pyp.sch.input(cfg.config),
         '--tmp', pyp.sch.tmpfile('destruct_tmp'),
         '--nocleanup', '--repopulate')

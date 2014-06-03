@@ -23,6 +23,7 @@ if __name__ == '__main__':
     argparser.add_argument('libraries', help='Libraries list filename')
     argparser.add_argument('breakpoints', help='Breakpoints table filename')
     argparser.add_argument('breakreads', help='Breakpoint reads table filename')
+    argparser.add_argument('plots_tar', help='Diagnostic plots tar filename')
 
     cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
     pyp = pypeliner.easypypeliner.EasyPypeliner([destruct, destruct_genesis], cfg)

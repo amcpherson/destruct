@@ -55,7 +55,7 @@ if __name__ == '__main__':
     sch.commandline('prepsample', axes, medmem, 'cat', sch.ifile('sample1', axes), sch.ifile('sample2', axes), '>', sch.ofile('sample', axes))
     sch.commandline('bwtsamplek2', axes, medmem, cfg.bowtie2_bin, '--very-sensitive', '-k', '2', '-x', cfg.genome_fasta, sch.ifile('sample', axes), '>', sch.ofile('sample.k2.sam', axes))
     sch.commandline('alignnull', axes, medmem, cfg.alignnull_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-c', sch.ifile('sample.sam', axes), '-a', sch.ifile('sample.k2.sam', axes), '-s', sch.ifile('sample', axes), '-r', cfg.genome_fasta, '>', sch.ofile('samples.align.null', axes))
-    sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), int(cfg.match_score), sch.ofile('score.stats', axes))
+    sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), int(cfg.match_score), sch.ofile('score.stats', axes), sch.ofile('score.stats.plots', axes), sch.inst('bysim'))
 
     sch.transform('readstats', axes, medmem, calculate_concordant_stats, sch.oobj('stats', axes), sch.ifile('sample.sam', axes))
 
@@ -64,8 +64,8 @@ if __name__ == '__main__':
     sch.commandline('bwtseed', axes, medmem, cfg.bowtie_bin, cfg.genome_fasta, sch.ifile('reads.seed', axes), '--chunkmbs', '512', '-k', '1000', '-m', '1000', '--strata', '--best', '-S', '>', sch.ofile('reads.seed.sam', axes))
     sch.commandline('realign', axes, medmem, cfg.realign2_tool, '-a', sch.ifile('reads.seed.sam', axes), '-s', sch.ifile('reads', axes), '-r', cfg.genome_fasta, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmin', sch.iobj('stats', axes).prop('fragment_length_min'), '--flmax', sch.iobj('stats', axes).prop('fragment_length_max'), '--tchimer', cfg.chimeric_threshold, '--talign', cfg.alignment_threshold, '--pchimer', cfg.chimeric_prior, '--pvalid', cfg.readvalid_prior, '--tvalid', cfg.readvalid_threshold, '-z', sch.ifile('score.stats', axes), '--span', sch.ofile('spanning.alignments', axes), '--split', sch.ofile('split.alignments', axes))
 
-    sch.transform('eval_span_align', axes, medmem, eval_span_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('spanning.alignments', axes), sch.ofile('spanning.alignments.eval', axes))
-    sch.transform('eval_split_align', axes, medmem, eval_split_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('split.alignments', axes), sch.ofile('split.alignments.eval', axes))
+    sch.transform('eval_span_align', axes, medmem, eval_span_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('spanning.alignments', axes), sch.ofile('spanning.alignments.anno', axes), sch.ofile('spanning.alignments.eval', axes))
+    sch.transform('eval_split_align', axes, medmem, eval_split_align, None, sch.ifile('simulated.info', axes), sch.ifile('reads1', axes), sch.ifile('split.alignments', axes), sch.ofile('split.alignments.anno', axes), sch.ofile('split.alignments.eval', axes))
 
     sch.commandline('cluster', axes, himem, cfg.clustermatepairs_tool, '-a', sch.ifile('spanning.alignments', axes), '-m', '1', '-u', sch.iobj('stats', axes).prop('fragment_length_mean'), '-d', sch.iobj('stats', axes).prop('fragment_length_stddev'), '-o', sch.ofile('clusters', axes))
     sch.commandline('breaks', axes, himem, cfg.predictbreaks_tool, '-s', sch.ifile('split.alignments', axes), '-c', sch.ifile('clusters', axes), '-r', cfg.genome_fasta, '-b', sch.ofile('breakpoints', axes))
@@ -132,7 +132,7 @@ else:
         return simulated
 
 
-    def eval_span_align(simulated_filename, reads_filename, spanning_filename, eval_filename):
+    def eval_span_align(simulated_filename, reads_filename, spanning_filename, spanning_annotated_filename, eval_filename):
 
         max_diff = 1000
 
@@ -165,6 +165,8 @@ else:
         spanning['is_true'] = spanning['is_side_1'] | spanning['is_side_2']
         spanning['is_true_best'] = spanning['is_true'] & spanning['is_best']
 
+        spanning.to_csv(spanning_annotated_filename, sep='\t', index=False)
+
         spanning = spanning.set_index(['sim_id', 'read_id', 'read_end'])
 
         true_alignment = spanning['is_true'].groupby(level=[0,1,2]).apply(any).unstack().apply(any, axis=1)
@@ -180,7 +182,7 @@ else:
         span_eval.to_csv(eval_filename, sep='\t', index=True)
 
 
-    def eval_split_align(simulated_filename, reads_filename, split_filename, eval_filename):
+    def eval_split_align(simulated_filename, reads_filename, split_filename, split_annotated_filename, eval_filename):
 
         sim_reads = create_sim_read_table(reads_filename)
         simulated = read_simulated_table(simulated_filename)
@@ -230,6 +232,8 @@ else:
 
         split['is_true'] = split['is_side_1'] | split['is_side_2']
         split['is_true_best'] = split['is_true'] & split['is_best']
+
+        split.to_csv(split_annotated_filename, sep='\t', index=False)
 
         split = split.set_index(['sim_id', 'read_id', 'read_end'])
 
