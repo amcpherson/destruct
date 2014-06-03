@@ -26,6 +26,7 @@ if args.candidate_id is not None:
     cnv = cnv.loc[(cnv['candidate_id'] == args.candidate_id)]
 
 cnv = cnv.loc[(cnv['chr'].isin(chromosomes))]
+cnv = cnv.loc[(cnv['high_conf'] == 1)]
 
 cnv['chr_index'] = cnv['chr'].apply(lambda a: chromosome_indices[a])
 
