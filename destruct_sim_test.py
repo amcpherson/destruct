@@ -21,7 +21,7 @@ import pypeliner
 
 if __name__ == '__main__':
 
-    import destruct_test
+    import destruct_sim_test
     import create_breakpoint_simulation
 
     argparser = argparse.ArgumentParser()
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     argparser.add_argument('results', help='Test results plots (pdf)')
 
     cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
-    pyp = pypeliner.easypypeliner.EasyPypeliner([destruct_test, create_breakpoint_simulation], cfg)
+    pyp = pypeliner.easypypeliner.EasyPypeliner([destruct_sim_test, create_breakpoint_simulation], cfg)
 
     if not cfg.results.lower().endswith('.pdf'):
         raise Exception('results file requires pdf extension')
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     except OSError:
         pass
 
-    pyp.sch.transform('read_params', (), ctx, destruct_test.read_simulation_params,
+    pyp.sch.transform('read_params', (), ctx, destruct_sim_test.read_simulation_params,
         pyp.sch.oobj('simulation.params'), 
         pyp.sch.input(cfg.simconfig))
 
@@ -72,7 +72,7 @@ if __name__ == '__main__':
         '--config', pyp.sch.input(cfg.config),
         '--tmp', pyp.sch.tmpfile('bwa_tmp'))
 
-    pyp.sch.transform('write_bam_list', (), ctx, destruct_test.write_bam_list,
+    pyp.sch.transform('write_bam_list', (), ctx, destruct_sim_test.write_bam_list,
         None,
         pyp.sch.output(os.path.join(cfg.outdir, 'bam_list.tsv')),
         **{'simulated':pyp.sch.input(os.path.join(cfg.outdir, 'simulated.bam'))})
@@ -90,7 +90,7 @@ if __name__ == '__main__':
         '--tmp', pyp.sch.tmpfile('destruct_tmp'),
         '--nocleanup', '--repopulate')
 
-    pyp.sch.transform('plot', (), ctx, destruct_test.create_roc_plot,
+    pyp.sch.transform('plot', (), ctx, destruct_sim_test.create_roc_plot,
         None,
         pyp.sch.iobj('simulation.params'),
         pyp.sch.input(os.path.join(cfg.outdir, 'simulated.tsv')),
