@@ -57,7 +57,7 @@ if __name__ == '__main__':
     sch.commandline('alignnull', axes, medmem, cfg.alignnull_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-c', sch.ifile('sample.sam', axes), '-a', sch.ifile('sample.k2.sam', axes), '-s', sch.ifile('sample', axes), '-r', cfg.genome_fasta, '>', sch.ofile('samples.align.null', axes))
     sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), sch.ifile('samples.align.null', axes), int(cfg.match_score), sch.ofile('score.stats', axes), sch.ofile('score.stats.plots', axes), sch.inst('bysim'))
 
-    sch.transform('readstats', axes, medmem, calculate_concordant_stats, sch.oobj('stats', axes), sch.ifile('sample.sam', axes))
+    sch.transform('readstats', axes, medmem, calculate_concordant_stats, sch.oobj('stats', axes), sch.ifile('sample.sam', axes), float(cfg.fragment_length_num_stddevs))
 
     sch.transform('prepseed', axes, medmem, prepare_seed_fastq, None, sch.ifile('reads1', axes), sch.ifile('reads2', axes), 36, sch.ofile('reads.seed', axes))
     sch.commandline('prepreads', axes, medmem, 'cat', sch.ifile('reads1', axes), sch.ifile('reads2', axes), '>', sch.ofile('reads', axes))
@@ -139,7 +139,7 @@ else:
         sim_reads = create_sim_read_table(reads_filename)
         simulated = read_simulated_table(simulated_filename)
 
-        spanning = pd.read_csv(spanning_filename, sep='\t', header=None,
+        spanning = pd.read_csv(spanning_filename, sep='\t', header=None, index_col=False,
                                converters={'chromosome':str},
                                names=['read_id', 'read_end',
                                       'chromosome', 'strand', 'start', 'end',
@@ -187,7 +187,7 @@ else:
         sim_reads = create_sim_read_table(reads_filename)
         simulated = read_simulated_table(simulated_filename)
 
-        split = pd.read_csv(split_filename, sep='\t', header=None,
+        split = pd.read_csv(split_filename, sep='\t', header=None, index_col=False,
                             converters={'chromosome_1':str, 'chromosome_2':str},
                             names=['read_id', 'read_end',
                                    'chromosome_1', 'strand_1', 'position_1',
@@ -421,7 +421,8 @@ else:
 
 
     class ConcordantReadStatsAccumulator(object):
-        def __init__(self):
+        def __init__(self, fragment_length_num_stddevs):
+            self.fragment_length_num_stddevs = fragment_length_num_stddevs
             self.read_lengths = set()
             self.fragment_length_sum = 0
             self.fragment_length_sum_sq = 0
@@ -448,10 +449,10 @@ else:
             return self.fragment_length_sum_sq / self.fragment_count - self.fragment_length_mean ** 2
         @property
         def fragment_length_min(self):
-            return int(max(0, self.fragment_length_mean - 3 * self.fragment_length_stddev))
+            return int(max(0, self.fragment_length_mean - self.fragment_length_num_stddevs * self.fragment_length_stddev))
         @property
         def fragment_length_max(self):
-            return int(self.fragment_length_mean + 3 * self.fragment_length_stddev)
+            return int(self.fragment_length_mean + self.fragment_length_num_stddevs * self.fragment_length_stddev)
 
 
     class SamRecord(object):
@@ -542,8 +543,8 @@ else:
         deleted_re = re.compile('(\d+)D')
 
 
-    def calculate_concordant_stats(concordant_sam):
-        stats = ConcordantReadStatsAccumulator()
+    def calculate_concordant_stats(concordant_sam, fragment_length_num_stddevs):
+        stats = ConcordantReadStatsAccumulator(fragment_length_num_stddevs)
         try:
             with open(concordant_sam, 'r') as concordant:
                 for line_1 in concordant:

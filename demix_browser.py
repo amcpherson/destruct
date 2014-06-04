@@ -43,8 +43,8 @@ cnv.reset_index(inplace=True)
 
 cnv['chromosome_mid'] = 0.5 * (cnv['chromosome_start'] + cnv['chromosome_end'])
 
-cnv['start'] += cnv['chromosome_start']
-cnv['end'] += cnv['chromosome_start']
+cnv['plot_start'] = cnv['start'] + cnv['chromosome_start']
+cnv['plot_end'] = cnv['end'] + cnv['chromosome_start']
 
 mingap = 1000
 
@@ -89,11 +89,11 @@ major_connectors = list()
 minor_connectors = list()
 
 for (idx, row), (next_idx, next_row) in itertools.izip_longest(cnv.iterrows(), cnv.iloc[1:].iterrows(), fillvalue=(None, None)):
-    major_segments.append([(row['start'], row['major_raw']), (row['end'], row['major_raw'])])
-    minor_segments.append([(row['start'], row['minor_raw']), (row['end'], row['minor_raw'])])
-    if next_row is not None and next_row['start'] - row['end'] < mingap and next_row['chr'] == row['chr']:
-        major_connectors.append([(row['end'], row['major_raw']), (next_row['start'], next_row['major_raw'])])
-        minor_connectors.append([(row['end'], row['minor_raw']), (next_row['start'], next_row['minor_raw'])])
+    major_segments.append([(row['plot_start'], row['major_raw']), (row['plot_end'], row['major_raw'])])
+    minor_segments.append([(row['plot_start'], row['minor_raw']), (row['plot_end'], row['minor_raw'])])
+    if next_row is not None and next_row['plot_start'] - row['plot_end'] < mingap and next_row['chr'] == row['chr']:
+        major_connectors.append([(row['plot_end'], row['major_raw']), (next_row['plot_start'], next_row['major_raw'])])
+        minor_connectors.append([(row['plot_end'], row['minor_raw']), (next_row['plot_start'], next_row['minor_raw'])])
 
 major_segments = matplotlib.collections.LineCollection(major_segments, colors='r')
 minor_segments = matplotlib.collections.LineCollection(minor_segments, colors='b')
@@ -117,7 +117,7 @@ if args.positions is not None:
         markerline, stemlines, baseline = ax2.stem([pos, pos], [-10, 0.5], linefmt='-', markerfmt='-o', color='k')
         plt.setp(markerline, 'markerfacecolor', 'orange', 'markeredgecolor', 'k', 'zorder', 2)
 
-ax2.set_xlim((cnv['start'].min(), cnv['end'].max()))
+ax2.set_xlim((cnv['plot_start'].min(), cnv['plot_end'].max()))
 ax2.set_ylim((-0.2, copies_max + 0.2))
 
 ax2.set_xticks([0] + sorted(cnv['chromosome_end'].unique()))
@@ -150,6 +150,10 @@ class Picker(object):
                 self.select_chromosome(chromosome)
 
         elif isinstance(event.artist, matplotlib.collections.PathCollection) or isinstance(event.artist, matplotlib.collections.LineCollection):
+
+            # Print the segment to the terminal
+            cnv_region = cnv.iloc[event.ind[0]]
+            print 'selected: {0}:{1}-{2}'.format(cnv_region['chr'], int(cnv_region['start']), int(cnv_region['end']))
 
             self.select_segment(event.ind)
 
@@ -216,7 +220,7 @@ class Picker(object):
         major_minor_scatter.set_facecolors(scatter_colors)
 
         # Redo xaxis for full view
-        ax2.set_xlim((cnv['start'].min(), cnv['end'].max()))
+        ax2.set_xlim((cnv['plot_start'].min(), cnv['plot_end'].max()))
         ax2.set_xticks([0] + sorted(cnv['chromosome_end'].unique()))
         ax2.set_xticklabels([])
         ax2.xaxis.set_minor_locator(matplotlib.ticker.FixedLocator(sorted(cnv['chromosome_mid'].unique())))
