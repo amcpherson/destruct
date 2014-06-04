@@ -373,6 +373,13 @@ sources = """
 env.Program(target='bamextractsimreads', source=common_sources+bamtools_sources+sources)
 
 sources = """
+    bampartition.cpp
+    Parsers.cpp
+    Sequences.cpp
+""".split()
+env.Program(target='bampartition', source=common_sources+bamtools_sources+sources)
+
+sources = """
     Parsers.cpp
     bamstats.cpp
 """.split()
