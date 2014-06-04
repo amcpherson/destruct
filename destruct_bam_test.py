@@ -28,6 +28,7 @@ if __name__ == '__main__':
     pypeliner.easypypeliner.add_arguments(argparser)
     argparser.add_argument('simconfig', help='Simulation configuration filename')
     argparser.add_argument('bam', help='Source bam filename')
+    argparser.add_argument('ref', help='Reference genome for source bam')
     argparser.add_argument('outdir', help='Output directory')
     argparser.add_argument('results', help='Test results plots (pdf)')
 
