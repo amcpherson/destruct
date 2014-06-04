@@ -118,7 +118,7 @@ def simulate(cfg, sim_info, read_count, sequences_fasta, reads1, reads2, random_
     except OSError:
         pass
 
-def create(cfg, sim_info, breakpoints_fasta, breakpoints_info, concordant1, concordant2, discordant1, discordant2):
+def create_breakpoints(cfg, sim_info, breakpoints_fasta, breakpoints_info):
     random.seed(int(sim_info['breakpoints_seed']))
     genome = dict(read_sequences(open(cfg.genome_fasta, 'r')))
     with open(breakpoints_fasta, 'w') as fasta, open(breakpoints_info, 'w') as info:
@@ -126,6 +126,9 @@ def create(cfg, sim_info, breakpoints_fasta, breakpoints_info, concordant1, conc
             chr1, str1, pos1, chr2, str2, pos2, inserted, sequence, homology = create_random_breakpoint(genome, int(sim_info['num_inserted']), int(sim_info['adjacent_length']), int(sim_info['homology']))
             fasta.write('>{0}\n{1}\n'.format(idx, sequence))
             info.write('\t'.join([str(a) for a in (idx, chr1, str1, pos1, chr2, str2, pos2, inserted, homology)]) + '\n')
+
+def create(cfg, sim_info, breakpoints_fasta, breakpoints_info, concordant1, concordant2, discordant1, discordant2):
+    create_breakpoints(cfg, sim_info, breakpoints_fasta, breakpoints_info)
     sequences_size = sum([len(seq) for id, seq in read_sequences(open(breakpoints_fasta, 'r'))])
     read_count = int(float(sim_info['coverage']) * sequences_size / float(sim_info['fragment_mean']))
     simulate(cfg, sim_info, read_count, breakpoints_fasta, discordant1, discordant2, False)
