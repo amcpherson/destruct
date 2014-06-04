@@ -73,6 +73,8 @@ if __name__ == '__main__':
         '-1', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.1.fastq')),
         '-2', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.2.fastq')))
 
+    bwaalign_script = os.path.join(cfg.destruct_directory, 'bwaalign.py')
+
     pyp.sch.commandline('bwa_align', (), ctx, 
         sys.executable,
         bwaalign_script,
