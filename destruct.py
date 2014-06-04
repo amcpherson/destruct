@@ -111,7 +111,7 @@ else:
 
         sch.commandline('bamdisc', axes, medmem, cfg.bamdiscordantfastq_tool, '-r', '-c', cfg.bam_max_soft_clipped, '-f', cfg.bam_max_fragment_length, '-b', bams, '-s', sch.ofile('stats.file', axes), '-1', sch.ofile('reads1.unfiltered', axes), '-2', sch.ofile('reads2.unfiltered', axes), '-t', sch.tmpfile('bamdisc.tempspace', axes))
         sch.commandline('bamsample', axes, medmem, cfg.bamsamplefastq_tool, '-r', '-b', bams, '-n', cfg.num_read_samples, '-1', sch.ofile('sample1.unfiltered', axes), '-2', sch.ofile('sample2.unfiltered', axes))
-        sch.transform('readstats', axes, lowmem, read_stats, sch.oobj('stats', axes), sch.ifile('stats.file', axes), sch.ofile('flen.plots', axes), sch.inst('bylibrary'))
+        sch.transform('readstats', axes, lowmem, read_stats, sch.oobj('stats', axes), sch.ifile('stats.file', axes), float(cfg.fragment_length_num_stddevs), sch.ofile('flen.plots', axes), sch.inst('bylibrary'))
         sch.commandline('qtrimdisc', axes, lowmem, cfg.qualtrimfastq_tool, '-o', cfg.base_quality_offset, '-l', '36', '-q', '5', sch.ifile('reads1.unfiltered', axes), sch.ifile('reads2.unfiltered', axes), sch.ofile('reads1', axes), sch.ofile('reads2', axes))
         sch.commandline('qtrimsample', axes, lowmem, cfg.qualtrimfastq_tool, '-o', cfg.base_quality_offset, '-l', '36', '-q', '5', sch.ifile('sample1.unfiltered', axes), sch.ifile('sample2.unfiltered', axes), sch.ofile('sample1', axes), sch.ofile('sample2', axes))
 
@@ -159,8 +159,9 @@ else:
 
 
     class ConcordantReadStats(object):
-        def __init__(self, stats):
+        def __init__(self, stats, fragment_length_num_stddevs):
             self.stats = stats
+            self.fragment_length_num_stddevs = fragment_length_num_stddevs
         @property
         def fragment_length_mean(self):
             return float(self.stats['fragment_mean'])
@@ -169,13 +170,13 @@ else:
             return float(self.stats['fragment_stddev'])
         @property
         def fragment_length_min(self):
-            return int(self.fragment_length_mean - 3 * self.fragment_length_stddev)
+            return int(self.fragment_length_mean - self.fragment_length_num_stddevs * self.fragment_length_stddev)
         @property
         def fragment_length_max(self):
-            return int(self.fragment_length_mean + 3 * self.fragment_length_stddev)
+            return int(self.fragment_length_mean + self.fragment_length_num_stddevs * self.fragment_length_stddev)
 
 
-    def read_stats(stats_filename, plots_tar_filename, library_id):
+    def read_stats(stats_filename, fragment_length_num_stddevs, plots_tar_filename, library_id):
         stats = pd.read_csv(stats_filename, sep='\t')
         flen_stats = stats.loc[stats['type'] == 'fragment_length'].drop('type', axis=1)
         flen_stats = flen_stats.astype(float)
@@ -189,7 +190,7 @@ else:
             plt.title('fragment lengths for library {0}'.format(library_id))
             utils.plots.savefig_tar(plots_tar, fig, 'fragment_length_{0}.pdf'.format(library_id))
             plt.clf()
-        return ConcordantReadStats({'fragment_mean':fragment_mean, 'fragment_stddev':fragment_stddev})
+        return ConcordantReadStats({'fragment_mean':fragment_mean, 'fragment_stddev':fragment_stddev}, fragment_length_num_stddevs)
 
 
     def split_file_byline(in_filename, lines_per_file, out_filename_callback):
