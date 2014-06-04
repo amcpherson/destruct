@@ -6,6 +6,7 @@ bamdiscordantfastq
 bamextractsimreads
 bamfastq
 bammixture
+bampartition
 bamsamplefastq
 bamsamplespanning
 bamstats
