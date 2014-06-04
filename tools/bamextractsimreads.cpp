@@ -96,6 +96,12 @@ struct BamSimReader : PileupVisitor
 		mEndPos = position + simSequence.size();
 		mSimSequence = simSequence;
 
+		mReadNames.clear();
+		mAlignments[0].clear();
+		mAlignments[1].clear();
+		mModifications[0].clear();
+		mModifications[1].clear();
+
 		// Set the region for the bam index
 		int bamRefID = mBamReader.GetReferenceID(chromosome);
 		mBamReader.SetRegion(BamRegion(bamRefID, position, bamRefID, mEndPos));
@@ -212,7 +218,7 @@ struct BamSimReader : PileupVisitor
 				alignment.QueryBases[modIter->first] = modIter->second;
 			}
 
-			fastq << "@" << namePrefix << "_" << readID << "/" << readID+1 << endl;
+			fastq << "@" << namePrefix << "_" << readID << "/" << readEnd+1 << endl;
 			fastq << GetSequence(alignment) << endl;
 			fastq << "+" << readName << endl;
 			fastq << GetQualities(alignment) << endl;
