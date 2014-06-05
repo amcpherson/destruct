@@ -116,7 +116,7 @@ if __name__ == '__main__':
         pyp.sch.output(os.path.join(cfg.outdir, 'plots.tar')),
         '--config', pyp.sch.input(cfg.config),
         '--tmp', pyp.sch.tmpfile('destruct_tmp'),
-        '--nocleanup', '--repopulate')
+        '--nocleanup', '--repopulate', '--maxjobs', 4)
 
     pyp.sch.transform('plot', (), ctx, destruct_bam_test.create_roc_plot,
         None,
@@ -210,7 +210,7 @@ else:
         results = pd.read_csv(predicted_filename, sep='\t',
                               converters={'cluster_id':str, 'chromosome_1':str, 'chromosome_2':str})
 
-        results = results[results['normal_count'] > 0]
+        results = results[results['normal_count'] == 0]
 
         min_dist = 200
 
@@ -239,7 +239,7 @@ else:
 
         fig = plt.figure(figsize=(16,16))
 
-        for feature in ('align_prob', 'valid_prob', 'chimeric_prob', 'simulated_count', 'num_split'):
+        for feature in ('align_prob', 'valid_prob', 'chimeric_prob', 'tumour_count', 'num_split'):
             probs = np.concatenate([results[feature], np.array([0.0]*num_missed)])
             fpr, tpr, thresholds = roc_curve(y_test, probs)
             roc_auc = auc(fpr, tpr)
