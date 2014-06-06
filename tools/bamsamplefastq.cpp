@@ -31,12 +31,38 @@ using namespace std;
 using namespace BamTools;
 
 
+inline string GetSequence(const BamAlignment& alignment)
+{
+	string sequence = alignment.QueryBases;
+	if (alignment.IsReverseStrand())
+	{
+		ReverseComplement(sequence);
+	}
+	return sequence;
+}
+
+inline string GetQualities(const BamAlignment& alignment)
+{
+	string qualities = alignment.Qualities;
+	if (alignment.IsReverseStrand())
+	{
+		reverse(qualities.begin(), qualities.end());
+	}
+	return qualities;
+}
+
 struct ReadData
 {
-	ReadData(const string& sequence, const string& qualities, bool failedQC) : sequence(sequence), qualities(qualities), failedQC(failedQC) {}
+	ReadData(const BamAlignment& alignment)
+	{
+		sequence = GetSequence(alignment);
+		qualities = GetQualities(alignment);
+		failed = alignment.IsFailedQC() || (alignment.MapQuality <= 0);
+	}
+
 	string sequence;
 	string qualities;
-	bool failedQC;
+	bool failed;
 };
 
 bool IsInSample(RandomNumberGenerator& rng, int previousReadCount, int numSamples, int& sampleIndex)
@@ -56,26 +82,6 @@ bool IsInSample(RandomNumberGenerator& rng, int previousReadCount, int numSample
 	}
 	
 	return false;
-}
-
-inline string GetSequence(const BamAlignment& alignment)
-{
-	string sequence = alignment.QueryBases;
-	if (alignment.IsReverseStrand())
-	{
-		ReverseComplement(sequence);
-	}
-	return sequence;
-}
-
-inline string GetQualities(const BamAlignment& alignment)
-{
-	string qualities = alignment.Qualities;
-	if (alignment.IsReverseStrand())
-	{
-		reverse(qualities.begin(), qualities.end());
-	}
-	return qualities;
 }
 
 unordered_set<string> BamSampleReadNames(const string& bamFilename, int numSamples)
@@ -175,15 +181,14 @@ int main(int argc, char* argv[])
 		
 		int readEnd = alignment.IsFirstMate() ? 0 : 1;
 		int otherReadEnd = OtherReadEnd(readEnd);
-		
-		string sequence = GetSequence(alignment);
-		string qualities = GetQualities(alignment);
+
+		ReadData readData(alignment);
 		
 		unordered_map<string,ReadData>::iterator otherEndIter = readBuffer[otherReadEnd].find(alignment.Name);
 		
 		if (otherEndIter != readBuffer[otherReadEnd].end())
 		{
-			if (!alignment.IsFailedQC() && !otherEndIter->second.failedQC)
+			if (!readData.failed && !otherEndIter->second.failed)
 			{
 				string fragment = alignment.Name;
 				
@@ -195,9 +200,9 @@ int main(int argc, char* argv[])
 				}
 				
 				*fastqFiles[readEnd] << "@" << fragment << "/" << readEnd + 1 << endl;
-				*fastqFiles[readEnd] << sequence << endl;
+				*fastqFiles[readEnd] << readData.sequence << endl;
 				*fastqFiles[readEnd] << "+" << alignment.Name << endl;
-				*fastqFiles[readEnd] << qualities << endl;
+				*fastqFiles[readEnd] << readData.qualities << endl;
 				
 				*fastqFiles[otherReadEnd] << "@" << fragment << "/" << otherReadEnd + 1 << endl;
 				*fastqFiles[otherReadEnd] << otherEndIter->second.sequence << endl;
@@ -211,7 +216,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			readBuffer[readEnd].insert(make_pair(alignment.Name, ReadData(sequence, qualities, alignment.IsFailedQC())));
+			readBuffer[readEnd].insert(make_pair(alignment.Name, readData));
 		}
 	}
 }
