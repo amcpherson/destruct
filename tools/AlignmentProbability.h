@@ -17,17 +17,11 @@ public:
 	void ReadDistributions(const string& filename);
 	
 	double ProbTrue(int alignedLength, int score) const;
-	double ProbInvalid(int alignedLength, int score) const;
-	double ProbFalse(int alignedLength, int score) const;
-	double Classify(int alignedLength, int score, double prior) const;
 	
 private:
 	int mMatchScore;
-	DoubleMap mMixWeight;
 	DoubleMap mNBSizeTrue;
 	DoubleMap mNBProbTrue;
-	DoubleMap mNBSizeInvalid;
-	DoubleMap mNBProbInvalid;
 	unordered_map<int,pair<double,int> > mProbTrueMode;
 };
 
