@@ -28,6 +28,7 @@ if __name__ == '__main__':
     pypeliner.easypypeliner.add_arguments(argparser)
     argparser.add_argument('simconfig', help='Simulation configuration filename')
     argparser.add_argument('bam', help='Source bam filename')
+    argparser.add_argument('ref', help='Reference genome for source bam')
     argparser.add_argument('outdir', help='Output directory')
     argparser.add_argument('results', help='Test results plots (pdf)')
 
@@ -69,6 +70,7 @@ if __name__ == '__main__':
         '-b', pyp.sch.input(cfg.bam),
         '-r', pyp.sch.input(cfg.ref),
         '-s', pyp.sch.input(os.path.join(cfg.outdir, 'simulated.fasta')),
+        '-f', pyp.sch.iobj('simulation.params').extract(lambda a: a['coverage_fraction']),
         '-1', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.1.fastq')),
         '-2', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.2.fastq')))
 
@@ -115,7 +117,7 @@ if __name__ == '__main__':
         pyp.sch.output(os.path.join(cfg.outdir, 'plots.tar')),
         '--config', pyp.sch.input(cfg.config),
         '--tmp', pyp.sch.tmpfile('destruct_tmp'),
-        '--nocleanup', '--repopulate')
+        '--nocleanup', '--repopulate', '--maxjobs', 4)
 
     pyp.sch.transform('plot', (), ctx, destruct_bam_test.create_roc_plot,
         None,
@@ -140,7 +142,7 @@ else:
         sim_info['read_length'] = config.get(section, 'read_length')
         sim_info['fragment_mean'] = config.get(section, 'fragment_mean')
         sim_info['fragment_stddev'] = config.get(section, 'fragment_stddev')
-        sim_info['coverage'] = config.get(section, 'coverage')
+        sim_info['coverage_fraction'] = config.get(section, 'coverage_fraction')
         sim_info['num_inserted'] = config.get(section, 'num_inserted')
         sim_info['homology'] = config.get(section, 'homology')
         sim_info['adjacent_length'] = config.get(section, 'adjacent_length')
@@ -209,7 +211,7 @@ else:
         results = pd.read_csv(predicted_filename, sep='\t',
                               converters={'cluster_id':str, 'chromosome_1':str, 'chromosome_2':str})
 
-        results = results[results['normal_count'] > 0]
+        results = results[results['normal_count'] == 0]
 
         min_dist = 200
 
@@ -238,7 +240,7 @@ else:
 
         fig = plt.figure(figsize=(16,16))
 
-        for feature in ('align_prob', 'valid_prob', 'chimeric_prob', 'simulated_count', 'num_split'):
+        for feature in ('align_prob', 'valid_prob', 'chimeric_prob', 'tumour_count', 'num_split'):
             probs = np.concatenate([results[feature], np.array([0.0]*num_missed)])
             fpr, tpr, thresholds = roc_curve(y_test, probs)
             roc_auc = auc(fpr, tpr)
