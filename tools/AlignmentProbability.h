@@ -9,41 +9,72 @@
 #include "Common.h"
 
 
+class ScoreLikelihoodCalculator
+{
+public:
+	ScoreLikelihoodCalculator() : mMaxScore(0), mExponLambda(0.0) {}
+	ScoreLikelihoodCalculator(int maxScore, double exponLambda) : mMaxScore(maxScore), mExponLambda(exponLambda) {}
+
+	double Calculate(int score) const;
+
+private:
+	int mMaxScore;
+	double mExponLambda;
+};
+
+
 class AlignmentProbability
 {
 public:
 	AlignmentProbability(int matchScore) : mMatchScore(matchScore) {}
 	
-	void ReadDistributions(const string& filename);
+	void ReadDistributions(const string& filename, double cdfThreshold);
 	
-	double ProbTrue(int alignedLength, int score) const;
-	
+	double Likelihood(int alignedLength, int score) const;
+	bool AboveThreshold(int alignedLength, int score) const;
+
 private:
 	int mMatchScore;
-	DoubleMap mNBSizeTrue;
-	DoubleMap mNBProbTrue;
-	unordered_map<int,pair<double,int> > mProbTrueMode;
+	unordered_map<int,ScoreLikelihoodCalculator> mScoreLikelihoods;
+	unordered_map<int,int> mScoreThresholds;
 };
 
 
 class AlignmentPosterior
 {
 public:
-	AlignmentPosterior()
-	: mAlignmentProbability(0), mAlignedLength(0), mMaxScore(0), mSumProbTrue(0.0) {}
+	AlignmentPosterior(const AlignmentProbability& alignmentProbability, double priorDiscordant, const vector<int>& alignedLengths)
+	: mAlignmentProbability(alignmentProbability), mPriorDiscordant(priorDiscordant), mAlignedLengths(alignedLengths)
+	{
+		mSumReadLikelihood[0] = 0.0;
+		mSumReadLikelihood[1] = 0.0;
+		mSumConcordantLikelihood = 0.0;
+	}
 	
-	void Initialize(const AlignmentProbability* alignmentProbability, int alignedLength);
+	// Add alignment to the posterior calculation
+	void AppendAlignment(int readEnd, int score);
+
+	// Add alignment to the posterior calculation including
+	// score of a potentially concordant mate
+	void AppendAlignmentWithMate(int readEnd, int score, int mateScore);
 	
-	void AddAlignment(int score);
-	
-	double MaxPosterior();
-	double Posterior(int score);
+	// Posterior probability an alignment location is correct
+	double Posterior(int index);
+
+	// Posterior probability any concordant paired alignment is correct
+	double PosteriorConcordant();
 	
 private:
-	const AlignmentProbability* mAlignmentProbability;
-	int mAlignedLength;
-	int mMaxScore;
-	double mSumProbTrue;
+	double mPriorDiscordant;
+	const AlignmentProbability& mAlignmentProbability;
+	vector<int> mAlignedLengths;
+
+	double mSumReadLikelihood[2];
+	double mSumConcordantLikelihood;
+
+	vector<double> mReadEnd;
+	vector<double> mReadLikelihood;
+	vector<double> mConcordantLikelihood;
 };
 
 

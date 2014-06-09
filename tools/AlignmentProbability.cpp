@@ -8,14 +8,17 @@
 #include "Common.h"
 
 #include <fstream>
-#include <boost/algorithm/string.hpp>
-#include <boost/math/distributions/negative_binomial.hpp>
 
 using namespace boost;
 using namespace std;
 
 
-void AlignmentProbability::ReadDistributions(const string& filename)
+double ScoreLikelihoodCalculator::Calculate(int score) const
+{
+	return mExponLambda * exp(-mExponLambda * (double)(mMaxScore - score));
+}
+
+void AlignmentProbability::ReadDistributions(const string& filename, double cdfThreshold)
 {
 	ifstream distFile(filename.c_str());
 	
@@ -29,61 +32,91 @@ void AlignmentProbability::ReadDistributions(const string& filename)
 	while (ReadTSV(distFile, fields))
 	{
 		int alignedLength = SAFEPARSE(int, fields[0]);
+		double exponLambda = SAFEPARSE(double, fields[1]);
+
+		int maxScore = mMatchScore * alignedLength;
+
+		ScoreLikelihoodCalculator scoreLikelihood(maxScore, exponLambda);
 		
-		mNBSizeTrue[alignedLength] = SAFEPARSE(double, fields[2]);
-		mNBProbTrue[alignedLength] = SAFEPARSE(double, fields[3]);
-
-		// Simulations produce unrealistic curves
-		// As a work around, a score that is better than the mode will get the probability at the mode
-		vector<pair<double,int> > probTrues;
-		for (int x = 0; x < mMatchScore * alignedLength; x++)
+		// Calculate a score threshold based on the cdf of the likelihood
+		double normalize = 0.0;
+		for (int score = mMatchScore * alignedLength; score >= -mMatchScore * alignedLength; score--)
 		{
-			double probTrue = pdf(math::negative_binomial(mNBSizeTrue[alignedLength], mNBProbTrue[alignedLength]), x);
-			probTrues.push_back(make_pair(probTrue, x));
+			normalize += scoreLikelihood.Calculate(score);
 		}
-		mProbTrueMode[alignedLength] = *max_element(probTrues.begin(), probTrues.end());;
+
+		double cdf = 0.0;
+		for (int score = mMatchScore * alignedLength; score >= -mMatchScore * alignedLength; score--)
+		{
+			cdf += scoreLikelihood.Calculate(score) / normalize;
+
+			if (cdf > (1.0 - cdfThreshold))
+			{
+				mScoreThresholds[alignedLength] = score + 1;
+				break;
+			}
+		}
+
+		assert(mScoreThresholds.find(alignedLength) != mScoreThresholds.end());
+
+		mScoreLikelihoods[alignedLength] = scoreLikelihood;
 	}
 }
 
-double AlignmentProbability::ProbTrue(int alignedLength, int score) const
+double AlignmentProbability::Likelihood(int alignedLength, int score) const
 {
-	// Simulations work around, see above
-	if (mMatchScore * alignedLength - score < mProbTrueMode.find(alignedLength)->second.second)
-	{
-		return mProbTrueMode.find(alignedLength)->second.first;
-	}
-
-	return pdf(math::negative_binomial(mNBSizeTrue.find(alignedLength)->second, mNBProbTrue.find(alignedLength)->second), mMatchScore * alignedLength - score);
+	return mScoreLikelihoods.find(alignedLength)->second.Calculate(score);
 }
 
-void AlignmentPosterior::Initialize(const AlignmentProbability* alignmentProbability, int alignedLength)
+bool AlignmentProbability::AboveThreshold(int alignedLength, int score) const
 {
-	mAlignmentProbability = alignmentProbability;
-	mAlignedLength = alignedLength;
-	mSumProbTrue = 0.0;
-	mMaxScore = 0;
+	return score >= mScoreThresholds.find(alignedLength)->second;
 }
 
-void AlignmentPosterior::AddAlignment(int score)
+void AlignmentPosterior::AppendAlignment(int readEnd, int score)
 {
-	double probTrue = mAlignmentProbability->ProbTrue(mAlignedLength, score);
+	double readLikelihood = mAlignmentProbability.Likelihood(mAlignedLengths[readEnd], score);
+
+	mSumReadLikelihood[readEnd] += readLikelihood;
+
+	mReadEnd.push_back(readEnd);
+	mReadLikelihood.push_back(readLikelihood);
+	mConcordantLikelihood.push_back(0.0);
+}
+
+void AlignmentPosterior::AppendAlignmentWithMate(int readEnd, int score, int mateScore)
+{
+	int mateEnd = OtherReadEnd(readEnd);
+
+	double readLikelihood = mAlignmentProbability.Likelihood(mAlignedLengths[readEnd], score);
+	double mateLikelihood = mAlignmentProbability.Likelihood(mAlignedLengths[mateEnd], mateScore);
+
+	mSumReadLikelihood[readEnd] += readLikelihood;
+	mSumReadLikelihood[mateEnd] += mateLikelihood;
+	mSumConcordantLikelihood += readLikelihood * mateLikelihood;
+
+	mReadEnd.push_back(readEnd);
+	mReadLikelihood.push_back(readLikelihood);
+	mConcordantLikelihood.push_back(readLikelihood * mateLikelihood);
+}
+
+double AlignmentPosterior::Posterior(int index)
+{
+	double N = mPriorDiscordant * mReadLikelihood[index] * mSumReadLikelihood[OtherReadEnd(mReadEnd[index])] + 
+	           (1.0 - 2.0 * mPriorDiscordant) * mConcordantLikelihood[index];
+	double Z = mPriorDiscordant * mSumReadLikelihood[0] * mSumReadLikelihood[1] + 
+	           (1.0 - 2.0 * mPriorDiscordant) * mSumConcordantLikelihood;
 	
-	mSumProbTrue += probTrue;
-	mMaxScore = max(mMaxScore, score);
+	return N / Z;
 }
 
-double AlignmentPosterior::MaxPosterior()
+double AlignmentPosterior::PosteriorConcordant()
 {
-	double probTrue = mAlignmentProbability->ProbTrue(mAlignedLength, mMaxScore);
+	double N = (1.0 - mPriorDiscordant) * mSumConcordantLikelihood;
+	double Z = mPriorDiscordant * mSumReadLikelihood[0] * mSumReadLikelihood[1] + 
+	           (1.0 - 2.0 * mPriorDiscordant) * mSumConcordantLikelihood;
 	
-	return probTrue / mSumProbTrue;
-}
-
-double AlignmentPosterior::Posterior(int score)
-{
-	double probTrue = mAlignmentProbability->ProbTrue(mAlignedLength, score);
-	
-	return probTrue / mSumProbTrue;
+	return N / Z;
 }
 
 

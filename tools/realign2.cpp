@@ -99,10 +99,8 @@ int main(int argc, char* argv[])
 	string readSeqsFilename;
 	string alignmentsFilename;
 	string statsFilename;
-	double validReadPrior;
 	double validReadThreshold;
 	double chimericPrior;
-	double chimericThreshold;
 	double alignmentThreshold;
 	string spanningFilename;
 	string splitFilename;
@@ -119,10 +117,8 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<string> readSeqsFilenameArg("s","seqs","Read Sequences Fastq",true,"","string",cmd);
 		TCLAP::ValueArg<string> alignmentsFilenameArg("a","align","Sam Alignments",true,"","string",cmd);
 		TCLAP::ValueArg<string> statsFilenameArg("z","stats","Stats Filename",true,"","string",cmd);
-		TCLAP::ValueArg<double> validReadPriorArg("","pvalid","Prior Probability of Valid Read",true,0.95,"float",cmd);
-		TCLAP::ValueArg<double> validReadThresholdArg("","tvalid","Valid Posterior Threshold",true,0.1,"float",cmd);
+		TCLAP::ValueArg<double> validReadThresholdArg("","tvalid","Valid Read Threshold",true,0.01,"float",cmd);
 		TCLAP::ValueArg<double> chimericPriorArg("","pchimer","Prior Probility of Chimeric Read",true,0.05,"float",cmd);
-		TCLAP::ValueArg<double> chimericThresholdArg("","tchimer","Chimeric Posterior Threshold",true,0.1,"float",cmd);
 		TCLAP::ValueArg<double> alignmentThresholdArg("","talign","Alignment Posterior Threshold",true,0.1,"float",cmd);
 		TCLAP::ValueArg<string> spanningFilenameArg("","span","Spanning Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> splitFilenameArg("","split","Splits Filename",true,"","string",cmd);
@@ -137,10 +133,8 @@ int main(int argc, char* argv[])
 		readSeqsFilename = readSeqsFilenameArg.getValue();
 		alignmentsFilename = alignmentsFilenameArg.getValue();
 		statsFilename = statsFilenameArg.getValue();
-		validReadPrior = validReadPriorArg.getValue();
 		validReadThreshold = validReadThresholdArg.getValue();
 		chimericPrior = chimericPriorArg.getValue();
-		chimericThreshold = chimericThresholdArg.getValue();
 		alignmentThreshold = alignmentThresholdArg.getValue();
 		spanningFilename = spanningFilenameArg.getValue();
 		splitFilename = splitFilenameArg.getValue();
@@ -165,7 +159,7 @@ int main(int argc, char* argv[])
 	cerr << "Reading alignment stats" << endl;
 	
 	AlignmentProbability alignProbability(matchScore);
-	alignProbability.ReadDistributions(statsFilename);
+	alignProbability.ReadDistributions(statsFilename, validReadThreshold);
 	
 	cerr << "Reading reference fasta" << endl;
 	
@@ -257,55 +251,55 @@ int main(int argc, char* argv[])
 				mateRevAlignments[alignmentIndex] = mateRevAlignInfo;
 			}
 		}
-		
+
 		//
-		// Initialize posterior calculation for all alignments:
-		//  - alignPosteriorsPart: alignment length of best alignment
-		//  - alignPosteriorsFull: full length of read
+		// Calculate adjusted aligned length for each end
+		// Also create an array of read lengths
 		//
-		int alignedLength[2] = {0, 0};
-		AlignmentPosterior alignPosteriorsPart[2];
-		AlignmentPosterior alignPosteriorsFull[2];
+		vector<int> alignedLength(2);
 		for (int readEnd = 0; readEnd <= 1; readEnd++)
 		{
 			alignedLength[readEnd] = bestAlignment[readEnd].second - cBreakEndAdjust;
-			alignPosteriorsPart[readEnd].Initialize(&alignProbability, alignedLength[readEnd]);
-			alignPosteriorsFull[readEnd].Initialize(&alignProbability, preppedReads.ReadLength(readEnd));
 		}
 		
 		//
-		// Identify best partial and full alignment scores
+		// Identify best full alignment scores
 		//
-		// Add alignment scores to posterior calculation including:
-		//  - self alignments, partial and full
-		//  - reverse mate alignments, partial and full, if they exist
+		// Add partial alignment scores to posterior calculation including:
+		//  - self alignments
+		//  - reverse mate alignments, if they exist
 		//
-		int bestSelfScorePart[2] = {0, 0};
 		int bestSelfScoreFull[2] = {0, 0};
+		AlignmentPosterior alignPosteriorPartial(alignProbability, chimericPrior, alignedLength);
 		for (int alignmentIndex = 0; alignmentIndex < alignments.size(); alignmentIndex++)
 		{
 			const RawAlignment& alignment = alignments[alignmentIndex];
 			
-			int selfScorePart = selfAlignments[alignmentIndex].SeqScores()[alignedLength[alignment.readEnd]];
-			int selfScoreFull = selfAlignments[alignmentIndex].SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
-			
-			alignPosteriorsPart[alignment.readEnd].AddAlignment(selfScorePart);
-			alignPosteriorsFull[alignment.readEnd].AddAlignment(selfScoreFull);
-
-			bestSelfScorePart[alignment.readEnd] = max(bestSelfScorePart[alignment.readEnd], selfScorePart);
-			bestSelfScoreFull[alignment.readEnd] = max(bestSelfScoreFull[alignment.readEnd], selfScoreFull);
+			int selfScore = selfAlignments[alignmentIndex].SeqScores()[alignedLength[alignment.readEnd]];
 			
 			unordered_map<int,AlignInfo>::const_iterator mateAlignIter = mateRevAlignments.find(alignmentIndex);
-			if (mateAlignIter != mateRevAlignments.end())
+			if (mateAlignIter == mateRevAlignments.end())
+			{
+				alignPosteriorPartial.AppendAlignment(alignment.readEnd, selfScore);
+			}
+			else
 			{
 				int mateEnd = OtherReadEnd(alignment.readEnd);
 
-				int mateScorePart = mateAlignIter->second.SeqScores()[alignedLength[mateEnd]];
-				int mateScoreFull = mateAlignIter->second.SeqScores()[preppedReads.ReadLength(mateEnd)];
+				int mateScore = mateAlignIter->second.SeqScores()[alignedLength[mateEnd]];
 				
-				alignPosteriorsPart[mateEnd].AddAlignment(mateScorePart);
-				alignPosteriorsFull[mateEnd].AddAlignment(mateScoreFull);
+				alignPosteriorPartial.AppendAlignmentWithMate(alignment.readEnd, selfScore, mateScore);
 			}
+		}
+
+		// 
+		// Filter concordant alignments based on threshold on 
+		// the posterior probability that any of the concordant
+		// alignments are above threshold
+		// 
+		if (alignPosteriorPartial.PosteriorConcordant() >= alignmentThreshold)
+		{
+			continue;
 		}
 		
 		//
@@ -316,10 +310,8 @@ int main(int argc, char* argv[])
 		for (int alignmentIndex = 0; alignmentIndex < alignments.size(); alignmentIndex++)
 		{
 			const RawAlignment& alignment = alignments[alignmentIndex];
-			
-			int selfScorePart = selfAlignments[alignmentIndex].SeqScores()[alignedLength[alignment.readEnd]];
 
-			double alignmentPosterior = alignPosteriorsPart[alignment.readEnd].Posterior(selfScorePart);
+			double alignmentPosterior = alignPosteriorPartial.Posterior(alignmentIndex);
 
 			if (alignmentPosterior < alignmentThreshold)
 			{
@@ -328,7 +320,7 @@ int main(int argc, char* argv[])
 			
 			alignmentIndices[alignment.readEnd].push_back(alignmentIndex);
 		}
-		
+
 		//
 		// Filter reads unless there is at least 1 alignment of each end exceeding
 		// partial alignment posterior threshold
@@ -377,56 +369,16 @@ int main(int argc, char* argv[])
 					swap(seq1Length, splitSeq1Length[readEnd][*selfAlignmentIter]);
 					swap(seq2Length, splitSeq2Length[readEnd][*selfAlignmentIter]);
 
-					alignPosteriorsFull[readEnd].AddAlignment(score);
 					bestSelfScoreFull[selfAlignment.readEnd] = max(bestSelfScoreFull[selfAlignment.readEnd], score);
 				}
 			}
 		}
-		
-		// Calculate probability the read is valid
-		double validReadPosterior[2] = {0.0, 0.0};
-		for (int readEnd = 0; readEnd <= 1; readEnd++)
-		{
-			validReadPosterior[readEnd] = alignProbability.Classify(preppedReads.ReadLength(readEnd), bestSelfScoreFull[readEnd], validReadPrior);
-		}
-		
-		// Apply threshold on valid read posterior
-		if (validReadPosterior[0] * validReadPosterior[1] < validReadThreshold)
-		{
-			continue;
-		}
-		
-		// Calculate probability for best discordant score
-		double lDiscTrue = alignProbability.ProbTrue(preppedReads.ReadLength(0), bestSelfScoreFull[0]) * alignProbability.ProbTrue(preppedReads.ReadLength(1), bestSelfScoreFull[1]);
-		double lDiscFalse = alignProbability.ProbFalse(preppedReads.ReadLength(0), bestSelfScoreFull[0]) * alignProbability.ProbFalse(preppedReads.ReadLength(1), bestSelfScoreFull[1]);
 
-		// Calculate probability for worst concordant score
-		double worstChimericPosterior = 1.0;
-		for (int alignmentIndex = 0; alignmentIndex < alignments.size(); alignmentIndex++)
-		{
-			const RawAlignment& alignment = alignments[alignmentIndex];
-			
-			int selfScoreFull = selfAlignments[alignmentIndex].SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
-
-			unordered_map<int,AlignInfo>::const_iterator mateAlignIter = mateRevAlignments.find(alignmentIndex);
-			if (mateAlignIter != mateRevAlignments.end())
-			{
-				int mateEnd = OtherReadEnd(alignment.readEnd);
-				
-				int mateScoreFull = mateAlignIter->second.SeqScores()[preppedReads.ReadLength(mateEnd)];
-
-				double lConcTrue = alignProbability.ProbTrue(preppedReads.ReadLength(alignment.readEnd), selfScoreFull) * alignProbability.ProbTrue(preppedReads.ReadLength(mateEnd), mateScoreFull);
-				double lConcFalse = alignProbability.ProbFalse(preppedReads.ReadLength(alignment.readEnd), selfScoreFull) * alignProbability.ProbFalse(preppedReads.ReadLength(mateEnd), mateScoreFull);
-
-				double chimericPosterior = lDiscTrue * lConcFalse * chimericPrior / (lDiscTrue * lConcFalse * chimericPrior + lDiscFalse * lConcTrue * (1.0 - chimericPrior));
-
-
-				worstChimericPosterior = min(worstChimericPosterior, chimericPosterior);
-			}
-		}
-
-		// Apply threshold on chimeric posterior
-		if (worstChimericPosterior < chimericThreshold)
+		//
+		// Filter reads based on the cdf of the score likelihood
+		//
+		if (!alignProbability.AboveThreshold(preppedReads.ReadLength(0), bestSelfScoreFull[0]) ||
+			!alignProbability.AboveThreshold(preppedReads.ReadLength(1), bestSelfScoreFull[1]))
 		{
 			continue;
 		}
@@ -457,13 +409,6 @@ int main(int argc, char* argv[])
 					const IntegerVec& seq1Length = splitSeq1Length[readEnd][*selfAlignmentIter];
 					const IntegerVec& seq2Length = splitSeq2Length[readEnd][*selfAlignmentIter];
 
-					double alignmentPosterior = alignPosteriorsFull[selfAlignment.readEnd].Posterior(score);
-
-					if (alignmentPosterior < alignmentThreshold)
-					{
-						continue;
-					}
-					
 					string readSeq = preppedReads.Sequence(readEnd);
 					
 					for (int i = 0; i < seq1Length.size(); i++)
@@ -487,7 +432,7 @@ int main(int argc, char* argv[])
 						splitFile << selfAlignInfo.SeqScores()[seq1Length[i]] << "\t";
 						splitFile << mateAlignInfo.SeqScores()[seq2Length[i]] << "\t";
 						splitFile << score << "\t";
-						splitFile << alignPosteriorsFull[readEnd].Posterior(score) << endl;
+						splitFile << alignPosteriorPartial.Posterior(*selfAlignmentIter) << endl;
 					}
 				}
 			}
@@ -503,7 +448,7 @@ int main(int argc, char* argv[])
 			int seqLength = alignedLength[alignment.readEnd];
 			int score = alignInfo.SeqScores()[alignedLength[alignment.readEnd]];
 			
-			double alignmentPosterior = alignPosteriorsPart[alignment.readEnd].Posterior(score);
+			double alignmentPosterior = alignPosteriorPartial.Posterior(alignmentIndex);
 			
 			if (alignmentPosterior < alignmentThreshold)
 			{
@@ -520,8 +465,8 @@ int main(int argc, char* argv[])
 			spanningFile << seqLength << "\t";
 			spanningFile << score << "\t";
 			spanningFile << alignmentPosterior << "\t";
-			spanningFile << worstChimericPosterior << "\t";
-			spanningFile << validReadPosterior[alignment.readEnd] << endl;
+			spanningFile << 1.0 << "\t";
+			spanningFile << 1.0 << endl;
 		}
 		
 	}
