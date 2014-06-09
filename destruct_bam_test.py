@@ -70,6 +70,7 @@ if __name__ == '__main__':
         '-b', pyp.sch.input(cfg.bam),
         '-r', pyp.sch.input(cfg.ref),
         '-s', pyp.sch.input(os.path.join(cfg.outdir, 'simulated.fasta')),
+        '-f', pyp.sch.iobj('simulation.params').extract(lambda a: a['coverage_fraction']),
         '-1', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.1.fastq')),
         '-2', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.2.fastq')))
 
@@ -141,7 +142,7 @@ else:
         sim_info['read_length'] = config.get(section, 'read_length')
         sim_info['fragment_mean'] = config.get(section, 'fragment_mean')
         sim_info['fragment_stddev'] = config.get(section, 'fragment_stddev')
-        sim_info['coverage'] = config.get(section, 'coverage')
+        sim_info['coverage_fraction'] = config.get(section, 'coverage_fraction')
         sim_info['num_inserted'] = config.get(section, 'num_inserted')
         sim_info['homology'] = config.get(section, 'homology')
         sim_info['adjacent_length'] = config.get(section, 'adjacent_length')
