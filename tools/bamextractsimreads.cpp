@@ -26,6 +26,8 @@
 #include <boost/unordered_map.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
+#include <boost/random/mersenne_twister.hpp>
+#include <boost/random/bernoulli_distribution.hpp>
 
 using namespace boost;
 using namespace std;
@@ -204,6 +206,22 @@ struct BamSimReader : PileupVisitor
 		}
 	}
 
+	void SampleReads(boost::random::mt19937& generator, double coverageFraction)
+	{
+		boost::random::bernoulli_distribution<double> distribution(coverageFraction);
+
+		vector<string> sampledReadNames;
+		for (int readID = 0; readID < mReadNames.size(); readID++)
+		{
+			if (distribution(generator))
+			{
+				sampledReadNames.push_back(mReadNames[readID]);
+			}
+		}
+
+		swap(sampledReadNames, mReadNames);
+	}
+
 	void WriteFastq(const string& namePrefix, int readEnd, ostream& fastq)
 	{
 		for (int readID = 0; readID < mReadNames.size(); readID++)
@@ -245,6 +263,7 @@ int main(int argc, char* argv[])
 	string bamFilename;
 	string refFasta;
 	string seqFasta;
+	double coverageFraction;
 	string fastq1Filename;
 	string fastq2Filename;
 	
@@ -254,6 +273,7 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<string> bamFilenameArg("b","bam","Bam Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> refFastaArg("r","ref","Reference Fasta Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> seqFastaArg("s","seq","Sequence to match reads to",true,"","string",cmd);
+		TCLAP::ValueArg<double> coverageFractionArg("f","frcov","Fraction of Bam Coverage",true,0.5,"float",cmd);
 		TCLAP::ValueArg<string> fastq1FilenameArg("1","fastq1","Fastq 1 filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> fastq2FilenameArg("2","fastq2","Fastq 2 filename",true,"","string",cmd);
 		cmd.parse(argc,argv);
@@ -261,6 +281,7 @@ int main(int argc, char* argv[])
 		bamFilename = bamFilenameArg.getValue();
 		refFasta = refFastaArg.getValue();
 		seqFasta = seqFastaArg.getValue();
+		coverageFraction = coverageFractionArg.getValue();
 		fastq1Filename = fastq1FilenameArg.getValue();
 		fastq2Filename = fastq2FilenameArg.getValue();
 	}
@@ -269,6 +290,8 @@ int main(int argc, char* argv[])
 		cerr << "error: " << e.error() << " for arg " << e.argId() << endl;
 		exit(1);
 	}
+
+	boost::random::mt19937 generator(2014);
 	
 	BamSimReader bamSimReader(bamFilename, refFasta);
 
@@ -302,6 +325,8 @@ int main(int argc, char* argv[])
 		const string& chromosome = bamSimReader.mBamReader.GetReferenceData()[chrIdx].RefName;
 
 		bamSimReader.Read(chromosome, position, simSeq);
+
+		bamSimReader.SampleReads(generator, coverageFraction);
 
 		bamSimReader.WriteFastq(seqName, 0, fastq1File);
 		bamSimReader.WriteFastq(seqName, 1, fastq2File);
