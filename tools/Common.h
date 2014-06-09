@@ -307,6 +307,10 @@ double normalpdf(double x, double mu, double sigma);
 class RandomNumberGenerator
 {
 public:
+	explicit RandomNumberGenerator(int seed = 2014)
+	 : mGenerator(seed)
+	{}
+
 	template <typename TType>
 	TType Next(TType l, TType u)
 	{
@@ -320,7 +324,8 @@ private:
 class RandomGenomicPositionGenerator
 {
 public:
-	explicit RandomGenomicPositionGenerator(const vector<long>& chromosomeLengths) : mChromosomeLengths(chromosomeLengths)
+	explicit RandomGenomicPositionGenerator(const vector<long>& chromosomeLengths, int seed = 2014)
+	 : mChromosomeLengths(chromosomeLengths), mGenerator(seed)
 	{
 		mGenomeLength = accumulate(chromosomeLengths.begin(), chromosomeLengths.end(), 0L);
 		mDistribution = boost::random::uniform_int_distribution<long>(1, mGenomeLength);
