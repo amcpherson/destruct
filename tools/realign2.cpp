@@ -268,6 +268,7 @@ int main(int argc, char* argv[])
 		// Add partial alignment scores to posterior calculation including:
 		//  - self alignments
 		//  - reverse mate alignments, if they exist
+		// Calculate best full alignment scores
 		//
 		int bestSelfScoreFull[2] = {0, 0};
 		AlignmentPosterior alignPosteriorPartial(alignProbability, chimericPrior, alignedLength);
@@ -275,12 +276,15 @@ int main(int argc, char* argv[])
 		{
 			const RawAlignment& alignment = alignments[alignmentIndex];
 			
-			int selfScore = selfAlignments[alignmentIndex].SeqScores()[alignedLength[alignment.readEnd]];
+			int selfScorePart = selfAlignments[alignmentIndex].SeqScores()[alignedLength[alignment.readEnd]];
+			int selfScoreFull = selfAlignments[alignmentIndex].SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
+
+			bestSelfScoreFull[alignment.readEnd] = max(bestSelfScoreFull[alignment.readEnd], selfScoreFull);
 			
 			unordered_map<int,AlignInfo>::const_iterator mateAlignIter = mateRevAlignments.find(alignmentIndex);
 			if (mateAlignIter == mateRevAlignments.end())
 			{
-				alignPosteriorPartial.AppendAlignment(alignment.readEnd, selfScore);
+				alignPosteriorPartial.AppendAlignment(alignment.readEnd, selfScorePart);
 			}
 			else
 			{
@@ -288,7 +292,7 @@ int main(int argc, char* argv[])
 
 				int mateScore = mateAlignIter->second.SeqScores()[alignedLength[mateEnd]];
 				
-				alignPosteriorPartial.AppendAlignmentWithMate(alignment.readEnd, selfScore, mateScore);
+				alignPosteriorPartial.AppendAlignmentWithMate(alignment.readEnd, selfScorePart, mateScore);
 			}
 		}
 
