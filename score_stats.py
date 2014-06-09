@@ -9,9 +9,12 @@ import utils.plots
 
 def load_align_data_hist(filename):
     reader = pd.read_table(filename, sep='\t', names=['aligned_length', 'score'], chunksize=1024*1024)
-    align_data_hist = pd.Series()
+    align_data_hist = None
     for chunk in reader:
         chunk_hist = chunk.groupby(['aligned_length', 'score']).size()
+        if align_data_hist is None:
+            align_data_hist = chunk_hist
+            continue
         align_data_hist, chunk_hist = align_data_hist.align(chunk_hist, fill_value=0)
         align_data_hist += chunk_hist
     align_data_hist.name = 'freq'
@@ -22,7 +25,6 @@ def create_score_stats(true_scores_filename, null_scores_filename, match_score, 
     The null samples may include some true scores so run a quick EM mixture model on the null samples to identify 
     the actual distribution of null scores.  Output distributions for each alignment length.
     '''
-
     with tarfile.open(plots_tar_filename, 'w') as plots_tar:
 
         all_true_scores = load_align_data_hist(true_scores_filename)
