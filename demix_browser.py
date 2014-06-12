@@ -18,7 +18,12 @@ args = argparser.parse_args()
 chromosomes = [str(a) for a in range(1, 23)] + ['X']
 chromosome_indices = dict([(chromosome, idx) for idx, chromosome in enumerate(chromosomes)])
 
-cnv = pd.read_csv(args.preds_filename, sep='\t', converters={'chr':str})
+if args.preds_filename.endswith('.gz'):
+    compression = 'gzip'
+else:
+    compression = None
+
+cnv = pd.read_csv(args.preds_filename, sep='\t', converters={'chr':str}, compression=compression)
 
 cnv = cnv.loc[(cnv['library_id'] == args.library_id)]
 
