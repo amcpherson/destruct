@@ -1,4 +1,4 @@
-
+import sys
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
@@ -13,6 +13,7 @@ argparser.add_argument('preds_filename', help='deMix Predictions Filename')
 argparser.add_argument('library_id', help='library id to view')
 argparser.add_argument('--candidate_id', help='candidate id to view', type=int, default=None)
 argparser.add_argument('--positions', help='annotate positions')
+argparser.add_argument('--listlibs', help='list library ids and exit', action='store_true', default=False)
 args = argparser.parse_args()
 
 chromosomes = [str(a) for a in range(1, 23)] + ['X']
@@ -24,6 +25,10 @@ else:
     compression = None
 
 cnv = pd.read_csv(args.preds_filename, sep='\t', converters={'chr':str}, compression=compression)
+
+if args.listlibs:
+    print '\n'.join(cnv['library_id'].unique())
+    sys.exit(0)
 
 cnv = cnv.loc[(cnv['library_id'] == args.library_id)]
 
