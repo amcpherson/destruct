@@ -117,7 +117,7 @@ if __name__ == '__main__':
         pyp.sch.output(os.path.join(cfg.outdir, 'plots.tar')),
         '--config', pyp.sch.input(cfg.config),
         '--tmp', pyp.sch.tmpfile('destruct_tmp'),
-        '--nocleanup', '--repopulate', '--maxjobs', 4)
+        '--nocleanup', '--repopulate', '--maxjobs', 4, '--verbose')
 
     pyp.sch.transform('plot', (), ctx, destruct_bam_test.create_roc_plot,
         None,
