@@ -10,10 +10,11 @@ import argparse
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument('preds_filename', help='deMix Predictions Filename')
-argparser.add_argument('library_id', help='library id to view')
+group = argparser.add_mutually_exclusive_group(required=True)
+group.add_argument('--library_id', help='library id to view')
+group.add_argument('--list_libraries', help='list library ids and exit', action='store_true', default=False)
 argparser.add_argument('--candidate_id', help='candidate id to view', type=int, default=None)
 argparser.add_argument('--positions', help='annotate positions')
-argparser.add_argument('--listlibs', help='list library ids and exit', action='store_true', default=False)
 args = argparser.parse_args()
 
 chromosomes = [str(a) for a in range(1, 23)] + ['X']
@@ -26,7 +27,7 @@ else:
 
 cnv = pd.read_csv(args.preds_filename, sep='\t', converters={'chr':str}, compression=compression)
 
-if args.listlibs:
+if args.list_libraries:
     print '\n'.join(cnv['library_id'].unique())
     sys.exit(0)
 
@@ -61,7 +62,7 @@ mingap = 1000
 
 copies_max = 5.0
 
-fig = plt.figure(figsize=(16,16))
+fig = plt.figure(figsize=(12,12))
 
 gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=(4, 1))
 
