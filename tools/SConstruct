@@ -236,7 +236,7 @@ sources = """
     Sequences.cpp
     SimpleAligner.cpp
 """.split()
-env.Program(target='realign_rna', source=common_sources+sources)
+#env.Program(target='realign_rna', source=common_sources+sources)
 
 sources = """
     realignp.cpp
@@ -247,7 +247,7 @@ sources = """
     Sequences.cpp
     SimpleAligner.cpp
 """.split()
-env.Program(target='realignp', source=common_sources+sources)
+#env.Program(target='realignp', source=common_sources+sources)
 
 sources = """
     AlignmentStream.cpp
