@@ -101,6 +101,7 @@ int main(int argc, char* argv[])
 	string statsFilename;
 	double validReadThreshold;
 	double chimericPrior;
+	double chimericThreshold;
 	double alignmentThreshold;
 	string spanningFilename;
 	string splitFilename;
@@ -119,6 +120,7 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<string> statsFilenameArg("z","stats","Stats Filename",true,"","string",cmd);
 		TCLAP::ValueArg<double> validReadThresholdArg("","tvalid","Valid Read Threshold",true,0.01,"float",cmd);
 		TCLAP::ValueArg<double> chimericPriorArg("","pchimer","Prior Probility of Chimeric Read",true,0.05,"float",cmd);
+		TCLAP::ValueArg<double> chimericThresholdArg("","tchimer","Chimeric Posterior Threshold",true,0.1,"float",cmd);
 		TCLAP::ValueArg<double> alignmentThresholdArg("","talign","Alignment Posterior Threshold",true,0.1,"float",cmd);
 		TCLAP::ValueArg<string> spanningFilenameArg("","span","Spanning Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> splitFilenameArg("","split","Splits Filename",true,"","string",cmd);
@@ -135,6 +137,7 @@ int main(int argc, char* argv[])
 		statsFilename = statsFilenameArg.getValue();
 		validReadThreshold = validReadThresholdArg.getValue();
 		chimericPrior = chimericPriorArg.getValue();
+		chimericThreshold = chimericThresholdArg.getValue();
 		alignmentThreshold = alignmentThresholdArg.getValue();
 		spanningFilename = spanningFilenameArg.getValue();
 		splitFilename = splitFilenameArg.getValue();
@@ -301,7 +304,7 @@ int main(int argc, char* argv[])
 		// the posterior probability that any of the concordant
 		// alignments are above threshold
 		// 
-		if (alignPosteriorPartial.PosteriorConcordant() >= alignmentThreshold)
+		if (alignPosteriorPartial.PosteriorConcordant() >= chimericThreshold)
 		{
 			continue;
 		}
