@@ -91,8 +91,8 @@ else:
         outputs: 'spanning.alignments', 'split.alignments'
         '''
 
-        sch.transform('splitfastq1', axes, lowmem, split_and_index_fastq, None, sch.ifile('reads1', axes), int(cfg.reads_per_split), sch.ofile('reads1', axes + ('byread',)))
-        sch.transform('splitfastq2', axes, lowmem, split_and_index_fastq, None, sch.ifile('reads2', axes), int(cfg.reads_per_split), sch.ofile('reads2', axes + ('byread2',)))
+        sch.transform('splitfastq1', axes, lowmem, split_fastq, None, sch.ifile('reads1', axes), int(cfg.reads_per_split), sch.ofile('reads1', axes + ('byread',)))
+        sch.transform('splitfastq2', axes, lowmem, split_fastq, None, sch.ifile('reads2', axes), int(cfg.reads_per_split), sch.ofile('reads2', axes + ('byread2',)))
         sch.changeaxis('fastq2axis', axes, 'reads2', 'byread2', 'byread')
 
         align_reads(sch, cfg, axes + ('byread',))
@@ -211,13 +211,12 @@ else:
                     out_file.close()
 
 
-    def split_and_index_fastq(in_filename, num_reads_per_file, out_filename_callback):
+    def split_fastq(in_filename, num_reads_per_file, out_filename_callback):
         with open(in_filename, 'r') as in_file:
             file_number = 0
             out_file = None
             out_file_read_count = None
             try:
-                read_id = 0
                 for name, seq, comment, qual in itertools.izip_longest(*[in_file]*4):
                     if out_file is None or out_file_read_count == num_reads_per_file:
                         if out_file is not None:
@@ -225,11 +224,10 @@ else:
                         out_file = open(out_filename_callback(file_number), 'w')
                         out_file_read_count = 0
                         file_number += 1
-                    out_file.write('@' + str(read_id) + name.rstrip()[-2:] + '\n')
+                    out_file.write(name)
                     out_file.write(seq)
                     out_file.write(comment)
                     out_file.write(qual)
-                    read_id += 1
                     out_file_read_count += 1
             finally:
                 if out_file is not None:
