@@ -31,6 +31,9 @@ if args.list_libraries:
     print '\n'.join(cnv['library_id'].unique())
     sys.exit(0)
 
+if args.library_id not in cnv['library_id'].unique():
+    raise Exception('Unable to find library ' + args.library_id)
+
 cnv = cnv.loc[(cnv['library_id'] == args.library_id)]
 
 if args.candidate_id is not None:
