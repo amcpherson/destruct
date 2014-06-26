@@ -10,11 +10,10 @@ import argparse
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument('preds_filename', help='deMix Predictions Filename')
-group = argparser.add_mutually_exclusive_group(required=True)
-group.add_argument('--library_id', help='library id to view')
-group.add_argument('--list_libraries', help='list library ids and exit', action='store_true', default=False)
+argparser.add_argument('--library_id', help='library id to view, omit to print all', default=None)
 argparser.add_argument('--candidate_id', help='candidate id to view', type=int, default=None)
 argparser.add_argument('--positions', help='annotate positions')
+argparser.add_argument('--max_copies', help='maximum copies to display', type=float, default=5.0)
 args = argparser.parse_args()
 
 chromosomes = [str(a) for a in range(1, 23)] + ['X']
@@ -27,7 +26,7 @@ else:
 
 cnv = pd.read_csv(args.preds_filename, sep='\t', converters={'chr':str}, compression=compression)
 
-if args.list_libraries:
+if args.library_id is None:
     print '\n'.join(cnv['library_id'].unique())
     sys.exit(0)
 
@@ -63,8 +62,6 @@ cnv['end'] += cnv['chromosome_start']
 
 mingap = 1000
 
-copies_max = 5.0
-
 fig = plt.figure(figsize=(12,12))
 
 gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=(4, 1))
@@ -87,8 +84,8 @@ major_minor_scatter_highlight = ax1.scatter(cnv['major_raw'], cnv['minor_raw'],
                                             facecolor=(0,0,0,0), edgecolor=(0,0,0,0), linewidth=0.0,
                                             picker=True)
 
-ax1.set_xlim((-0.5, copies_max))
-ax1.set_ylim((-0.5, 0.8*copies_max))
+ax1.set_xlim((-0.5, args.max_copies))
+ax1.set_ylim((-0.5, 0.8*args.max_copies))
 
 ax1.set_title(args.library_id)
 
@@ -133,7 +130,7 @@ if args.positions is not None:
         plt.setp(markerline, 'markerfacecolor', 'orange', 'markeredgecolor', 'k', 'zorder', 2)
 
 ax2.set_xlim((cnv['start'].min(), cnv['end'].max()))
-ax2.set_ylim((-0.2, copies_max + 0.2))
+ax2.set_ylim((-0.2, args.max_copies + 0.2))
 
 ax2.set_xticks([0] + sorted(cnv['chromosome_end'].unique()))
 ax2.set_xticklabels([])
@@ -241,7 +238,6 @@ class Picker(object):
         self.selected_chromosome = None
 
 
-            
 fig.canvas.mpl_connect('pick_event', Picker())
 
 
