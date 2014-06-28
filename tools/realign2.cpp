@@ -353,8 +353,9 @@ int main(int argc, char* argv[])
 			
 			for (vector<int>::const_iterator selfAlignmentIter = alignmentIndices[readEnd].begin(); selfAlignmentIter != alignmentIndices[readEnd].end(); selfAlignmentIter++)
 			{
-				const AlignInfo& selfAlignInfo = selfAlignments[*selfAlignmentIter];
-				const RawAlignment& selfAlignment = alignments[*selfAlignmentIter];
+				int selfAlignmentIndex = *selfAlignmentIter;
+				const AlignInfo& selfAlignInfo = selfAlignments[selfAlignmentIndex];
+				const RawAlignment& selfAlignment = alignments[selfAlignmentIndex];
 				
 				for (vector<int>::const_iterator mateAlignmentIter = alignmentIndices[mateEnd].begin(); mateAlignmentIter != alignmentIndices[mateEnd].end(); mateAlignmentIter++)
 				{
@@ -372,9 +373,9 @@ int main(int argc, char* argv[])
 					IntegerVec seq2Length;
 					int score = BestSplitAlignment(selfAlignInfo.SeqScores(), selfAlignInfo.SeqScoresLength(), mateAlignInfo.SeqScores(), mateAlignInfo.SeqScoresLength(), -1, seq1Length, seq2Length);
 
-					splitScores[readEnd][*selfAlignmentIter] = score;
-					swap(seq1Length, splitSeq1Length[readEnd][*selfAlignmentIter]);
-					swap(seq2Length, splitSeq2Length[readEnd][*selfAlignmentIter]);
+					splitScores[readEnd][selfAlignmentIndex] = score;
+					swap(seq1Length, splitSeq1Length[readEnd][selfAlignmentIndex]);
+					swap(seq2Length, splitSeq2Length[readEnd][selfAlignmentIndex]);
 
 					bestSelfScoreFull[selfAlignment.readEnd] = max(bestSelfScoreFull[selfAlignment.readEnd], score);
 				}
@@ -397,8 +398,9 @@ int main(int argc, char* argv[])
 			
 			for (vector<int>::const_iterator selfAlignmentIter = alignmentIndices[readEnd].begin(); selfAlignmentIter != alignmentIndices[readEnd].end(); selfAlignmentIter++)
 			{
-				const AlignInfo& selfAlignInfo = selfAlignments[*selfAlignmentIter];
-				const RawAlignment& selfAlignment = alignments[*selfAlignmentIter];
+				int selfAlignmentIndex = *selfAlignmentIter;
+				const AlignInfo& selfAlignInfo = selfAlignments[selfAlignmentIndex];
+				const RawAlignment& selfAlignment = alignments[selfAlignmentIndex];
 				
 				for (vector<int>::const_iterator mateAlignmentIter = alignmentIndices[mateEnd].begin(); mateAlignmentIter != alignmentIndices[mateEnd].end(); mateAlignmentIter++)
 				{
@@ -412,9 +414,9 @@ int main(int argc, char* argv[])
 					const AlignInfo& mateAlignInfo = mateAlignInfoIter->second;
 					const RawAlignment& mateAlignment = alignments[*mateAlignmentIter];
 					
-					int score = splitScores[readEnd][*selfAlignmentIter];
-					const IntegerVec& seq1Length = splitSeq1Length[readEnd][*selfAlignmentIter];
-					const IntegerVec& seq2Length = splitSeq2Length[readEnd][*selfAlignmentIter];
+					int score = splitScores[readEnd][selfAlignmentIndex];
+					const IntegerVec& seq1Length = splitSeq1Length[readEnd][selfAlignmentIndex];
+					const IntegerVec& seq2Length = splitSeq2Length[readEnd][selfAlignmentIndex];
 
 					string readSeq = preppedReads.Sequence(readEnd);
 					
@@ -439,7 +441,7 @@ int main(int argc, char* argv[])
 						splitFile << selfAlignInfo.SeqScores()[seq1Length[i]] << "\t";
 						splitFile << mateAlignInfo.SeqScores()[seq2Length[i]] << "\t";
 						splitFile << score << "\t";
-						splitFile << alignPosteriorPartial.Posterior(*selfAlignmentIter) << endl;
+						splitFile << alignPosteriorPartial.Posterior(selfAlignmentIndex) << endl;
 					}
 				}
 			}
@@ -464,6 +466,7 @@ int main(int argc, char* argv[])
 			
 			spanningFile << alignment.fragment << "\t";
 			spanningFile << alignment.readEnd << "\t";
+			spanningFile << alignmentIndex << "\t";
 			spanningFile << alignment.reference << "\t";
 			spanningFile << ((alignment.strand == PlusStrand) ? "+" : "-") << "\t";
 			spanningFile << alignInfo.AlignmentStart(seqLength) << "\t";
