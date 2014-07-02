@@ -227,7 +227,7 @@ bool FragmentAlignmentStream::GetNextAlignments(RawAlignmentVec& alignments)
 	alignments.clear();
 	alignments.push_back(mNextAlignment);
 	
-	while (mGood = mAlignmentStream->GetNextAlignment(mNextAlignment))
+	while ((mGood = mAlignmentStream->GetNextAlignment(mNextAlignment)))
 	{
 		if (alignments.front().fragment != mNextAlignment.fragment)
 		{
