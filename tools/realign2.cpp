@@ -14,6 +14,7 @@
 #include "SimpleAligner.h"
 #include "AlignmentProbability.h"
 #include "AlignRead.h"
+#include "AlignmentRecord.h"
 
 #include <fstream>
 #include <iostream>
@@ -103,6 +104,7 @@ int main(int argc, char* argv[])
 	double chimericPrior;
 	double chimericThreshold;
 	double alignmentThreshold;
+	int libID;
 	string spanningFilename;
 	string splitFilename;
 	
@@ -122,6 +124,7 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<double> chimericPriorArg("","pchimer","Prior Probility of Chimeric Read",true,0.05,"float",cmd);
 		TCLAP::ValueArg<double> chimericThresholdArg("","tchimer","Chimeric Posterior Threshold",true,0.1,"float",cmd);
 		TCLAP::ValueArg<double> alignmentThresholdArg("","talign","Alignment Posterior Threshold",true,0.1,"float",cmd);
+		TCLAP::ValueArg<int> libIDArg("l","lib","Library ID",true,0,"int",cmd);
 		TCLAP::ValueArg<string> spanningFilenameArg("","span","Spanning Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> splitFilenameArg("","split","Splits Filename",true,"","string",cmd);
 		cmd.parse(argc,argv);
@@ -139,6 +142,7 @@ int main(int argc, char* argv[])
 		chimericPrior = chimericPriorArg.getValue();
 		chimericThreshold = chimericThresholdArg.getValue();
 		alignmentThreshold = alignmentThresholdArg.getValue();
+		libID = libIDArg.getValue();
 		spanningFilename = spanningFilenameArg.getValue();
 		splitFilename = splitFilenameArg.getValue();
 	}
@@ -189,7 +193,9 @@ int main(int argc, char* argv[])
 	RawAlignmentVec alignments;
 	while (fragmentAlignmentStream.GetNextAlignments(alignments))
 	{
-		preppedReads.SetCurrentRead(SAFEPARSE(int, alignments.front().fragment));
+		int readID = SAFEPARSE(int, alignments.front().fragment);
+
+		preppedReads.SetCurrentRead(readID);
 		
 		// Check that both ends are mapped
 		bool readEndMapped[2] = {false,false};
@@ -359,7 +365,8 @@ int main(int argc, char* argv[])
 				
 				for (vector<int>::const_iterator mateAlignmentIter = alignmentIndices[mateEnd].begin(); mateAlignmentIter != alignmentIndices[mateEnd].end(); mateAlignmentIter++)
 				{
-					unordered_map<int,AlignInfo>::const_iterator mateAlignInfoIter = mateFwdAlignments.find(*mateAlignmentIter);
+					int mateAlignmentIndex = *mateAlignmentIter;
+					unordered_map<int,AlignInfo>::const_iterator mateAlignInfoIter = mateFwdAlignments.find(mateAlignmentIndex);
 					
 					if (mateAlignInfoIter == mateFwdAlignments.end())
 					{
@@ -367,7 +374,7 @@ int main(int argc, char* argv[])
 					}
 					
 					const AlignInfo& mateAlignInfo = mateAlignInfoIter->second;
-					const RawAlignment& mateAlignment = alignments[*mateAlignmentIter];
+					const RawAlignment& mateAlignment = alignments[mateAlignmentIndex];
 					
 					IntegerVec seq1Length;
 					IntegerVec seq2Length;
@@ -404,7 +411,8 @@ int main(int argc, char* argv[])
 				
 				for (vector<int>::const_iterator mateAlignmentIter = alignmentIndices[mateEnd].begin(); mateAlignmentIter != alignmentIndices[mateEnd].end(); mateAlignmentIter++)
 				{
-					unordered_map<int,AlignInfo>::const_iterator mateAlignInfoIter = mateFwdAlignments.find(*mateAlignmentIter);
+					int mateAlignmentIndex = *mateAlignmentIter;
+					unordered_map<int,AlignInfo>::const_iterator mateAlignInfoIter = mateFwdAlignments.find(mateAlignmentIndex);
 					
 					if (mateAlignInfoIter == mateFwdAlignments.end())
 					{
@@ -412,7 +420,7 @@ int main(int argc, char* argv[])
 					}
 					
 					const AlignInfo& mateAlignInfo = mateAlignInfoIter->second;
-					const RawAlignment& mateAlignment = alignments[*mateAlignmentIter];
+					const RawAlignment& mateAlignment = alignments[mateAlignmentIndex];
 					
 					int score = splitScores[readEnd][selfAlignmentIndex];
 					const IntegerVec& seq1Length = splitSeq1Length[readEnd][selfAlignmentIndex];
@@ -426,22 +434,22 @@ int main(int argc, char* argv[])
 						{
 							continue;
 						}
-						
-						splitFile << selfAlignment.fragment << "\t";
-						splitFile << selfAlignment.readEnd << "\t";
-						splitFile << selfAlignment.reference << "\t";
-						splitFile << ((selfAlignment.strand == PlusStrand) ? "+" : "-") << "\t";
-						splitFile << selfAlignInfo.BreakPosition(seq1Length[i]) << "\t";
-						splitFile << mateAlignment.reference << "\t";
-						splitFile << ((mateAlignment.strand == PlusStrand) ? "+" : "-") << "\t";
-						splitFile << mateAlignInfo.BreakPosition(seq2Length[i]) << "\t";
-						splitFile << readSeq.substr(seq1Length[i], readSeq.size() - seq2Length[i] - seq1Length[i]) << "\t";
-						splitFile << seq1Length[i] << "\t";
-						splitFile << seq2Length[i] << "\t";
-						splitFile << selfAlignInfo.SeqScores()[seq1Length[i]] << "\t";
-						splitFile << mateAlignInfo.SeqScores()[seq2Length[i]] << "\t";
-						splitFile << score << "\t";
-						splitFile << alignPosteriorPartial.Posterior(selfAlignmentIndex) << endl;
+
+						SplitAlignmentRecord record;
+						record.libID = libID;
+						record.readID = readID;
+						record.readEnd = selfAlignment.readEnd;
+						record.alignID1 = selfAlignmentIndex;
+						record.alignID2 = mateAlignmentIndex;
+						record.chromosome1 = selfAlignment.reference;
+						record.strand1 = selfAlignment.strand;
+						record.position1 = selfAlignInfo.BreakPosition(seq1Length[i]);
+						record.chromosome2 = mateAlignment.reference;
+						record.strand2 = mateAlignment.strand;
+						record.position2 = mateAlignInfo.BreakPosition(seq2Length[i]);
+						record.score = score;
+
+						splitFile << record;
 					}
 				}
 			}
@@ -457,32 +465,20 @@ int main(int argc, char* argv[])
 			int seqLength = alignedLength[alignment.readEnd];
 			int score = alignInfo.SeqScores()[alignedLength[alignment.readEnd]];
 			
-			double alignmentPosterior = alignPosteriorPartial.Posterior(alignmentIndex);
-			
-			if (alignmentPosterior < alignmentThreshold)
-			{
-				continue;
-			}
-			
-			spanningFile << alignment.fragment << "\t";
-			spanningFile << alignment.readEnd << "\t";
-			spanningFile << alignmentIndex << "\t";
-			spanningFile << alignment.reference << "\t";
-			spanningFile << ((alignment.strand == PlusStrand) ? "+" : "-") << "\t";
-			spanningFile << alignInfo.AlignmentStart(seqLength) << "\t";
-			spanningFile << alignInfo.AlignmentEnd(seqLength) << "\t";
-			spanningFile << preppedReads.ReadLength(alignment.readEnd) << "\t";
-			spanningFile << seqLength << "\t";
-			spanningFile << score << "\t";
-			spanningFile << alignmentPosterior << "\t";
-			spanningFile << 1.0 << "\t";
-			spanningFile << 1.0 << endl;
+			SpanningAlignmentRecord record;
+			record.libID = libID;
+			record.readID = readID;
+			record.readEnd = alignment.readEnd;
+			record.alignID = alignmentIndex;
+			record.chromosome = alignment.reference;
+			record.strand = alignment.strand;
+			record.start = alignInfo.AlignmentStart(seqLength);
+			record.end = alignInfo.AlignmentEnd(seqLength);
+			record.score = score;
+
+			spanningFile << record;
 		}
-		
 	}
 }
-
-
-
 
 
