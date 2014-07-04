@@ -9,7 +9,7 @@ import subprocess
 import argparse
 import string
 import tarfile
-from collections import *
+import collections
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -36,7 +36,9 @@ if __name__ == '__main__':
     cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
     pyp = pypeliner.easypypeliner.EasyPypeliner([destruct], cfg)
 
-    pyp.sch.transform('readlibs', (), destruct.lowmem, destruct.link_libraries, None, cfg.libraries, pyp.sch.ofile('bam', ('bylibrary',)))
+    pyp.sch.transform('readlibs', (), destruct.lowmem, destruct.read_libraries, pyp.sch.oobj('libinfo', ('bylibrary',)), cfg.libraries)
+
+    pyp.sch.transform('linklibs', ('bylibrary',), destruct.lowmem, destruct.link_libraries, None, pyp.sch.oobj('libinfo', ('bylibrary',)).prop('bam'), pyp.sch.ofile('bam', ('bylibrary',)))
 
     destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads), pyp.sch.output(cfg.plots_tar))
 
@@ -288,17 +290,23 @@ else:
                         fragment_mappings.add(fragment_mapping)
 
 
-    def link_libraries(libraries_filename, bam_filename_callback):
+    LibInfo = collections.namedtuple('LibInfo', ['id', 'name', 'bam'])
+    def read_libraries(libraries_filename):
         libraries = dict()
         with open(libraries_filename, 'r') as libraries_file:
-            for row in csv.reader(libraries_file, delimiter='\t'):
+            for lib_idx, row in enumerate(csv.reader(libraries_file, delimiter='\t')):
                 lib_name = row[0]
                 lib_bam = row[1]
-                try:
-                    os.remove(bam_filename_callback(lib_name))
-                except OSError:
-                    pass
-                os.symlink(os.path.abspath(lib_bam), bam_filename_callback(lib_name))
+                libraries[lib_name] = LibInfo(lib_idx, lib_name, lib_bam)
+        return libraries
+
+
+    def link_libraries(target_bam_filename, link_bam_filename):
+        try:
+            os.remove(bam_filename_callback(lib_name))
+        except OSError:
+            pass
+        os.symlink(os.path.abspath(lib_bam), bam_filename_callback(lib_name))
 
 
     def run_mclustermatepairs(mclustermatepairs_bin, stats, spanning_alignments, clusters_filename):
@@ -350,7 +358,7 @@ else:
                                 reads_table_file.write('\t'.join([str(cluster_id), lib_id, str(fragment_id), read_end, seq, qual, comment]) + '\n')
 
 
-    GenomicRegion = namedtuple('GenomicRegion', ['chromosome', 'strand', 'start', 'end'])
+    GenomicRegion = collections.namedtuple('GenomicRegion', ['chromosome', 'strand', 'start', 'end'])
 
     def read_cluster_regions(input_file):
         for cluster_id, rows in itertools.groupby(csv.reader(input_file, delimiter='\t'), lambda row: row[0]):
