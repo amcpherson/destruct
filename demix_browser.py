@@ -62,7 +62,7 @@ cnv['end'] += cnv['chromosome_start']
 
 mingap = 1000
 
-fig = plt.figure(figsize=(12,12))
+fig = plt.figure(figsize=(12,9))
 
 gs = matplotlib.gridspec.GridSpec(2, 1, height_ratios=(4, 1))
 
