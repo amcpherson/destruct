@@ -38,7 +38,7 @@ if __name__ == '__main__':
 
     pyp.sch.transform('readlibs', (), destruct.lowmem, destruct.read_libraries, pyp.sch.oobj('libinfo', ('bylibrary',)), cfg.libraries)
 
-    pyp.sch.transform('linklibs', ('bylibrary',), destruct.lowmem, destruct.link_libraries, None, pyp.sch.oobj('libinfo', ('bylibrary',)).prop('bam'), pyp.sch.ofile('bam', ('bylibrary',)))
+    pyp.sch.transform('linklibs', ('bylibrary',), destruct.lowmem, destruct.link_libraries, None, pyp.sch.iobj('libinfo', ('bylibrary',)).prop('bam'), pyp.sch.ofile('bam', ('bylibrary',)))
 
     destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads), pyp.sch.output(cfg.plots_tar))
 
@@ -303,10 +303,10 @@ else:
 
     def link_libraries(target_bam_filename, link_bam_filename):
         try:
-            os.remove(bam_filename_callback(lib_name))
+            os.remove(link_bam_filename)
         except OSError:
             pass
-        os.symlink(os.path.abspath(lib_bam), bam_filename_callback(lib_name))
+        os.symlink(os.path.abspath(target_bam_filename), link_bam_filename)
 
 
     def run_mclustermatepairs(mclustermatepairs_bin, stats, spanning_alignments, clusters_filename):
