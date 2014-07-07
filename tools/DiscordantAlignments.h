@@ -72,6 +72,22 @@ public:
 		return refStrand.id;
 	}
 
+	string GetChromosome(uint32_t idx)
+	{
+		RefStrand refStrand;
+		refStrand.id = idx;
+
+		return mRefNameIndex.Get(refStrand.referenceIndex);
+	}
+
+	string GetStrand(uint32_t idx)
+	{
+		RefStrand refStrand;
+		refStrand.id = idx;
+
+		return ((refStrand.strand == PlusStrand) ? "+" : "-");
+	}
+
 private:
 	NameIndex mRefNameIndex;
 };
