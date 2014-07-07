@@ -103,9 +103,8 @@ else:
 
         align_reads(sch, cfg, axes + ('byread',))
 
-        # sch.transform('mergespan', axes, lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', axes + ('byread',)), sch.ofile('spanning.alignments.unfiltered', axes))
-        # sch.commandline('filterreads', axes, lowmem, cfg.filterreads_tool, '-n', '2', '-a', sch.ifile('spanning.alignments.unfiltered', axes), '-r', cfg.satellite_regions, '>', sch.ofile('spanning.alignments', axes))
-        sch.transform('mergespan', axes, lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', axes + ('byread',)), sch.ofile('spanning.alignments', axes))
+        sch.transform('mergespan', axes, lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', axes + ('byread',)), sch.ofile('spanning.alignments.unfiltered', axes))
+        sch.commandline('filterreads', axes, lowmem, cfg.filterreads_tool, '-n', '2', '-a', sch.ifile('spanning.alignments.unfiltered', axes), '-r', cfg.satellite_regions, '>', sch.ofile('spanning.alignments', axes))
         sch.transform('mergesplt', axes, lowmem, merge_files_by_line, None, sch.ifile('split.alignments', axes + ('byread',)), sch.ofile('split.alignments', axes))
 
 
