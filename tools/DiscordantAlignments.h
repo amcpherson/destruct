@@ -6,6 +6,8 @@
 #define DISCORDANTALIGNMENTS_H_
 
 #include "DebugCheck.h"
+#include "Indexer.h"
+#include "AlignmentRecord.h"
 
 #include <string>
 #include <map>
@@ -16,242 +18,237 @@ using namespace boost;
 using namespace std;
 
 
-inline bool operator==(const RefStrand& rs1, const RefStrand& rs2)
+bool IsConcordant(const vector<SpanningAlignmentRecord>& alignments, int maxFragmentLength)
 {
-	return rs1.id == rs2.id;
-}
-
-inline size_t hash_value(const RefStrand& rs)
-{
-	size_t seed = 0;
-	hash_combine(seed, rs.id);
-	return seed;
-}
-
-struct AlignID
-{
-	union
+	for (vector<SpanningAlignmentRecord>::const_iterator alignmentIter1 = alignments.begin(); alignmentIter1 != alignments.end(); alignmentIter1++)
 	{
-		struct
+		for (vector<SpanningAlignmentRecord>::const_iterator alignmentIter2 = alignmentIter1 + 1; alignmentIter2 != alignments.end(); alignmentIter2++)
 		{
-			unsigned alignIndex : 31;
-			unsigned readEnd : 1;
-		};
-		
-		int id;
-	};
+			if (alignmentIter1->readEnd == alignmentIter2->readEnd)
+			{
+				continue;
+			}
+			
+			if (alignmentIter1->chromosome != alignmentIter2->chromosome)
+			{
+				continue;
+			}
+			
+			if (alignmentIter1->strand == "+" && alignmentIter2->strand == "-")
+			{
+				int inferredLength = alignmentIter2->end - alignmentIter1->start + 1;
+				
+				if (inferredLength >= 0 && inferredLength < maxFragmentLength)
+				{
+					return true;
+				}
+			}
+			
+			if (alignmentIter2->strand == "+" && alignmentIter1->strand == "-")
+			{
+				int inferredLength = alignmentIter1->end - alignmentIter2->start + 1;
+				
+				if (inferredLength >= 0 && inferredLength < maxFragmentLength)
+				{
+					return true;
+				}
+			}
+		}
+	}
+	
+	return false;
+}
+
+
+class ChromosomeStrandIndex
+{
+public:
+	uint32_t Index(const string& chromosome, const string& strand)
+	{
+		RefStrand refStrand;
+		refStrand.referenceIndex = mRefNameIndex.Index(chromosome);
+		refStrand.strand = InterpretStrand(strand);
+
+		return refStrand.id;
+	}
+
+private:
+	NameIndex mRefNameIndex;
 };
 
 
 class DiscordantAlignments
 {
 public:
-	DiscordantAlignments()
+	DiscordantAlignments(const vector<double>& fragmentMeans, const vector<double>& fragmentStdDevs, int maxFragmentLength)
+	: mFragmentMeans(fragmentMeans), mFragmentStdDevs(fragmentStdDevs), mMaxFragmentLength(maxFragmentLength), mFragmentCount(0)
 	{}
-	
-	void AddFragmentAlignments(const CompAlignVec& alignments, float fragmentMean, float fragmentStdDev)
+
+	void AddFragmentAlignments(const vector<SpanningAlignmentRecord>& alignments)
 	{
 		if (alignments.empty())
 		{
 			return;
 		}
 		
-		int fragmentRemap = mFragmentIndices.size();
-		
-		mFragmentIndices.push_back(alignments.front().readID.fragmentIndex);
-		mFragmentMeans.push_back(fragmentMean);
-		mFragmentStdDevs.push_back(fragmentStdDev);
-		
-		int alignIndexBegin[2];
-		for (int readEnd = 0; readEnd < 2; readEnd++)
+		if (IsConcordant(alignments, mMaxFragmentLength))
 		{
-			alignIndexBegin[readEnd] = mRefStrands[readEnd].size();
+			return;
 		}
-		
-		for (CompAlignVecConstIter alignIter = alignments.begin(); alignIter != alignments.end(); alignIter++)
+
+		vector<size_t> readEndIdxs[2];
+		for (size_t idx = 0; idx < alignments.size(); idx++)
 		{
-			const CompactAlignment& alignment = *alignIter;
-			
-			DebugCheck(mFragmentIndices.back() == alignment.readID.fragmentIndex);
-			
-			mFragmentRemaps[alignment.readID.readEnd].push_back(fragmentRemap);
-			
-			mRefStrands[alignment.readID.readEnd].push_back(alignment.refStrand);
-			mStarts[alignment.readID.readEnd].push_back(alignment.region.start);
-			mLengths[alignment.readID.readEnd].push_back(alignment.region.end - alignment.region.start + 1);
-			mAlignProb[alignment.readID.readEnd].push_back((uint16_t)((float)numeric_limits<uint16_t>::max() * alignment.alignProb));
-			mChimericProb[alignment.readID.readEnd].push_back((uint16_t)((float)numeric_limits<uint16_t>::max() * alignment.chimericProb));
-			mValidProb[alignment.readID.readEnd].push_back((uint16_t)((float)numeric_limits<uint16_t>::max() * alignment.validProb));
+			readEndIdxs[alignments[idx].readEnd].push_back(idx);
 		}
-		
-		int alignIndexEnd[2];
-		for (int readEnd = 0; readEnd < 2; readEnd++)
+
+		size_t idxOffset = mLibIDs.size();
+		DebugCheck(mLibIDs.size() == mReadIDs.size());
+		DebugCheck(mLibIDs.size() == mReadEnds.size());
+		DebugCheck(mLibIDs.size() == mAlignIDs.size());
+		DebugCheck(mLibIDs.size() == mPositions.size());
+
+		for (vector<size_t>::const_iterator idx1Iter = readEndIdxs[0].begin(); idx1Iter != readEndIdxs[0].end(); idx1Iter++)
 		{
-			alignIndexEnd[readEnd] = mRefStrands[readEnd].size();
-		}
-		
-		for (int readEnd = 0; readEnd < 2; readEnd++)
-		{
-			mMateBegin[readEnd].push_back(alignIndexBegin[OtherReadEnd(readEnd)]);
-			mMateEnd[readEnd].push_back(alignIndexEnd[OtherReadEnd(readEnd)]);
-			
-			for (int alignIndex = alignIndexBegin[readEnd]; alignIndex < alignIndexEnd[readEnd]; alignIndex++)
+			size_t idx1 = *idx1Iter;
+
+			const SpanningAlignmentRecord& alignment1 = alignments[idx1];
+
+			uint32_t chrStrIdx1 = mChrStrIndex.Index(alignment1.chromosome, alignment1.strand);
+
+			for (vector<size_t>::const_iterator idx2Iter = readEndIdxs[1].begin(); idx2Iter != readEndIdxs[1].end(); idx2Iter++)
 			{
-				AlignID alignID;
+				size_t idx2 = *idx2Iter;
+
+				const SpanningAlignmentRecord& alignment2 = alignments[idx2];
 				
-				alignID.alignIndex = alignIndex;
-				alignID.readEnd = readEnd;
-				
-				const RefStrand& refStrand = mRefStrands[readEnd][alignIndex];
-				
-				mBinnedReads[refStrand].push_back(alignID);
+				uint32_t chrStrIdx2 = mChrStrIndex.Index(alignment2.chromosome, alignment2.strand);
+
+				pair<uint32_t,uint32_t> chrStrIdxPair;
+				pair<size_t,size_t> alignmentIdxPair;
+				if ((chrStrIdx1 < chrStrIdx2) || 
+					((chrStrIdx1 == chrStrIdx2) && alignment1.GetOuterPosition() < alignment2.GetOuterPosition()))
+				{
+					chrStrIdxPair = pair<uint32_t,uint32_t>(chrStrIdx1, chrStrIdx2);
+					alignmentIdxPair = pair<size_t,size_t>(idx1 + idxOffset, idx2 + idxOffset);
+				}
+				else
+				{
+					chrStrIdxPair = pair<uint32_t,uint32_t>(chrStrIdx2, chrStrIdx1);
+					alignmentIdxPair = pair<size_t,size_t>(idx2 + idxOffset, idx1 + idxOffset);
+				}
+
+				mPaired[chrStrIdxPair].push_back(alignmentIdxPair);
 			}
 		}
-	}
-	
-	void StartRefStrandIteration() const
-	{
-		mFinishedSectorIteration = DoSectorIteration(false);
-	}
-	
-	void NextRefStrandIteration() const
-	{
-		if (!mFinishedSectorIteration)
+
+		for (vector<SpanningAlignmentRecord>::const_iterator alignmentIter = alignments.begin(); alignmentIter != alignments.end(); alignmentIter++)
 		{
-			mFinishedSectorIteration = DoSectorIteration(true);
+			mLibIDs.push_back(alignmentIter->libID);
+			mReadIDs.push_back(alignmentIter->readID);
+			mReadEnds.push_back(alignmentIter->readEnd);
+			mAlignIDs.push_back(alignmentIter->alignID);
+			mPositions.push_back(alignmentIter->GetOuterPosition());
 		}
+
+		mFragmentCount++;
 	}
-	
-	void RetrieveRefStrandAlignments(CompAlignVec& alignments1, CompAlignVec& alignments2) const
+
+	vector<pair<uint32_t,uint32_t> > GetChrStrIdxPairs()
 	{
-		const vector<pair<AlignID,AlignID> >& binnedMates = mRefStrandIter2->second;
-		
-		for (vector<pair<AlignID,AlignID> >::const_iterator mateIter = binnedMates.begin(); mateIter != binnedMates.end(); mateIter++)
+		vector<pair<uint32_t,uint32_t> > chrStrIdxPairs;
+
+		for (unordered_map<pair<uint32_t,uint32_t>,vector<pair<size_t,size_t> > >::const_iterator pairIter = mPaired.begin(); pairIter != mPaired.end(); pairIter++)
 		{
-			AlignID alignID1 = mateIter->first;
-			AlignID alignID2 = mateIter->second;
-			
-			CompactAlignment alignment1;
-			CompactAlignment alignment2;
-			
-			DebugCheck(alignID1.readEnd != alignID2.readEnd);
-			
-			int fragmentRemap = mFragmentRemaps[alignID1.readEnd][alignID1.alignIndex];
-			int fragmentIndex = mFragmentIndices[fragmentRemap];
-			
-			alignment1.readID.fragmentIndex = fragmentIndex;
-			alignment1.readID.readEnd = alignID1.readEnd;
-			alignment1.refStrand = mRefStrands[alignID1.readEnd][alignID1.alignIndex];
-			alignment1.region.start = mStarts[alignID1.readEnd][alignID1.alignIndex];
-			alignment1.region.end = alignment1.region.start + mLengths[alignID1.readEnd][alignID1.alignIndex] - 1;
-			alignment1.alignProb = (float)mAlignProb[alignID1.readEnd][alignID1.alignIndex] / (float)numeric_limits<uint16_t>::max();
-			alignment1.chimericProb = (float)mChimericProb[alignID1.readEnd][alignID1.alignIndex] / (float)numeric_limits<uint16_t>::max();
-			alignment1.validProb = (float)mValidProb[alignID1.readEnd][alignID1.alignIndex] / (float)numeric_limits<uint16_t>::max();
-			
-			alignment2.readID.fragmentIndex = fragmentIndex;
-			alignment2.readID.readEnd = alignID2.readEnd;
-			alignment2.refStrand = mRefStrands[alignID2.readEnd][alignID2.alignIndex];
-			alignment2.region.start = mStarts[alignID2.readEnd][alignID2.alignIndex];
-			alignment2.region.end = alignment2.region.start + mLengths[alignID2.readEnd][alignID2.alignIndex] - 1;
-			alignment2.alignProb = (float)mAlignProb[alignID2.readEnd][alignID2.alignIndex] / (float)numeric_limits<uint16_t>::max();
-			alignment2.chimericProb = (float)mChimericProb[alignID2.readEnd][alignID2.alignIndex] / (float)numeric_limits<uint16_t>::max();
-			alignment2.validProb = (float)mValidProb[alignID2.readEnd][alignID2.alignIndex] / (float)numeric_limits<uint16_t>::max();
-			
-			alignments1.push_back(alignment1);
-			alignments2.push_back(alignment2);
+			chrStrIdxPairs.push_back(pairIter->first);
 		}
+
+		return chrStrIdxPairs;
 	}
-	
-	bool FinishedRefStrandIteration() const
+
+	vector<MatePair> CreateMatePairs(const pair<uint32_t,uint32_t>& chrStrIdxPair) const
 	{
-		return mFinishedSectorIteration;	
+		vector<MatePair> matePairs;
+
+		const vector<pair<size_t,size_t> >& alignmentIdxPairs = mPaired.find(chrStrIdxPair)->second;
+
+		for (vector<pair<size_t,size_t> >::const_iterator alignmentIdxPairIter = alignmentIdxPairs.begin(); alignmentIdxPairIter != alignmentIdxPairs.end(); alignmentIdxPairIter++)
+		{
+			size_t alignmentIdx1 = alignmentIdxPairIter->first;
+			size_t alignmentIdx2 = alignmentIdxPairIter->second;
+
+			DebugCheck(mLibIDs[alignmentIdx1] == mLibIDs[alignmentIdx2]);
+
+			MatePair matePair;
+			matePair.x = mPositions[alignmentIdx1];
+			matePair.y = mPositions[alignmentIdx2];
+			matePair.u = mFragmentMeans[mLibIDs[alignmentIdx1]];
+			matePair.s = mFragmentStdDevs[mLibIDs[alignmentIdx1]];
+
+			matePairs.push_back(matePair);
+		}
+
+		return matePairs;
+	}
+
+	vector<pair<ReadInfo,ReadInfo> > CreateReadInfos(const pair<uint32_t,uint32_t>& chrStrIdxPair) const
+	{
+		vector<pair<ReadInfo,ReadInfo> > readInfos;
+
+		const vector<pair<size_t,size_t> >& alignmentIdxPairs = mPaired.find(chrStrIdxPair)->second;
+
+		for (vector<pair<size_t,size_t> >::const_iterator alignmentIdxPairIter = alignmentIdxPairs.begin(); alignmentIdxPairIter != alignmentIdxPairs.end(); alignmentIdxPairIter++)
+		{
+			size_t alignmentIdx1 = alignmentIdxPairIter->first;
+			size_t alignmentIdx2 = alignmentIdxPairIter->second;
+
+			DebugCheck(mLibIDs[alignmentIdx1] == mLibIDs[alignmentIdx2]);
+			DebugCheck(mReadIDs[alignmentIdx1] == mReadIDs[alignmentIdx2]);
+			DebugCheck(mReadEnds[alignmentIdx1] != mReadEnds[alignmentIdx2]);
+
+			ReadInfo readInfo1;
+			readInfo1.libID = mLibIDs[alignmentIdx1];
+			readInfo1.readID = mReadIDs[alignmentIdx1];
+			readInfo1.readEnd = mReadEnds[alignmentIdx1];
+			readInfo1.alignID = mAlignIDs[alignmentIdx1];
+
+			ReadInfo readInfo2;
+			readInfo2.libID = mLibIDs[alignmentIdx2];
+			readInfo2.readID = mReadIDs[alignmentIdx2];
+			readInfo2.readEnd = mReadEnds[alignmentIdx2];
+			readInfo2.alignID = mAlignIDs[alignmentIdx2];
+
+			readInfos.push_back(make_pair(readInfo1, readInfo2));
+		}
+
+		return readInfos;
+	}
+
+	int GetFragmentCount() const
+	{
+		return mFragmentCount;
+	}
+
+	int GetAlignmentCount() const
+	{
+		return (int)mLibIDs.size();
 	}
 	
 private:
-	void GenerateBinnedMates() const
-	{
-		mBinnedMates.clear();
-		
-		const vector<AlignID>& alignIDs = mRefStrandIter1->second;
-		
-		for (vector<AlignID>::const_iterator alignIDIter = alignIDs.begin(); alignIDIter != alignIDs.end(); alignIDIter++)
-		{
-			AlignID alignID = *alignIDIter;
-			
-			int fragmentRemap = mFragmentRemaps[alignID.readEnd][alignID.alignIndex];
-			RefStrand refStrand = mRefStrands[alignID.readEnd][alignID.alignIndex];
-			int start = mStarts[alignID.readEnd][alignID.alignIndex];
-			
-			for (int mateAlignIndex = mMateBegin[alignID.readEnd][fragmentRemap]; mateAlignIndex < mMateEnd[alignID.readEnd][fragmentRemap]; mateAlignIndex++)
-			{
-				AlignID mateAlignID;
-				mateAlignID.alignIndex = mateAlignIndex;
-				mateAlignID.readEnd = OtherReadEnd(alignID.readEnd);
-				
-				RefStrand mateRefStrand = mRefStrands[mateAlignID.readEnd][mateAlignID.alignIndex];
-				
-				int mateStart = mStarts[mateAlignID.readEnd][mateAlignID.alignIndex];
-				
-				if (refStrand.id != mateRefStrand.id || start < mateStart)
-				{
-					mBinnedMates[mateRefStrand].push_back(make_pair(alignID,mateAlignID));
-				}
-			}
-		}
-	}
-	
-	bool DoSectorIteration(bool resume) const
-	{
-		if (mBinnedReads.empty())
-		{
-			return true;
-		}
-		
-		if (resume)
-		{
-			goto resumeiteration;
-		}
-		
-		for (mRefStrandIter1 = mBinnedReads.begin(); mRefStrandIter1 != mBinnedReads.end(); mRefStrandIter1++)
-		{
-			GenerateBinnedMates();
-			
-			for (mRefStrandIter2 = mBinnedMates.begin(); mRefStrandIter2 != mBinnedMates.end(); mRefStrandIter2++)
-			{
-				if (mRefStrandIter2->first.id > mRefStrandIter1->first.id)
-				{
-					continue;
-				}
-				
-				return false;
-				
-				resumeiteration: (void)(0);
-			}
-		}
-		
-		return true;
-	}	
-	
-	vector<int> mFragmentRemaps[2];
-	vector<RefStrand> mRefStrands[2];
-	vector<int> mStarts[2];
-	vector<unsigned char> mLengths[2];
-	vector<uint16_t> mAlignProb[2];
-	vector<uint16_t> mChimericProb[2];
-	vector<uint16_t> mValidProb[2];
-	
-	vector<int> mFragmentIndices;
-	vector<float> mFragmentMeans;
-	vector<float> mFragmentStdDevs;
-	vector<int> mMateBegin[2];
-	vector<int> mMateEnd[2];
-	
-	unordered_map<RefStrand,vector<AlignID> > mBinnedReads;
-	
-	mutable bool mFinishedSectorIteration;
-	mutable unordered_map<RefStrand,vector<AlignID> >::const_iterator mRefStrandIter1;
-	mutable unordered_map<RefStrand,vector<pair<AlignID,AlignID> > > mBinnedMates;
-	mutable unordered_map<RefStrand,vector<pair<AlignID,AlignID> > >::const_iterator mRefStrandIter2;
+	int mMaxFragmentLength;
+	const vector<double> mFragmentMeans;
+	const vector<double> mFragmentStdDevs;
+	int mFragmentCount;
+
+	ChromosomeStrandIndex mChrStrIndex;
+
+	vector<uint16_t> mLibIDs;
+	vector<uint32_t> mReadIDs;
+	vector<uint8_t> mReadEnds;
+	vector<uint16_t> mAlignIDs;
+	vector<uint32_t> mPositions;
+
+	unordered_map<pair<uint32_t,uint32_t>,vector<pair<size_t,size_t> > > mPaired;
 };
 
 

@@ -41,7 +41,7 @@ struct RefStrand
 			unsigned strand : 1;
 		};
 		
-		unsigned int id;
+		uint32_t id;
 	};
 };
 
@@ -299,6 +299,14 @@ struct MatePair
 };
 
 typedef vector<MatePair> MatePairVec;
+
+struct ReadInfo
+{
+	int libID;
+	int readID;
+	int readEnd;
+	int alignID;
+};
 
 bool FragmentLessThan(const CompactAlignment& a1, const CompactAlignment& a2);
 

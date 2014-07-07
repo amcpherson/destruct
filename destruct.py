@@ -62,7 +62,11 @@ else:
         align_sample(sch, cfg, ('bylibrary',))
         split_align_merge(sch, cfg, ('bylibrary',))
 
-        sch.transform('cluster', (), himem, run_mclustermatepairs, None, cfg.mclustermatepairs_tool, sch.iobj('stats', ('bylibrary',)), sch.ifile('spanning.alignments', ('bylibrary',)), sch.ofile('clusters.raw'))
+        sch.transform('write_stats_table', (), lowmem, write_stats_table, None, sch.iobj('libinfo', ('bylibrary',)), sch.iobj('stats', ('bylibrary',)), sch.ofile('libstats.tsv'))
+
+        sch.transform('merge_alignments', (), lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', ('bylibrary',)), sch.ofile('spanning.alignments'))
+
+        sch.commandline('cluster', (), himem, cfg.mclustermatepairs_tool, '-a', sch.ifile('spanning.alignments'), '-s', sch.ifile('libstats.tsv'), '-c', sch.ofile('clusters.raw'), '--clustmin', '1', '--fragmax', cfg.fragment_length_max)
 
         sch.transform('segmt', (), lowmem, segregate_mitochondrial, None, cfg.mitochondrial_chromosome, sch.ifile('clusters.raw'), sch.ofile('clusters.segrmt'))
         sch.transform('nodup', (), lowmem, remove_duplicates, None, sch.ifile('clusters.segrmt'), sch.ofile('clusters.nodup'))
@@ -99,8 +103,9 @@ else:
 
         align_reads(sch, cfg, axes + ('byread',))
 
-        sch.transform('mergespan', axes, lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', axes + ('byread',)), sch.ofile('spanning.alignments.unfiltered', axes))
-        sch.commandline('filterreads', axes, lowmem, cfg.filterreads_tool, '-n', '2', '-a', sch.ifile('spanning.alignments.unfiltered', axes), '-r', cfg.satellite_regions, '>', sch.ofile('spanning.alignments', axes))
+        # sch.transform('mergespan', axes, lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', axes + ('byread',)), sch.ofile('spanning.alignments.unfiltered', axes))
+        # sch.commandline('filterreads', axes, lowmem, cfg.filterreads_tool, '-n', '2', '-a', sch.ifile('spanning.alignments.unfiltered', axes), '-r', cfg.satellite_regions, '>', sch.ofile('spanning.alignments', axes))
+        sch.transform('mergespan', axes, lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', axes + ('byread',)), sch.ofile('spanning.alignments', axes))
         sch.transform('mergesplt', axes, lowmem, merge_files_by_line, None, sch.ifile('split.alignments', axes + ('byread',)), sch.ofile('split.alignments', axes))
 
 
@@ -139,7 +144,7 @@ else:
 
         sch.transform('prepseed', axes, medmem, prepare_seed_fastq, None, sch.ifile('reads1', axes), sch.ifile('reads2', axes), 36, sch.ofile('reads.seed', axes))
         sch.commandline('prepreads', axes, medmem, 'cat', sch.ifile('reads1', axes), sch.ifile('reads2', axes), '>', sch.ofile('reads', axes))
-        sch.commandline('bwtrealign', axes, medmem, cfg.bowtie_bin, cfg.genome_fasta, sch.ifile('reads.seed', axes), '--chunkmbs', '512', '-k', '1000', '-m', '1000', '--strata', '--best', '-S', '|', cfg.realign2_tool, '-a', '-', '-s', sch.ifile('reads', axes), '-r', cfg.genome_fasta, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmin', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_min'), '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'), '--tchimer', cfg.chimeric_threshold, '--talign', cfg.alignment_threshold, '--pchimer', cfg.chimeric_prior, '--tvalid', cfg.readvalid_threshold, '-z', sch.ifile('score.stats', ('bylibrary',)), '--span', sch.ofile('spanning.alignments', axes), '--split', sch.ofile('split.alignments', axes))
+        sch.commandline('bwtrealign', axes, medmem, cfg.bowtie_bin, cfg.genome_fasta, sch.ifile('reads.seed', axes), '--chunkmbs', '512', '-k', '1000', '-m', '1000', '--strata', '--best', '-S', '|', cfg.realign2_tool, '-l', sch.iobj('libinfo', ('bylibrary',)).prop('id'), '-a', '-', '-s', sch.ifile('reads', axes), '-r', cfg.genome_fasta, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmin', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_min'), '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'), '--tchimer', cfg.chimeric_threshold, '--talign', cfg.alignment_threshold, '--pchimer', cfg.chimeric_prior, '--tvalid', cfg.readvalid_threshold, '-z', sch.ifile('score.stats', ('bylibrary',)), '--span', sch.ofile('spanning.alignments', axes), '--split', sch.ofile('split.alignments', axes))
 
 
     def prepare_seed_fastq(reads_1_fastq, reads_2_fastq, seed_length, seed_fastq):
@@ -191,6 +196,14 @@ else:
             utils.plots.savefig_tar(plots_tar, fig, 'fragment_length_{0}.pdf'.format(library_id))
             plt.clf()
         return ConcordantReadStats({'fragment_mean':fragment_mean, 'fragment_stddev':fragment_stddev}, fragment_length_num_stddevs)
+
+
+    def write_stats_table(lib_infos, lib_stats, stats_table_filename):
+        with open(stats_table_filename, 'w') as stats_table_file:
+            for lib_name, lib_info in lib_infos.iteritems():
+                stats_table_file.write(str(lib_infos[lib_name].id) + '\t')
+                stats_table_file.write(str(lib_stats[lib_name].fragment_length_mean) + '\t')
+                stats_table_file.write(str(lib_stats[lib_name].fragment_length_stddev) + '\n')
 
 
     def split_file_byline(in_filename, lines_per_file, out_filename_callback):
@@ -307,18 +320,6 @@ else:
         except OSError:
             pass
         os.symlink(os.path.abspath(target_bam_filename), link_bam_filename)
-
-
-    def run_mclustermatepairs(mclustermatepairs_bin, stats, spanning_alignments, clusters_filename):
-        mclustermatepairs_arguments = [mclustermatepairs_bin, '-m', '1', '-o', clusters_filename, '-i', '-']
-        mclustermatepairs_process = subprocess.Popen(mclustermatepairs_arguments, stdin=subprocess.PIPE, stdout=sys.stdout, stderr=sys.stderr)
-        for lib_name, lib_stats in stats.iteritems():
-            mclustermatepairs_process.stdin.write('\t'.join(['library', lib_name, str(lib_stats.fragment_length_mean), str(lib_stats.fragment_length_stddev)]) + '\n')
-        for lib_name, lib_spanning_alignments in spanning_alignments.iteritems():
-            mclustermatepairs_process.stdin.write('\t'.join(['alignments', lib_name, lib_spanning_alignments, 'compact']) + '\n')
-        mclustermatepairs_process.stdin.close()
-        if mclustermatepairs_process.wait() != 0:
-            raise Exception('mclustermatepairs process %s produced exit code %s' % (' '.join(mclustermatepairs_arguments), mclustermatepairs_process.returncode))
 
 
     def run_mpredictbreaks(mpredictbreaks_bin, genome_fasta, clusters_filename, split_alignments, breakpoints):

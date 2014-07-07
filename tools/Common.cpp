@@ -1,13 +1,10 @@
 /*
  *  Common.cpp
- *  linkexons
- *
- *  Created by Andrew McPherson on 15/09/09.
- *  Copyright 2009 __MyCompanyName__. All rights reserved.
  *
  */
 
 #include "Common.h"
+#include "DebugCheck.h"
 
 #include <iostream>
 #include <fstream>
@@ -94,18 +91,15 @@ int FindMaxElement(const IntegerTable& clusters)
 
 int InterpretStrand(const string& strand)
 {
+	DebugCheck(strand == "+" || strand == "-");
+
 	if (strand == "+")
 	{
 		return PlusStrand;
 	}
-	else if (strand == "-")
-	{
-		return MinusStrand;
-	}
 	else
 	{
-		cerr << "Error: Unable to intepret strand " << strand << endl;
-		exit(1);			
+		return MinusStrand;
 	}
 }
 

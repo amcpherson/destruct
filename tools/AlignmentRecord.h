@@ -17,25 +17,17 @@ struct SpanningAlignmentRecord
     int readEnd;
     int alignID;
     string chromosome;
-    char strand;
+    string strand;
     int start;
     int end;
     int score;
+
+    int GetOuterPosition() const;
 };
 
-std::ostream & operator<<(std::ostream &os, const SpanningAlignmentRecord& record)
-{
-    os << record.libID << "\t";
-    os << record.readID << "\t";
-    os << record.readEnd << "\t";
-    os << record.alignID << "\t";
-    os << record.chromosome << "\t";
-    os << ((record.strand == PlusStrand) ? '+' : '-') << "\t";
-    os << record.start << "\t";
-    os << record.end << "\t";
-    os << record.score << std::endl;
-    return os;
-}
+std::ostream & operator<<(std::ostream &os, const SpanningAlignmentRecord& record);
+
+std::istream & operator>>(std::istream &is, SpanningAlignmentRecord& record);
 
 struct SplitAlignmentRecord
 {
@@ -53,22 +45,9 @@ struct SplitAlignmentRecord
     int score;
 };
 
-std::ostream & operator<<(std::ostream &os, const SplitAlignmentRecord& record)
-{
-    os << record.libID << "\t";
-    os << record.readID << "\t";
-    os << record.readEnd << "\t";
-    os << record.alignID1 << "\t";
-    os << record.alignID2 << "\t";
-    os << record.chromosome1 << "\t";
-    os << ((record.strand1 == PlusStrand) ? '+' : '-') << "\t";
-    os << record.position1 << "\t";
-    os << record.chromosome2 << "\t";
-    os << ((record.strand2 == PlusStrand) ? '+' : '-') << "\t";
-    os << record.position2 << "\t";
-    os << record.score << std::endl;
-    return os;
-}
+std::ostream & operator<<(std::ostream &os, const SplitAlignmentRecord& record);
+
+std::istream & operator>>(std::istream &is, SplitAlignmentRecord& record);
 
 
 #endif

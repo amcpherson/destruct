@@ -52,7 +52,7 @@ sources = """
 env.Program(target='overlapclusters', source=common_sources+sources)
 
 sources = """
-    AlignmentStream.cpp
+    AlignmentRecord.cpp
     MatePairGibbs.cpp
     Parsers.cpp
     asa136.cpp
