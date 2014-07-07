@@ -96,22 +96,10 @@ int main(int argc, char* argv[])
 	ifstream alignmentsFile(alignmentsFilename.c_str());
 	CheckFile(alignmentsFile, alignmentsFilename);
 
-	SpanningAlignmentRecord alignment;
-	vector<SpanningAlignmentRecord> readAlignments;
-	while (alignmentsFile >> alignment)
-	{
-		if (!readAlignments.empty() &&
-			(alignment.libID != readAlignments.back().libID ||
-			 alignment.readID != readAlignments.back().readID))
-		{
-			discordantAlignments.AddFragmentAlignments(readAlignments);
-			readAlignments.clear();
-		}
+	AlignmentRecordStream<SpanningAlignmentRecord> alignmentsStream(alignmentsFile);
 
-		readAlignments.push_back(alignment);
-	}
-	
-	if (!readAlignments.empty())
+	vector<SpanningAlignmentRecord> readAlignments;
+	while (alignmentsStream.Next(readAlignments))
 	{
 		discordantAlignments.AddFragmentAlignments(readAlignments);
 	}

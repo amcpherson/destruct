@@ -49,5 +49,46 @@ std::ostream & operator<<(std::ostream &os, const SplitAlignmentRecord& record);
 
 std::istream & operator>>(std::istream &is, SplitAlignmentRecord& record);
 
+template<typename TRecordType>
+class AlignmentRecordStream
+{
+public:
+    AlignmentRecordStream(std::istream& is) : mStream(is)
+    {
+        mGood = (is >> mNextRecord);
+    }
+    
+    bool Next(vector<TRecordType>& records)
+    {
+        if (!mGood)
+        {
+            return false;
+        }
+        
+        records.clear();
+        records.push_back(mNextRecord);
+        
+        while ((mGood = (mStream >> mNextRecord)))
+        {
+            if (records.front().libID != mNextRecord.libID ||
+                records.front().readID != mNextRecord.readID)
+            {
+                break;
+            }
+            else
+            {
+                records.push_back(mNextRecord);
+            }
+        }
+        
+        return true;
+    }
+    
+protected:
+    std::istream& mStream;
+    TRecordType mNextRecord;
+    bool mGood;
+};
+
 
 #endif
