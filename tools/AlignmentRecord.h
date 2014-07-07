@@ -50,6 +50,17 @@ std::ostream & operator<<(std::ostream &os, const SplitAlignmentRecord& record);
 std::istream & operator>>(std::istream &is, SplitAlignmentRecord& record);
 
 template<typename TRecordType>
+std::ostream & operator<<(std::ostream &os, const vector<TRecordType>& records)
+{
+    for (typename vector<TRecordType>::const_iterator recordIter = records.begin(); recordIter != records.end(); recordIter++)
+    {
+        os << *recordIter;
+    }
+
+    return os;
+}
+
+template<typename TRecordType>
 class AlignmentRecordStream
 {
 public:

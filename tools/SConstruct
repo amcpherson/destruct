@@ -298,7 +298,7 @@ sources = """
 env.Program(target='paths', source=common_sources+sources)
 
 sources = """
-    AlignmentStream.cpp
+    AlignmentRecord.cpp
     RegionDB.cpp
     filterreads.cpp
 """.split()
