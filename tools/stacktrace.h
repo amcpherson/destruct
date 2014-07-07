@@ -91,3 +91,4 @@ static inline void print_stacktrace(FILE *out = stderr, unsigned int max_frames 
 }
 
 #endif // _STACKTRACE_H_
+
