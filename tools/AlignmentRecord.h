@@ -10,6 +10,14 @@
 
 #include <ostream>
 
+
+struct AlignmentPairKey
+{
+    int libID;
+    int readID;
+    int alignID[2];
+};
+
 struct SpanningAlignmentRecord
 {
     int libID;
@@ -34,20 +42,33 @@ struct SplitAlignmentRecord
     int libID;
     int readID;
     int readEnd;
-    int alignID1;
-    int alignID2;
-    string chromosome1;
-    char strand1;
-    int position1;
-    string chromosome2;
-    char strand2;
-    int position2;
+    int alignID[2];
+    string chromosome[2];
+    string strand[2];
+    int position[2];
+    string inserted;
     int score;
+
+    AlignmentPairKey GetAlignmentPairKey() const;
 };
 
 std::ostream & operator<<(std::ostream &os, const SplitAlignmentRecord& record);
 
 std::istream & operator>>(std::istream &is, SplitAlignmentRecord& record);
+
+struct ClusterMemberRecord
+{
+    int clusterID;
+    int clusterEnd;
+    int libID;
+    int readID;
+    int readEnd;
+    int alignID;
+};
+
+std::ostream & operator<<(std::ostream &os, const ClusterMemberRecord& record);
+
+std::istream & operator>>(std::istream &is, ClusterMemberRecord& record);
 
 template<typename TRecordType>
 std::ostream & operator<<(std::ostream &os, const vector<TRecordType>& records)
@@ -61,15 +82,31 @@ std::ostream & operator<<(std::ostream &os, const vector<TRecordType>& records)
 }
 
 template<typename TRecordType>
-class AlignmentRecordStream
+bool ReadEqual(const TRecordType& a, const TRecordType& b)
+{
+    return (a.libID == b.libID &&
+            a.readID == b.readID);
+}
+
+template<typename TRecordType>
+bool ClusterReadEqual(const TRecordType& a, const TRecordType& b)
+{
+    return (a.clusterID == b.clusterID &&
+            a.libID == b.libID &&
+            a.readID == b.readID);
+}
+
+template<typename TRecordType>
+class GroupedRecordsStream
 {
 public:
-    AlignmentRecordStream(std::istream& is) : mStream(is)
+    GroupedRecordsStream(std::istream& is) : mStream(is)
     {
         mGood = (is >> mNextRecord);
     }
     
-    bool Next(vector<TRecordType>& records)
+    template<typename TEqualFunc>
+    bool Next(vector<TRecordType>& records, TEqualFunc eq)
     {
         if (!mGood)
         {
@@ -81,8 +118,7 @@ public:
         
         while ((mGood = (mStream >> mNextRecord)))
         {
-            if (records.front().libID != mNextRecord.libID ||
-                records.front().readID != mNextRecord.readID)
+            if (eq(records.front(), mNextRecord))
             {
                 break;
             }

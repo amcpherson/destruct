@@ -63,7 +63,7 @@ sources = """
 env.Program(target='mclustermatepairs', source=common_sources+sources)
 
 sources = """
-    AlignmentStream.cpp
+    AlignmentRecord.cpp
     Parsers.cpp
     Sequences.cpp
     mpredictbreaks.cpp

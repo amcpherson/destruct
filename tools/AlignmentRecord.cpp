@@ -55,14 +55,13 @@ std::ostream & operator<<(std::ostream &os, const SplitAlignmentRecord& record)
     os << record.libID << "\t";
     os << record.readID << "\t";
     os << record.readEnd << "\t";
-    os << record.alignID1 << "\t";
-    os << record.alignID2 << "\t";
-    os << record.chromosome1 << "\t";
-    os << record.strand1 << "\t";
-    os << record.position1 << "\t";
-    os << record.chromosome2 << "\t";
-    os << record.strand2 << "\t";
-    os << record.position2 << "\t";
+    for (int readEnd = 0; readEnd < 2; readEnd++)
+    {
+        os << record.alignID[readEnd] << "\t";
+        os << record.chromosome[readEnd] << "\t";
+        os << record.strand[readEnd] << "\t";
+        os << record.position[readEnd] << "\t";
+    }
     os << record.score << std::endl;
     return os;
 }
@@ -72,15 +71,48 @@ std::istream & operator>>(std::istream &is, SplitAlignmentRecord& record)
     is >> record.libID;
     is >> record.readID;
     is >> record.readEnd;
-    is >> record.alignID1;
-    is >> record.alignID2;
-    is >> record.chromosome1;
-    is >> record.strand1;
-    is >> record.position1;
-    is >> record.chromosome2;
-    is >> record.strand2;
-    is >> record.position2;
+    for (int readEnd = 0; readEnd < 2; readEnd++)
+    {
+        is >> record.alignID[readEnd];
+        is >> record.chromosome[readEnd];
+        is >> record.strand[readEnd];
+        is >> record.position[readEnd];
+    }
     is >> record.score;
+    return is;
+}
+
+AlignmentPairKey SplitAlignmentRecord::GetAlignmentPairKey() const
+{
+    AlignmentPairKey alignPairKey;
+    alignPairKey.libID = libID;
+    alignPairKey.readID = readID;
+    for (int readEnd = 0; readEnd < 2; readEnd++)
+    {
+        alignPairKey.alignID[readEnd] = alignID[readEnd];
+    }
+    return alignPairKey;
+}
+
+std::ostream & operator<<(std::ostream &os, const ClusterMemberRecord& record)
+{
+    os << record.clusterID << "\t";
+    os << record.clusterEnd << "\t";
+    os << record.libID << "\t";
+    os << record.readID << "\t";
+    os << record.readEnd << "\t";
+    os << record.alignID << std::endl;
+    return os;
+}
+
+std::istream & operator>>(std::istream &is, ClusterMemberRecord& record)
+{
+    is >> record.clusterID;
+    is >> record.clusterEnd;
+    is >> record.libID;
+    is >> record.readID;
+    is >> record.readEnd;
+    is >> record.alignID;
     return is;
 }
 
