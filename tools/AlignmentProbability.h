@@ -72,7 +72,7 @@ private:
 	double mSumReadLikelihood[2];
 	double mSumConcordantLikelihood;
 
-	vector<double> mReadEnd;
+	vector<int> mReadEnd;
 	vector<double> mReadLikelihood;
 	vector<double> mConcordantLikelihood;
 };
