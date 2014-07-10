@@ -71,10 +71,10 @@ int main(int argc, char* argv[])
 	ifstream alignmentsFile(alignmentsFilename.c_str());
 	CheckFile(alignmentsFile, alignmentsFilename);
 
-	AlignmentRecordStream<SpanningAlignmentRecord> alignmentsStream(alignmentsFile);
+	GroupedRecordsStream<SpanningAlignmentRecord> alignmentsStream(alignmentsFile);
 
 	vector<SpanningAlignmentRecord> alignments;
-	while (alignmentsStream.Next(alignments))
+	while (alignmentsStream.Next(alignments, ReadEqual<SpanningAlignmentRecord>))
 	{
 		if (IsFiltered(alignments, excludedRegions, numEnds))
 		{
