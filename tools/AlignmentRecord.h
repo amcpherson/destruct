@@ -118,7 +118,7 @@ public:
         
         while ((mGood = (mStream >> mNextRecord)))
         {
-            if (eq(records.front(), mNextRecord))
+            if (!eq(records.front(), mNextRecord))
             {
                 break;
             }
