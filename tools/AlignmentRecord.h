@@ -11,6 +11,12 @@
 #include <ostream>
 
 
+struct ReadRecord
+{
+    int libID;
+    int readID;
+};
+
 struct AlignmentPairKey
 {
     int libID;
@@ -64,6 +70,8 @@ struct ClusterMemberRecord
     int readID;
     int readEnd;
     int alignID;
+
+    ReadRecord GetReadRecord() const;
 };
 
 std::ostream & operator<<(std::ostream &os, const ClusterMemberRecord& record);
@@ -94,6 +102,12 @@ bool ClusterReadEqual(const TRecordType& a, const TRecordType& b)
     return (a.clusterID == b.clusterID &&
             a.libID == b.libID &&
             a.readID == b.readID);
+}
+
+template<typename TRecordType>
+bool ClusterEqual(const TRecordType& a, const TRecordType& b)
+{
+    return (a.clusterID == b.clusterID);
 }
 
 template<typename TRecordType>
@@ -136,6 +150,38 @@ protected:
     TRecordType mNextRecord;
     bool mGood;
 };
+
+inline bool operator==(const ReadRecord& record1, const ReadRecord& record2)
+{
+    return record1.libID == record2.libID &&
+           record1.readID == record2.readID;
+}
+
+inline size_t hash_value(const ReadRecord& record)
+{
+    size_t seed = 0;
+    hash_combine(seed, record.libID);
+    hash_combine(seed, record.readID);
+    return seed;
+}
+
+inline bool operator==(const AlignmentPairKey& alignPairKey1, const AlignmentPairKey& alignPairKey2)
+{
+    return alignPairKey1.libID == alignPairKey2.libID &&
+           alignPairKey1.readID == alignPairKey2.readID &&
+           alignPairKey1.alignID[0] == alignPairKey2.alignID[0] &&
+           alignPairKey1.alignID[1] == alignPairKey2.alignID[1];
+}
+
+inline size_t hash_value(const AlignmentPairKey& alignPairKey)
+{
+    size_t seed = 0;
+    hash_combine(seed, alignPairKey.libID);
+    hash_combine(seed, alignPairKey.readID);
+    hash_combine(seed, alignPairKey.alignID[0]);
+    hash_combine(seed, alignPairKey.alignID[1]);
+    return seed;
+}
 
 
 #endif

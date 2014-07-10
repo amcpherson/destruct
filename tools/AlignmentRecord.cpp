@@ -118,3 +118,12 @@ std::istream & operator>>(std::istream &is, ClusterMemberRecord& record)
     return is;
 }
 
+ReadRecord ClusterMemberRecord::GetReadRecord() const
+{
+    ReadRecord record;
+    record.libID = libID;
+    record.readID = readID;
+    return record;
+}
+
+

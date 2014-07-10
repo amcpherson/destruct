@@ -19,24 +19,6 @@ using namespace boost;
 using namespace std;
 
 
-inline bool operator==(const AlignmentPairKey& alignPairKey1, const AlignmentPairKey& alignPairKey2)
-{
-	return alignPairKey1.libID == alignPairKey2.libID &&
-		   alignPairKey1.readID == alignPairKey2.readID &&
-		   alignPairKey1.alignID[0] == alignPairKey2.alignID[0] &&
-		   alignPairKey1.alignID[1] == alignPairKey2.alignID[1];
-}
-
-inline size_t hash_value(const AlignmentPairKey& alignPairKey)
-{
-	size_t seed = 0;
-	hash_combine(seed, alignPairKey.libID);
-	hash_combine(seed, alignPairKey.readID);
-	hash_combine(seed, alignPairKey.alignID[0]);
-	hash_combine(seed, alignPairKey.alignID[1]);
-	return seed;
-}
-
 struct SplitDefinition
 {
 	int position[2];
@@ -45,7 +27,9 @@ struct SplitDefinition
 
 inline bool operator==(const SplitDefinition& split1, const SplitDefinition& split2)
 {
-	return split1.position[0] == split2.position[0] && split1.position[1] == split2.position[1] && split1.numInserted == split2.numInserted;
+	return split1.position[0] == split2.position[0] &&
+	       split1.position[1] == split2.position[1] &&
+	       split1.numInserted == split2.numInserted;
 }
 
 inline size_t hash_value(const SplitDefinition& split)

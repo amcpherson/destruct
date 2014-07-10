@@ -7,8 +7,8 @@
 
 #include "Common.h"
 #include "DebugCheck.h"
-#include "Parsers.h"
 #include "Algorithms.h"
+#include "AlignmentRecord.h"
 
 #include <fstream>
 #include <iostream>
@@ -23,20 +23,20 @@ using namespace std;
 int main(int argc, char* argv[])
 {
 	string clustersFilename;
-	string outClustersFilename;
-	bool distanceMin;
+	string weightsFilename;
+	string assignmentsFilename;
 	
 	try
 	{
 		TCLAP::CmdLine cmd("Set cover for maximum parsimony");
 		TCLAP::ValueArg<string> clustersFilenameArg("c","clusters","Clusters Filename",true,"","string",cmd);
-		TCLAP::ValueArg<string> outClustersFilenameArg("o","outclust","Output Clusters Filename",true,"","string",cmd);
-		TCLAP::SwitchArg distanceMinArg("d","distmin","Minimize distance",cmd);
+		TCLAP::ValueArg<string> weightsFilenameArg("w","weights","Weights Filename",false,"","string",cmd);
+		TCLAP::ValueArg<string> assignmentsFilenameArg("a","assignments","Output Assignments Filename",true,"","string",cmd);
 		cmd.parse(argc,argv);
 		
 		clustersFilename = clustersFilenameArg.getValue();
-		outClustersFilename = outClustersFilenameArg.getValue();
-		distanceMin = distanceMinArg.getValue();
+		weightsFilename = weightsFilenameArg.getValue();
+		assignmentsFilename = assignmentsFilenameArg.getValue();
 	}
 	catch (TCLAP::ArgException &e)
 	{
@@ -44,56 +44,106 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 	
-	double epsilon = 0.0;
-	if (distanceMin)
-	{
-		epsilon = 0.00001;
-	}
-	
 	cout << "Reading clusters" << endl;
 	
-	ClusterMembership clusterMembership(clustersFilename);
-	
-	IntegerVecMap clusters;
-	IntegerMap distances;
-	clusterMembership.Read(clusters, distances);
-	
-	double maxDistance = 1.0;
-	for (IntegerMapConstIter distIter = distances.begin(); distIter != distances.end(); distIter++)
+	vector<int> ids;
+	vector<vector<ReadRecord> > clusters;
+
 	{
-		maxDistance = max(maxDistance, (double)distIter->second);
+		ifstream clustersFile(clustersFilename.c_str());
+		CheckFile(clustersFile, clustersFilename);
+
+		GroupedRecordsStream<ClusterMemberRecord> memberStream(clustersFile);
+
+		vector<ClusterMemberRecord> clusterRecords;
+		while (memberStream.Next(clusterRecords, ClusterEqual<ClusterMemberRecord>))
+		{
+			DebugCheck(clusterRecords.size() > 0);
+
+			ids.push_back(clusterRecords.front().clusterID);
+			clusters.push_back(vector<ReadRecord>());
+
+			for (vector<ClusterMemberRecord>::const_iterator recordIter = clusterRecords.begin(); recordIter != clusterRecords.end(); recordIter++)
+			{
+				if (recordIter->clusterEnd == 0)
+				{
+					clusters.back().push_back(recordIter->GetReadRecord());
+				}
+			}
+		}
 	}
-	
-	DoubleMap clusterWeights;
-	for (IntegerVecMapConstIter clusterIter = clusters.begin(); clusterIter != clusters.end(); clusterIter++)
+
+	vector<double> weights;
+
+	if (!weightsFilename.empty())
 	{
-		double clusterWeight = 1.0;
-		
-		IntegerMapConstIter distIter = distances.find(clusterIter->first);
-		if (distIter != distances.end())
+		cout << "Reading weights" << endl;
+
+		ifstream weightsFile(weightsFilename.c_str());
+		CheckFile(weightsFile, weightsFilename);
+
+		double weight;
+		while (weightsFile >> weight)
 		{
-			clusterWeight += epsilon * log((double)distIter->second);
+			weights.push_back(weight);
 		}
-		else
+
+		if (clusters.size() != weights.size())
 		{
-			clusterWeight += epsilon * log(maxDistance * 2.0);
+			cerr << "Error: read " << clusters.size() << " clusters and " << weights.size() << " weights" << endl;
+			exit(1);
 		}
-		
-		clusterWeights[clusterIter->first] = clusterWeight;
 	}
-	
+	else
+	{
+		cout << "Setting weights to 1" << endl;
+
+		weights = vector<double>(clusters.size(), 1.0);
+	}
+
 	cout << "Calculating set cover solution" << endl;
 
-	IntegerVec solution;
-	SetCover(clusters, clusterWeights, solution);
+	vector<int> solution;
+	SetCover(clusters, weights, solution);
 	
 	cout << "Assigning fragments to solution sets" << endl;
 	
-	IntegerVecMap assignment;
+	vector<vector<ReadRecord> > assignment;
 	AssignInOrder(clusters, solution, assignment);
+
+	DebugCheck(ids.size() == assignment.size());
 	
-	cout << "Writing out clusters" << endl;
-	
-	clusterMembership.Write(outClustersFilename, assignment);
+	cout << "Writing out assignments" << endl;
+
+	{
+		ofstream assignmentsFile(assignmentsFilename.c_str());
+		CheckFile(assignmentsFile, assignmentsFilename);
+
+		ifstream clustersFile(clustersFilename.c_str());
+		CheckFile(clustersFile, clustersFilename);
+
+		GroupedRecordsStream<ClusterMemberRecord> memberStream(clustersFile);
+
+		int fileIdx = 0;
+
+		vector<ClusterMemberRecord> clusterRecords;
+		while (memberStream.Next(clusterRecords, ClusterEqual<ClusterMemberRecord>))
+		{
+			DebugCheck(clusterRecords.size() > 0);
+			DebugCheck(clusterRecords.front().clusterID == ids[fileIdx]);
+
+			unordered_set<ReadRecord> assigned(clusters[fileIdx].begin(), clusters[fileIdx].end());
+
+			for (vector<ClusterMemberRecord>::const_iterator recordIter = clusterRecords.begin(); recordIter != clusterRecords.end(); recordIter++)
+			{
+				if (assigned.find(recordIter->GetReadRecord()) != assigned.end())
+				{
+					assignmentsFile << (*recordIter);
+				}
+			}
+
+			fileIdx++;
+		}
+	}
 }
 

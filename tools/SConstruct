@@ -96,8 +96,7 @@ sources = """
 env.Program(target='presetcover', source=common_sources+sources)
 
 sources = """
-    Algorithms.cpp
-    Parsers.cpp
+    AlignmentRecord.cpp
     setcover.cpp
 """.split()
 env.Program(target='setcover', source=common_sources+sources)
