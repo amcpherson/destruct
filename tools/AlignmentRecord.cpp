@@ -62,6 +62,7 @@ std::ostream & operator<<(std::ostream &os, const SplitAlignmentRecord& record)
         os << record.strand[readEnd] << "\t";
         os << record.position[readEnd] << "\t";
     }
+    os << record.inserted << "\t";
     os << record.score << std::endl;
     return os;
 }
@@ -78,6 +79,7 @@ std::istream & operator>>(std::istream &is, SplitAlignmentRecord& record)
         is >> record.strand[readEnd];
         is >> record.position[readEnd];
     }
+    is >> record.inserted;
     is >> record.score;
     return is;
 }
