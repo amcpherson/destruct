@@ -409,6 +409,8 @@ int main(int argc, char* argv[])
 				const AlignInfo& selfAlignInfo = selfAlignments[selfAlignmentIndex];
 				const RawAlignment& selfAlignment = alignments[selfAlignmentIndex];
 				
+				DebugCheck(selfAlignment.readEnd == readEnd);
+
 				for (vector<int>::const_iterator mateAlignmentIter = alignmentIndices[mateEnd].begin(); mateAlignmentIter != alignmentIndices[mateEnd].end(); mateAlignmentIter++)
 				{
 					int mateAlignmentIndex = *mateAlignmentIter;
@@ -422,6 +424,8 @@ int main(int argc, char* argv[])
 					const AlignInfo& mateAlignInfo = mateAlignInfoIter->second;
 					const RawAlignment& mateAlignment = alignments[mateAlignmentIndex];
 					
+					DebugCheck(mateAlignment.readEnd == mateEnd);
+
 					int score = splitScores[readEnd][selfAlignmentIndex];
 					const IntegerVec& seq1Length = splitSeq1Length[readEnd][selfAlignmentIndex];
 					const IntegerVec& seq2Length = splitSeq2Length[readEnd][selfAlignmentIndex];
@@ -439,14 +443,15 @@ int main(int argc, char* argv[])
 						record.libID = libID;
 						record.readID = readID;
 						record.readEnd = selfAlignment.readEnd;
-						record.alignID1 = selfAlignmentIndex;
-						record.alignID2 = mateAlignmentIndex;
-						record.chromosome1 = selfAlignment.reference;
-						record.strand1 = selfAlignment.strand;
-						record.position1 = selfAlignInfo.BreakPosition(seq1Length[i]);
-						record.chromosome2 = mateAlignment.reference;
-						record.strand2 = mateAlignment.strand;
-						record.position2 = mateAlignInfo.BreakPosition(seq2Length[i]);
+						record.alignID[readEnd] = selfAlignmentIndex;
+						record.chromosome[readEnd] = selfAlignment.reference;
+						record.strand[readEnd] = ((selfAlignment.strand == PlusStrand) ? "+" : "-");
+						record.position[readEnd] = selfAlignInfo.BreakPosition(seq1Length[i]);
+						record.alignID[mateEnd] = mateAlignmentIndex;
+						record.chromosome[mateEnd] = mateAlignment.reference;
+						record.strand[mateEnd] = ((mateAlignment.strand == PlusStrand) ? "+" : "-");
+						record.position[mateEnd] = mateAlignInfo.BreakPosition(seq2Length[i]);
+						record.inserted = readSeq.substr(seq1Length[i], readSeq.size() - seq2Length[i] - seq1Length[i]);
 						record.score = score;
 
 						splitFile << record;
@@ -471,7 +476,7 @@ int main(int argc, char* argv[])
 			record.readEnd = alignment.readEnd;
 			record.alignID = alignmentIndex;
 			record.chromosome = alignment.reference;
-			record.strand = alignment.strand;
+			record.strand = ((alignment.strand == PlusStrand) ? "+" : "-");
 			record.start = alignInfo.AlignmentStart(seqLength);
 			record.end = alignInfo.AlignmentEnd(seqLength);
 			record.score = score;
