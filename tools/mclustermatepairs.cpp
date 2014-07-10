@@ -49,12 +49,16 @@ void ReadLibStats(const string& libStatsFilename, vector<double>& fragmentLength
 
 void OutputClusterMember(ostream& out, int clusterID, int clusterEnd, const ReadInfo& readInfo)
 {
-	out << clusterID << "\t";
-	out << clusterEnd << "\t";
-	out << readInfo.libID << "\t";
-	out << readInfo.readID << "\t";
-	out << readInfo.readEnd << "\t";
-	out << readInfo.alignID << endl;
+	ClusterMemberRecord memberRecord;
+
+	memberRecord.clusterID = clusterID;
+	memberRecord.clusterEnd = clusterEnd;
+	memberRecord.libID = readInfo.libID;
+	memberRecord.readID = readInfo.readID;
+	memberRecord.readEnd = readInfo.readEnd;
+	memberRecord.alignID = readInfo.alignID;
+
+	out << memberRecord;
 }
 
 int main(int argc, char* argv[])
@@ -96,10 +100,10 @@ int main(int argc, char* argv[])
 	ifstream alignmentsFile(alignmentsFilename.c_str());
 	CheckFile(alignmentsFile, alignmentsFilename);
 
-	AlignmentRecordStream<SpanningAlignmentRecord> alignmentsStream(alignmentsFile);
+	GroupedRecordsStream<SpanningAlignmentRecord> alignmentsStream(alignmentsFile);
 
 	vector<SpanningAlignmentRecord> readAlignments;
-	while (alignmentsStream.Next(readAlignments))
+	while (alignmentsStream.Next(readAlignments, ReadEqual<SpanningAlignmentRecord>))
 	{
 		discordantAlignments.AddFragmentAlignments(readAlignments);
 	}
