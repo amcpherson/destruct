@@ -36,9 +36,9 @@ if __name__ == '__main__':
     cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
     pyp = pypeliner.easypypeliner.EasyPypeliner([destruct], cfg)
 
-    pyp.sch.transform('readlibs', (), destruct.lowmem, destruct.read_libraries, pyp.sch.oobj('libinfo', ('bylibrary',)), cfg.libraries)
+    pyp.sch.transform('readlibs', (), destruct.locally, destruct.read_libraries, pyp.sch.oobj('libinfo', ('bylibrary',)), cfg.libraries)
 
-    pyp.sch.transform('linklibs', ('bylibrary',), destruct.lowmem, destruct.link_libraries, None, pyp.sch.iobj('libinfo', ('bylibrary',)).prop('bam'), pyp.sch.ofile('bam', ('bylibrary',)))
+    pyp.sch.transform('linklibs', ('bylibrary',), destruct.locally, destruct.link_libraries, None, pyp.sch.iobj('libinfo', ('bylibrary',)).prop('bam'), pyp.sch.ofile('bam', ('bylibrary',)))
 
     destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads), pyp.sch.output(cfg.plots_tar))
 
@@ -46,6 +46,7 @@ if __name__ == '__main__':
 
 else:
 
+    locally = {'local':True}
     lowmem = {'mem':1}
     medmem = {'mem':8}
     himem = {'mem':32}
