@@ -49,16 +49,16 @@ void ReadLibStats(const string& libStatsFilename, vector<double>& fragmentLength
 
 void OutputClusterMember(ostream& out, int clusterID, int clusterEnd, const ReadInfo& readInfo)
 {
-	ClusterMemberRecord memberRecord;
+	ClusterMemberRecord record;
 
-	memberRecord.clusterID = clusterID;
-	memberRecord.clusterEnd = clusterEnd;
-	memberRecord.libID = readInfo.libID;
-	memberRecord.readID = readInfo.readID;
-	memberRecord.readEnd = readInfo.readEnd;
-	memberRecord.alignID = readInfo.alignID;
+	record.clusterID = clusterID;
+	record.clusterEnd = clusterEnd;
+	record.libID = readInfo.libID;
+	record.readID = readInfo.readID;
+	record.readEnd = readInfo.readEnd;
+	record.alignID = readInfo.alignID;
 
-	out << memberRecord;
+	out << record;
 }
 
 int main(int argc, char* argv[])
