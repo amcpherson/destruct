@@ -209,6 +209,7 @@ sources = """
     realign2.cpp
     AlignmentProbability.cpp
     AlignmentStream.cpp
+    AlignmentRecord.cpp
     Parsers.cpp
     ReadStream.cpp
     Sequences.cpp
