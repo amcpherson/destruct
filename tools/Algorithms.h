@@ -20,7 +20,7 @@ using namespace boost;
 
 
 template<typename TElemType>
-void SetCover(const vector<vector<TElemType> >& sets, const vector<double>& weights, vector<int>& solution)
+void SetCover(const vector<unordered_set<TElemType> >& sets, const vector<double>& weights, vector<int>& solution)
 {
 	BinaryMinHeap minHeap;
 	
@@ -30,11 +30,11 @@ void SetCover(const vector<vector<TElemType> >& sets, const vector<double>& weig
 
 	for (int setIdx = 0; setIdx < (size_t)sets.size(); setIdx++)
 	{
-		const vector<TElemType>& set = sets[setIdx];
+		const unordered_set<TElemType>& set = sets[setIdx];
 
 		setSizes[setIdx] = (int)set.size();
 		
-		for (typename vector<TElemType>::const_iterator elementIter = set.begin(); elementIter != set.end(); elementIter++)
+		for (typename unordered_set<TElemType>::const_iterator elementIter = set.begin(); elementIter != set.end(); elementIter++)
 		{
 			elementSets[*elementIter].push_back(setIdx);
 			
@@ -49,11 +49,11 @@ void SetCover(const vector<vector<TElemType> >& sets, const vector<double>& weig
 		
 		solution.push_back(setIdx);
 		
-		const vector<TElemType>& set = sets[setIdx];
+		const unordered_set<TElemType>& set = sets[setIdx];
 		
 		unordered_set<int> alteredSets;
 
-		for (typename vector<TElemType>::const_iterator elementIter = set.begin(); elementIter != set.end(); elementIter++)
+		for (typename unordered_set<TElemType>::const_iterator elementIter = set.begin(); elementIter != set.end(); elementIter++)
 		{
 			if (assigned.insert(*elementIter).second)
 			{
@@ -82,21 +82,24 @@ void SetCover(const vector<vector<TElemType> >& sets, const vector<double>& weig
 }
 
 template<typename TElemType>
-void AssignInOrder(const vector<vector<TElemType> >& sets, const vector<int>& order, vector<vector<TElemType> >& result)
+void AssignInOrder(const vector<unordered_set<TElemType> >& sets, const vector<int>& order, vector<unordered_set<TElemType> >& result)
 {
-	result = vector<vector<TElemType> >(sets.size(), vector<TElemType>());
+	result = vector<unordered_set<TElemType> >(sets.size(), unordered_set<TElemType>());
 
 	unordered_set<TElemType> assigned;
 	for (vector<int>::const_iterator idxIter = order.begin(); idxIter != order.end(); idxIter++)
 	{
-		const vector<TElemType>& set = sets[*idxIter];
+		const unordered_set<TElemType>& set = sets[*idxIter];
 
-		for (typename vector<TElemType>::const_iterator elementIter = set.begin(); elementIter != set.end(); elementIter++)
+		for (typename unordered_set<TElemType>::const_iterator elementIter = set.begin(); elementIter != set.end(); elementIter++)
 		{
 			if (assigned.find(*elementIter) == assigned.end())
 			{
-				result[*idxIter].push_back(*elementIter);
-				assigned.insert(*elementIter);
+				bool inserted = result[*idxIter].insert(*elementIter).second;
+				DebugCheck(inserted);
+
+				inserted = assigned.insert(*elementIter).second;
+				DebugCheck(inserted);
 			}
 		}
 	}

@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
 	cout << "Reading clusters" << endl;
 	
 	vector<int> ids;
-	vector<vector<ReadRecord> > clusters;
+	vector<unordered_set<ReadRecord> > clusters;
 
 	{
 		ifstream clustersFile(clustersFilename.c_str());
@@ -61,13 +61,21 @@ int main(int argc, char* argv[])
 			DebugCheck(clusterRecords.size() > 0);
 
 			ids.push_back(clusterRecords.front().clusterID);
-			clusters.push_back(vector<ReadRecord>());
+			clusters.push_back(unordered_set<ReadRecord>());
 
 			for (vector<ClusterMemberRecord>::const_iterator recordIter = clusterRecords.begin(); recordIter != clusterRecords.end(); recordIter++)
 			{
 				if (recordIter->clusterEnd == 0)
 				{
-					clusters.back().push_back(recordIter->GetReadRecord());
+					ReadRecord readRecord = recordIter->GetReadRecord();
+
+					bool inserted = clusters.back().insert(readRecord).second;
+
+					if (!inserted)
+					{
+						cerr << "Error: read " << readRecord.readID << ", lib " << readRecord.libID << " has multiple entries for cluster " << ids.back() << endl;
+						exit(1);
+					}
 				}
 			}
 		}
@@ -108,10 +116,10 @@ int main(int argc, char* argv[])
 	
 	cout << "Assigning fragments to solution sets" << endl;
 	
-	vector<vector<ReadRecord> > assignment;
-	AssignInOrder(clusters, solution, assignment);
+	vector<unordered_set<ReadRecord> > assignments;
+	AssignInOrder(clusters, solution, assignments);
 
-	DebugCheck(ids.size() == assignment.size());
+	DebugCheck(ids.size() == assignments.size());
 	
 	cout << "Writing out assignments" << endl;
 
@@ -132,11 +140,11 @@ int main(int argc, char* argv[])
 			DebugCheck(clusterRecords.size() > 0);
 			DebugCheck(clusterRecords.front().clusterID == ids[fileIdx]);
 
-			unordered_set<ReadRecord> assigned(clusters[fileIdx].begin(), clusters[fileIdx].end());
+			const unordered_set<ReadRecord>& set = assignments[fileIdx];
 
 			for (vector<ClusterMemberRecord>::const_iterator recordIter = clusterRecords.begin(); recordIter != clusterRecords.end(); recordIter++)
 			{
-				if (assigned.find(recordIter->GetReadRecord()) != assigned.end())
+				if (set.find(recordIter->GetReadRecord()) != set.end())
 				{
 					assignmentsFile << (*recordIter);
 				}
