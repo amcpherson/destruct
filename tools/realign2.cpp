@@ -461,27 +461,32 @@ int main(int argc, char* argv[])
 		}
 
 		// Output spanning alignments exceeding posterior threshold
-		for (int alignmentIndex = 0; alignmentIndex < alignments.size(); alignmentIndex++)
+		for (int readEnd = 0; readEnd <= 1; readEnd++)
 		{
-			const RawAlignment& alignment = alignments[alignmentIndex];
-			
-			AlignInfo alignInfo = selfAlignments[alignmentIndex];
-			
-			int seqLength = alignedLength[alignment.readEnd];
-			int score = alignInfo.SeqScores()[alignedLength[alignment.readEnd]];
-			
-			SpanningAlignmentRecord record;
-			record.libID = libID;
-			record.readID = readID;
-			record.readEnd = alignment.readEnd;
-			record.alignID = alignmentIndex;
-			record.chromosome = alignment.reference;
-			record.strand = ((alignment.strand == PlusStrand) ? "+" : "-");
-			record.start = alignInfo.AlignmentStart(seqLength);
-			record.end = alignInfo.AlignmentEnd(seqLength);
-			record.score = score;
+			for (vector<int>::const_iterator alignmentIter = alignmentIndices[readEnd].begin(); alignmentIter != alignmentIndices[readEnd].end(); alignmentIter++)
+			{
+				int alignmentIndex = *alignmentIter;
 
-			spanningFile << record;
+				const RawAlignment& alignment = alignments[alignmentIndex];
+				
+				AlignInfo alignInfo = selfAlignments[alignmentIndex];
+				
+				int seqLength = alignedLength[alignment.readEnd];
+				int score = alignInfo.SeqScores()[alignedLength[alignment.readEnd]];
+				
+				SpanningAlignmentRecord record;
+				record.libID = libID;
+				record.readID = readID;
+				record.readEnd = alignment.readEnd;
+				record.alignID = alignmentIndex;
+				record.chromosome = alignment.reference;
+				record.strand = ((alignment.strand == PlusStrand) ? "+" : "-");
+				record.start = alignInfo.AlignmentStart(seqLength);
+				record.end = alignInfo.AlignmentEnd(seqLength);
+				record.score = score;
+
+				spanningFile << record;
+			}
 		}
 	}
 }
