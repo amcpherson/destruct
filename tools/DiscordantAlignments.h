@@ -100,17 +100,42 @@ public:
 	: mFragmentMeans(fragmentMeans), mFragmentStdDevs(fragmentStdDevs), mMaxFragmentLength(maxFragmentLength), mFragmentCount(0)
 	{}
 
-	void AddFragmentAlignments(const vector<SpanningAlignmentRecord>& alignments)
+	void SetChromosomePair(const string& chromosome1, const string& chromosome2)
 	{
-		if (alignments.empty())
+		mChromosomePair = pair<string,string>(chromosome1, chromosome2);
+	}
+
+	void SetExcludedChromosomePairs(const vector<string>& chromosomes)
+	{
+		mExcludedChromosomePairs = unordered_set<string>(chromosomes.begin(), chromosomes.end());
+	}
+
+	bool IsExcluded(const string& chromosome1, const string& chromosome2) const
+	{
+		if (!mChromosomePair.first.empty() && !mChromosomePair.second.empty())
 		{
-			return;
+			if ((chromosome1 == mChromosomePair.first && chromosome2 == mChromosomePair.second) || 
+				(chromosome2 == mChromosomePair.first && chromosome1 == mChromosomePair.second))
+			{
+				return false;
+			}
+			else
+			{
+				return true;
+			}
 		}
-		
-		if (IsConcordant(alignments, mMaxFragmentLength))
+		else if (mExcludedChromosomePairs.find(chromosome1) != mExcludedChromosomePairs.end() &&
+			     mExcludedChromosomePairs.find(chromosome2) != mExcludedChromosomePairs.end())
 		{
-			return;
+			return true;
 		}
+
+		return false;
+	}
+
+	vector<pair<size_t,size_t> > CalculateAlignmentPairs(const vector<SpanningAlignmentRecord>& alignments) const
+	{
+		vector<pair<size_t,size_t> > alignmentPairs;
 
 		vector<size_t> readEndIdxs[2];
 		for (size_t idx = 0; idx < alignments.size(); idx++)
@@ -118,44 +143,107 @@ public:
 			readEndIdxs[alignments[idx].readEnd].push_back(idx);
 		}
 
+		for (vector<size_t>::const_iterator idx1Iter = readEndIdxs[0].begin(); idx1Iter != readEndIdxs[0].end(); idx1Iter++)
+		{
+			size_t idx1 = *idx1Iter;
+
+			for (vector<size_t>::const_iterator idx2Iter = readEndIdxs[1].begin(); idx2Iter != readEndIdxs[1].end(); idx2Iter++)
+			{
+				size_t idx2 = *idx2Iter;
+
+				if (IsExcluded(alignments[idx1].chromosome, alignments[idx2].chromosome))
+				{
+					continue;
+				}
+
+				alignmentPairs.push_back(pair<size_t,size_t>(idx1, idx2));
+			}
+		}
+
+		return alignmentPairs;
+	}
+
+	vector<SpanningAlignmentRecord> CalculateFilteredAlignments(const vector<SpanningAlignmentRecord>& alignments) const
+	{
+		vector<pair<size_t,size_t> > alignmentPairs = CalculateAlignmentPairs(alignments);
+
+		vector<bool> isIncluded(alignments.size(), false);
+
+		for (vector<pair<size_t,size_t> >::const_iterator pairIter = alignmentPairs.begin(); pairIter != alignmentPairs.end(); pairIter++)
+		{
+			size_t idx1 = pairIter->first;
+			size_t idx2 = pairIter->second;
+
+			isIncluded[idx1] = true;
+			isIncluded[idx2] = true;
+		}
+
+		vector<SpanningAlignmentRecord> filteredAlignments;
+
+		for (int idx = 0; idx < alignments.size(); idx++)
+		{
+			if (isIncluded[idx])
+			{
+				filteredAlignments.push_back(alignments[idx]);
+			}
+		}
+
+		return filteredAlignments;
+	}
+
+	void AddFragmentAlignments(const vector<SpanningAlignmentRecord>& fullAlignments)
+	{
+		if (fullAlignments.empty())
+		{
+			return;
+		}
+		
+		if (IsConcordant(fullAlignments, mMaxFragmentLength))
+		{
+			return;
+		}
+
+		vector<SpanningAlignmentRecord> alignments = CalculateFilteredAlignments(fullAlignments);
+
+		if (alignments.empty())
+		{
+			return;
+		}
+		
 		size_t idxOffset = mLibIDs.size();
 		DebugCheck(mLibIDs.size() == mReadIDs.size());
 		DebugCheck(mLibIDs.size() == mReadEnds.size());
 		DebugCheck(mLibIDs.size() == mAlignIDs.size());
 		DebugCheck(mLibIDs.size() == mPositions.size());
 
-		for (vector<size_t>::const_iterator idx1Iter = readEndIdxs[0].begin(); idx1Iter != readEndIdxs[0].end(); idx1Iter++)
+		vector<pair<size_t,size_t> > alignmentPairs = CalculateAlignmentPairs(alignments);
+
+		for (vector<pair<size_t,size_t> >::const_iterator pairIter = alignmentPairs.begin(); pairIter != alignmentPairs.end(); pairIter++)
 		{
-			size_t idx1 = *idx1Iter;
+			size_t idx1 = pairIter->first;
+			size_t idx2 = pairIter->second;
 
 			const SpanningAlignmentRecord& alignment1 = alignments[idx1];
+			const SpanningAlignmentRecord& alignment2 = alignments[idx2];
 
 			uint32_t chrStrIdx1 = mChrStrIndex.Index(alignment1.chromosome, alignment1.strand);
+			uint32_t chrStrIdx2 = mChrStrIndex.Index(alignment2.chromosome, alignment2.strand);
 
-			for (vector<size_t>::const_iterator idx2Iter = readEndIdxs[1].begin(); idx2Iter != readEndIdxs[1].end(); idx2Iter++)
+			pair<uint32_t,uint32_t> chrStrIdxPair;
+			pair<size_t,size_t> alignmentIdxPair;
+			if ((chrStrIdx1 < chrStrIdx2) || 
+				((chrStrIdx1 == chrStrIdx2) && alignment1.GetOuterPosition() < alignment2.GetOuterPosition()))
 			{
-				size_t idx2 = *idx2Iter;
-
-				const SpanningAlignmentRecord& alignment2 = alignments[idx2];
-				
-				uint32_t chrStrIdx2 = mChrStrIndex.Index(alignment2.chromosome, alignment2.strand);
-
-				pair<uint32_t,uint32_t> chrStrIdxPair;
-				pair<size_t,size_t> alignmentIdxPair;
-				if ((chrStrIdx1 < chrStrIdx2) || 
-					((chrStrIdx1 == chrStrIdx2) && alignment1.GetOuterPosition() < alignment2.GetOuterPosition()))
-				{
-					chrStrIdxPair = pair<uint32_t,uint32_t>(chrStrIdx1, chrStrIdx2);
-					alignmentIdxPair = pair<size_t,size_t>(idx1 + idxOffset, idx2 + idxOffset);
-				}
-				else
-				{
-					chrStrIdxPair = pair<uint32_t,uint32_t>(chrStrIdx2, chrStrIdx1);
-					alignmentIdxPair = pair<size_t,size_t>(idx2 + idxOffset, idx1 + idxOffset);
-				}
-
-				mPaired[chrStrIdxPair].push_back(alignmentIdxPair);
+				chrStrIdxPair = pair<uint32_t,uint32_t>(chrStrIdx1, chrStrIdx2);
+				alignmentIdxPair = pair<size_t,size_t>(idx1 + idxOffset, idx2 + idxOffset);
 			}
+			else
+			{
+				chrStrIdxPair = pair<uint32_t,uint32_t>(chrStrIdx2, chrStrIdx1);
+				alignmentIdxPair = pair<size_t,size_t>(idx2 + idxOffset, idx1 + idxOffset);
+			}
+
+			mPaired[chrStrIdxPair].push_back(alignmentIdxPair);
 		}
 
 		for (vector<SpanningAlignmentRecord>::const_iterator alignmentIter = alignments.begin(); alignmentIter != alignments.end(); alignmentIter++)
@@ -265,6 +353,9 @@ private:
 	vector<uint32_t> mPositions;
 
 	unordered_map<pair<uint32_t,uint32_t>,vector<pair<size_t,size_t> > > mPaired;
+
+	pair<string,string> mChromosomePair;
+	unordered_set<string> mExcludedChromosomePairs;
 };
 
 

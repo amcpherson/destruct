@@ -67,7 +67,11 @@ else:
 
         sch.transform('merge_alignments', (), lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', ('bylibrary',)), sch.ofile('spanning.alignments'))
 
-        sch.commandline('cluster', (), himem, cfg.mclustermatepairs_tool, '-a', sch.ifile('spanning.alignments'), '-s', sch.ifile('libstats.tsv'), '-c', sch.ofile('clusters.raw'), '--clustmin', '1', '--fragmax', cfg.fragment_length_max)
+        sch.transform('chromosome_args', (), locally, generate_chromosome_args, sch.oobj('chrom.args', ('bychromarg',)), cfg.chromosomes.split(' '))
+
+        sch.commandline('cluster', ('bychromarg',), himem, cfg.mclustermatepairs_tool, '-a', sch.ifile('spanning.alignments'), '-s', sch.ifile('libstats.tsv'), '-c', sch.ofile('clusters.raw', ('bychromarg',)), sch.iobj('chrom.args', ('bychromarg',)), '--clustmin', '1', '--fragmax', cfg.fragment_length_max)
+
+        sch.transform('merge_clusters', (), lowmem, merge_clusters, None, sch.ifile('clusters.raw', ('bychromarg',)), sch.ofile('clusters.raw'), sch.ofile('merge_clusters.debug'))
 
         sch.transform('segmt', (), lowmem, segregate_mitochondrial, None, cfg.mitochondrial_chromosome, sch.ifile('clusters.raw'), sch.ofile('clusters.segrmt'))
         sch.transform('nodup', (), lowmem, remove_duplicates, None, sch.ifile('clusters.segrmt'), sch.ofile('clusters.nodup'))
@@ -255,6 +259,28 @@ else:
                 with open(in_filename, 'r') as in_file:
                     for line in in_file:
                         out_file.write(line)
+
+
+    def generate_chromosome_args(chromosomes):
+        args = list()
+        for chromosome_pair in itertools.combinations_with_replacement(chromosomes, 2):
+            args.append('--chrompair ' + ','.join(chromosome_pair))
+        args.append('--exclchrompairs ' + ','.join(chromosomes))
+        return dict(enumerate(args))
+
+
+    def merge_clusters(in_filenames, out_filename, debug_filename):
+        new_cluster_id = 0
+        with open(out_filename, 'w') as out_file, open(debug_filename, 'w') as debug_file:
+            for idx, in_filename in in_filenames.iteritems():
+                with open(in_filename, 'r') as in_file:
+                    reader = csv.reader(in_file, delimiter='\t')
+                    for cluster_id, rows in itertools.groupby(reader, lambda row: row[0]):
+                        for row in rows:
+                            row[0] = str(new_cluster_id)
+                            out_file.write('\t'.join(row) + '\n')
+                        debug_filename.write('\t'.join(new_cluster_id, idx, cluster_id) + '\n')
+                        new_cluster_id += 1
 
 
     def merge_samples(all_samples, merged_samples):

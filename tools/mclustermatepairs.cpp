@@ -68,6 +68,8 @@ int main(int argc, char* argv[])
 	string clustersFilename;
 	int minClusterSize;
 	int maxFragmentLength;
+	string chromPair;
+	string exclChromPairs;
 	
 	try
 	{
@@ -77,6 +79,8 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<string> clustersFilenameArg("c","clusters","Clusters Filename",true,"","string",cmd);
 		TCLAP::ValueArg<int> minClusterSizeArg("","clustmin","Minimum Cluster Size",true,-1,"integer",cmd);
 		TCLAP::ValueArg<int> maxFragmentLengthArg("","fragmax","Maximum Fragment Length",true,-1,"integer",cmd);
+		TCLAP::ValueArg<string> chromPairArg("","chrompair","Restrict to Chromosome Pair (comma separated)",false,"","string",cmd);
+		TCLAP::ValueArg<string> exclChromPairsArg("","exclchrompairs","Excluded Chromosome Pairs from Set (comma separated)",false,"","string",cmd);
 		cmd.parse(argc,argv);
 		
 		alignmentsFilename = alignmentsFilenameArg.getValue();
@@ -84,6 +88,8 @@ int main(int argc, char* argv[])
 		clustersFilename = clustersFilenameArg.getValue();
 		minClusterSize = minClusterSizeArg.getValue();
 		maxFragmentLength = maxFragmentLengthArg.getValue();
+		chromPair = chromPairArg.getValue();
+		exclChromPairs = exclChromPairsArg.getValue();
 	}
 	catch (TCLAP::ArgException &e)
 	{
@@ -96,6 +102,38 @@ int main(int argc, char* argv[])
 	ReadLibStats(libStatsFilename, fragmentLengthMeans, fragmentLengthStdDevs);
 	
 	DiscordantAlignments discordantAlignments(fragmentLengthMeans, fragmentLengthStdDevs, maxFragmentLength);
+
+	if (!chromPair.empty())
+	{
+		vector<string> chromPairFields;
+		split(chromPairFields, chromPair, is_any_of(","));
+
+		if (chromPairFields.size() != 2)
+		{
+			cerr << "Error: Require 2 chromosomes separated by comma for chrompair argument" << endl;
+			exit(1);
+		}
+
+		cout << "Restricting analysis to alignments connecting chromosomes ";
+		cout << chromPairFields[0] << " and " << chromPairFields[1] << endl;
+
+		discordantAlignments.SetChromosomePair(chromPairFields[0], chromPairFields[1]);
+	}
+
+	if (!exclChromPairs.empty())
+	{
+		vector<string> exclChromPairsFields;
+		split(exclChromPairsFields, exclChromPairs, is_any_of(","));
+
+		cout << "Excluding analysis of alignments connecting pairs of chromosomes from ";
+		for (vector<string>::const_iterator chromIter = exclChromPairsFields.begin(); chromIter != exclChromPairsFields.end(); chromIter++)
+		{
+			cout << *chromIter << " ";
+		}
+		cout << endl;
+
+		discordantAlignments.SetExcludedChromosomePairs(exclChromPairsFields);
+	}
 	
 	ifstream alignmentsFile(alignmentsFilename.c_str());
 	CheckFile(alignmentsFile, alignmentsFilename);
@@ -108,7 +146,7 @@ int main(int argc, char* argv[])
 		discordantAlignments.AddFragmentAlignments(readAlignments);
 	}
 
-	cerr << "Read " << discordantAlignments.GetAlignmentCount() << " alignments for " << discordantAlignments.GetFragmentCount() << " fragments" << endl;
+	cout << "Read " << discordantAlignments.GetAlignmentCount() << " alignments for " << discordantAlignments.GetFragmentCount() << " fragments" << endl;
 	
 	// Open output clusters file
 	ofstream clustersFile(clustersFilename.c_str());
