@@ -69,7 +69,7 @@ else:
 
         sch.transform('chromosome_args', (), locally, generate_chromosome_args, sch.oobj('chrom.args', ('bychromarg',)), cfg.chromosomes.split(' '))
 
-        sch.commandline('cluster', ('bychromarg',), himem, cfg.mclustermatepairs_tool, '-a', sch.ifile('spanning.alignments'), '-s', sch.ifile('libstats.tsv'), '-c', sch.ofile('clusters.raw', ('bychromarg',)), sch.iobj('chrom.args', ('bychromarg',)), '--clustmin', '1', '--fragmax', cfg.fragment_length_max)
+        sch.commandline('cluster', ('bychromarg',), medmem, cfg.mclustermatepairs_tool, '-a', sch.ifile('spanning.alignments'), '-s', sch.ifile('libstats.tsv'), '-c', sch.ofile('clusters.raw', ('bychromarg',)), sch.iobj('chrom.args', ('bychromarg',)), '--clustmin', '1', '--fragmax', cfg.fragment_length_max)
 
         sch.transform('merge_clusters', (), lowmem, merge_clusters, None, sch.ifile('clusters.raw', ('bychromarg',)), sch.ofile('clusters.raw'), sch.ofile('merge_clusters.debug'))
 
@@ -279,7 +279,7 @@ else:
                         for row in rows:
                             row[0] = str(new_cluster_id)
                             out_file.write('\t'.join(row) + '\n')
-                        debug_filename.write('\t'.join(new_cluster_id, idx, cluster_id) + '\n')
+                        debug_file.write('{0}\t{1}\t{2}\n'.format(new_cluster_id, idx, cluster_id))
                         new_cluster_id += 1
 
 
