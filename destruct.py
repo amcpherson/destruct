@@ -291,8 +291,8 @@ else:
                 cluster_id = row[0]
                 chromosome1 = row[1]
                 chromosome2 = row[4]
-                position1 = row[3]
-                position2 = row[6]
+                position1 = int(row[3])
+                position2 = int(row[6])
                 if chromosome1 != chromosome2:
                     distance = itx_distance
                 else:
