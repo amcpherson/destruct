@@ -107,10 +107,10 @@ void WriteBreakpoint(ostream& out, int clusterID, const string (&chromosome)[2],
 	out << clusterID << "\t";
 	out << chromosome[0] << "\t";
 	out << strand[0] << "\t";
-	out << breakpoint.position + CalculateOffset(strand[0], offset1) << "\t";
+	out << breakpoint.position[0] + CalculateOffset(strand[0], offset1) << "\t";
 	out << chromosome[1] << "\t";
 	out << strand[1] << "\t";
-	out << breakpoint.position + CalculateOffset(strand[1], offset2) << "\t";
+	out << breakpoint.position[1] + CalculateOffset(strand[1], offset2) << "\t";
 	out << breakpoint.numInserted << "\t";
 	out << splitCount << endl;
 }
@@ -161,6 +161,8 @@ int main(int argc, char* argv[])
 
 	GroupedRecordsStream<ClusterMemberRecord> memberStream(clustersFile);
 
+	int numClusters = 0;
+
 	vector<ClusterMemberRecord> clusterRecords;
 	while (memberStream.Next(clusterRecords, ClusterReadEqual<ClusterMemberRecord>))
 	{
@@ -183,7 +185,11 @@ int main(int argc, char* argv[])
 		bool flip = (clusterRecords[0].readEnd != clusterRecords[0].clusterEnd);
 
 		memberships[alignPairKey].insert(make_pair(clusterRecords[0].clusterID, flip));
+
+		numClusters++;
 	}
+
+	cerr << "Read " << numClusters << " clusters" << endl;
 
 	cerr << "Reading split alignments" << endl;
 
