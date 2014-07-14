@@ -73,14 +73,14 @@ else:
 
         sch.transform('merge_clusters', (), lowmem, merge_clusters, None, sch.ifile('clusters.raw', ('bychromarg',)), sch.ofile('clusters.raw'), sch.ofile('merge_clusters.debug'))
 
-        sch.transform('segmt', (), lowmem, segregate_mitochondrial, None, cfg.mitochondrial_chromosome, sch.ifile('clusters.raw'), sch.ofile('clusters.segrmt'))
-        sch.transform('nodup', (), lowmem, remove_duplicates, None, sch.ifile('clusters.segrmt'), sch.ofile('clusters.nodup'))
+        sch.transform('breaks', (), himem, run_mpredictbreaks, None, cfg.mpredictbreaks_tool, cfg.genome_fasta, sch.ifile('clusters.raw'), sch.ifile('split.alignments', ('bylibrary',)), sch.ofile('breakpoints'))
+
         sch.commandline('rankclust', (), himem, cfg.rankclusters_tool, '-c', sch.ifile('clusters.nodup'), '>', sch.ofile('clusters.prob'))
-        sch.commandline('setcover', (), himem, cfg.setcover_tool, '-d', '-c', sch.ifile('clusters.nodup'), '-o', sch.ofile('clusters.setcover'))
+
+        sch.transform('calc_weights', (), lowmem, calculate_cluster_weights, None, sch.ifile('breakpoints'), sch.ofile('clusters.weights'))
+        sch.commandline('setcover', (), himem, cfg.setcover_tool, '-c', sch.ifile('clusters.nodup'), '-w', sch.ifile('clusters.weights'), '-a', sch.ofile('clusters.setcover'))
 
         sch.transform('filter', (), medmem, filter_clusters, None, sch.ofile('clusters.filtered'), sch.ifile('clusters.setcover'), sch.ifile('clusters.prob'), float(cfg.cluster_align_threshold), float(cfg.cluster_chimeric_threshold), float(cfg.cluster_valid_threshold), int(cfg.cluster_coverage_threshold), int(cfg.cluster_readcount_threshold))
-
-        sch.transform('breaks', (), himem, run_mpredictbreaks, None, cfg.mpredictbreaks_tool, cfg.genome_fasta, sch.ifile('clusters.filtered'), sch.ifile('split.alignments', ('bylibrary',)), sch.ofile('breakpoints'))
 
         sch.commandline('getclusterids', (), lowmem, 'cut', '-f1', sch.ifile('clusters.filtered'), '|', 'uniq', '>', sch.ofile('clusters.filtered.ids'))
         sch.transform('splitclusterids', (), lowmem, split_file_byline, None, sch.ifile('clusters.filtered.ids'), int(cfg.clusters_per_split), sch.ofile('clusters.filtered.ids', ('bycluster',)))
@@ -281,6 +281,24 @@ else:
                             out_file.write('\t'.join(row) + '\n')
                         debug_file.write('{0}\t{1}\t{2}\n'.format(new_cluster_id, idx, cluster_id))
                         new_cluster_id += 1
+
+
+    def calculate_cluster_weights(breakpoints_filename, weights_filename):
+        epsilon = 0.0001
+        itx_distance = 1000000000
+        with open(breakpoints_filename, 'r') as breakpoints_file, open(weights_filename, 'w') as weights_file:
+            for row in csv.reader(breakpoints_file, delimiter='\t'):
+                cluster_id = row[0]
+                chromosome1 = row[1]
+                chromosome2 = row[4]
+                position1 = row[3]
+                position2 = row[6]
+                if chromosome1 != chromosome2:
+                    distance = itx_distance
+                else:
+                    distance = abs(position1 - position2)
+                weight = epsilon * math.log(distance)
+                weights_file.write('\t'.join((cluster_id, str(weight))) + '\n')
 
 
     def merge_samples(all_samples, merged_samples):
