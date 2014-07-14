@@ -297,7 +297,7 @@ else:
                     distance = itx_distance
                 else:
                     distance = abs(position1 - position2)
-                weight = epsilon * math.log(distance)
+                weight = 1.0 + epsilon * math.log(distance)
                 weights_file.write('\t'.join((cluster_id, str(weight))) + '\n')
 
 
