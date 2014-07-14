@@ -116,7 +116,7 @@ class GroupedRecordsStream
 public:
     GroupedRecordsStream(std::istream& is) : mStream(is)
     {
-        mGood = (is >> mNextRecord);
+        mGood = (bool)(is >> mNextRecord);
     }
     
     template<typename TEqualFunc>
@@ -130,7 +130,7 @@ public:
         records.clear();
         records.push_back(mNextRecord);
         
-        while ((mGood = (mStream >> mNextRecord)))
+        while ((mGood = (bool)(mStream >> mNextRecord)))
         {
             if (!eq(records.front(), mNextRecord))
             {
