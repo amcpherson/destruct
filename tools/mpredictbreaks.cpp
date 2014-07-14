@@ -197,6 +197,8 @@ int main(int argc, char* argv[])
 	CheckFile(alignmentsFile, alignmentsFilename);
 
 	unordered_map<int,ClusterSplitInfo> clusterSplitInfo;
+	
+	int numAlignments = 0;
 
 	SplitAlignmentRecord splitRecord;
 	while (alignmentsFile >> splitRecord)
@@ -236,7 +238,11 @@ int main(int argc, char* argv[])
 				clusterSplitInfo[clusterID].score.insert(make_pair(split, 0)).first->second += splitRecord.score;
 			}
 		}
+		
+		numAlignments++;
 	}
+	
+	cerr << "Read " << numAlignments << " split alignments" << endl;
 
 	cerr << "Reading reference fasta" << endl;
 	
