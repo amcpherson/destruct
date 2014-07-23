@@ -72,7 +72,7 @@ public:
 		return refStrand.id;
 	}
 
-	string GetChromosome(uint32_t idx)
+	string GetChromosome(uint32_t idx) const
 	{
 		RefStrand refStrand;
 		refStrand.id = idx;
@@ -80,7 +80,7 @@ public:
 		return mRefNameIndex.Get(refStrand.referenceIndex);
 	}
 
-	string GetStrand(uint32_t idx)
+	string GetStrand(uint32_t idx) const
 	{
 		RefStrand refStrand;
 		refStrand.id = idx;
@@ -281,11 +281,14 @@ public:
 			size_t alignmentIdx1 = alignmentIdxPairIter->first;
 			size_t alignmentIdx2 = alignmentIdxPairIter->second;
 
+			string strand1 = mChrStrIndex.GetStrand(chrStrIdxPair.first);
+			string strand2 = mChrStrIndex.GetStrand(chrStrIdxPair.second);
+
 			DebugCheck(mLibIDs[alignmentIdx1] == mLibIDs[alignmentIdx2]);
 
 			MatePair matePair;
-			matePair.x = mPositions[alignmentIdx1];
-			matePair.y = mPositions[alignmentIdx2];
+			matePair.x = (strand1 == "+") ? mPositions[alignmentIdx1] : -mPositions[alignmentIdx1];
+			matePair.y = (strand2 == "+") ? mPositions[alignmentIdx2] : -mPositions[alignmentIdx2];
 			matePair.u = mFragmentMeans[mLibIDs[alignmentIdx1]];
 			matePair.s = mFragmentStdDevs[mLibIDs[alignmentIdx1]];
 
