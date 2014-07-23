@@ -137,4 +137,23 @@ ReadRecord ClusterMemberRecord::GetReadRecord() const
 	return record;
 }
 
+std::ostream & operator<<(std::ostream &os, const BreakendRecord& record)
+{
+	os << record.clusterID << "\t";
+	os << record.clusterEnd << "\t";
+	os << record.chromosome << "\t";
+	os << record.strand << "\t";
+	os << record.position << std::endl;
+	return os;
+}
+
+std::istream & operator>>(std::istream &is, BreakendRecord& record)
+{
+	is >> record.clusterID;
+	is >> record.clusterEnd;
+	is >> record.chromosome;
+	is >> record.strand;
+	is >> record.position;
+	return is;
+}
 

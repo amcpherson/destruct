@@ -100,9 +100,9 @@ public:
 	: mFragmentMeans(fragmentMeans), mFragmentStdDevs(fragmentStdDevs), mMaxFragmentLength(maxFragmentLength), mFragmentCount(0)
 	{}
 
-	void SetChromosomePair(const string& chromosome1, const string& chromosome2)
+	void SetIncludedChromosomePair(const string& chromosome1, const string& chromosome2)
 	{
-		mChromosomePair = pair<string,string>(chromosome1, chromosome2);
+		mIncludedChromosomePair = pair<string,string>(chromosome1, chromosome2);
 	}
 
 	void SetExcludedChromosomePairs(const vector<string>& chromosomes)
@@ -112,10 +112,10 @@ public:
 
 	bool IsExcluded(const string& chromosome1, const string& chromosome2) const
 	{
-		if (!mChromosomePair.first.empty() && !mChromosomePair.second.empty())
+		if (!mIncludedChromosomePair.first.empty() && !mIncludedChromosomePair.second.empty())
 		{
-			if ((chromosome1 == mChromosomePair.first && chromosome2 == mChromosomePair.second) || 
-				(chromosome2 == mChromosomePair.first && chromosome1 == mChromosomePair.second))
+			if ((chromosome1 == mIncludedChromosomePair.first && chromosome2 == mIncludedChromosomePair.second) || 
+				(chromosome2 == mIncludedChromosomePair.first && chromosome1 == mIncludedChromosomePair.second))
 			{
 				return false;
 			}
@@ -270,6 +270,18 @@ public:
 		return chrStrIdxPairs;
 	}
 
+	pair<string,string> GetChromosomePair(const pair<uint32_t,uint32_t>& chrStrIdxPair)
+	{
+		return pair<string,string>(mChrStrIndex.GetChromosome(chrStrIdxPair.first),
+		                           mChrStrIndex.GetChromosome(chrStrIdxPair.second));
+	}
+
+	pair<string,string> GetStrandPair(const pair<uint32_t,uint32_t>& chrStrIdxPair)
+	{
+		return pair<string,string>(mChrStrIndex.GetStrand(chrStrIdxPair.first),
+		                           mChrStrIndex.GetStrand(chrStrIdxPair.second));
+	}
+
 	vector<MatePair> CreateMatePairs(const pair<uint32_t,uint32_t>& chrStrIdxPair) const
 	{
 		vector<MatePair> matePairs;
@@ -357,7 +369,7 @@ private:
 
 	unordered_map<pair<uint32_t,uint32_t>,vector<pair<size_t,size_t> > > mPaired;
 
-	pair<string,string> mChromosomePair;
+	pair<string,string> mIncludedChromosomePair;
 	unordered_set<string> mExcludedChromosomePairs;
 };
 

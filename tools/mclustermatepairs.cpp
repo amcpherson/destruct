@@ -61,11 +61,25 @@ void OutputClusterMember(ostream& out, int clusterID, int clusterEnd, const Read
 	out << record;
 }
 
+void OutputBreakend(ostream& out, int clusterID, int clusterEnd, const string& chromosome, const string& strand, int position)
+{
+	BreakendRecord record;
+
+	record.clusterID = clusterID;
+	record.clusterEnd = clusterEnd;
+	record.chromosome = chromosome;
+	record.strand = strand;
+	record.position = abs(position);
+
+	out << record;
+}
+
 int main(int argc, char* argv[])
 {
 	string alignmentsFilename;
 	string libStatsFilename;
 	string clustersFilename;
+	string breakendsFilename;
 	int minClusterSize;
 	int maxFragmentLength;
 	string chromPair;
@@ -77,15 +91,17 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<string> alignmentsFilenameArg("a","alignments","Paired End Alignments",true,"","string",cmd);
 		TCLAP::ValueArg<string> libStatsFilenameArg("s","stats","Library Read Stats",true,"","string",cmd);
 		TCLAP::ValueArg<string> clustersFilenameArg("c","clusters","Clusters Filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> breakendsFilenameArg("b","breakends","Breakends Filename",true,"","string",cmd);
 		TCLAP::ValueArg<int> minClusterSizeArg("","clustmin","Minimum Cluster Size",true,-1,"integer",cmd);
 		TCLAP::ValueArg<int> maxFragmentLengthArg("","fragmax","Maximum Fragment Length",true,-1,"integer",cmd);
-		TCLAP::ValueArg<string> chromPairArg("","chrompair","Restrict to Chromosome Pair (comma separated)",false,"","string",cmd);
-		TCLAP::ValueArg<string> exclChromPairsArg("","exclchrompairs","Excluded Chromosome Pairs from Set (comma separated)",false,"","string",cmd);
+		TCLAP::ValueArg<string> chromPairArg("","inclchrompair","Include Chromosome Pair (comma separated)",false,"","string",cmd);
+		TCLAP::ValueArg<string> exclChromPairsArg("","exclchrompairs","Exclude Chromosome Pairs from Set (comma separated)",false,"","string",cmd);
 		cmd.parse(argc,argv);
 		
 		alignmentsFilename = alignmentsFilenameArg.getValue();
 		libStatsFilename = libStatsFilenameArg.getValue();
 		clustersFilename = clustersFilenameArg.getValue();
+		breakendsFilename = breakendsFilenameArg.getValue();
 		minClusterSize = minClusterSizeArg.getValue();
 		maxFragmentLength = maxFragmentLengthArg.getValue();
 		chromPair = chromPairArg.getValue();
@@ -117,7 +133,7 @@ int main(int argc, char* argv[])
 		cout << "Restricting analysis to alignments connecting chromosomes ";
 		cout << chromPairFields[0] << " and " << chromPairFields[1] << endl;
 
-		discordantAlignments.SetChromosomePair(chromPairFields[0], chromPairFields[1]);
+		discordantAlignments.SetIncludedChromosomePair(chromPairFields[0], chromPairFields[1]);
 	}
 
 	if (!exclChromPairs.empty())
@@ -148,13 +164,11 @@ int main(int argc, char* argv[])
 
 	cout << "Read " << discordantAlignments.GetAlignmentCount() << " alignments for " << discordantAlignments.GetFragmentCount() << " fragments" << endl;
 	
-	// Open output clusters file
 	ofstream clustersFile(clustersFilename.c_str());
-	if (!clustersFile)
-	{
-		cerr << "Error: unable to write to clusters file" << endl;		
-		exit(1);
-	}
+	CheckFile(clustersFile, clustersFilename);
+
+	ofstream breakendsFile(breakendsFilename.c_str());
+	CheckFile(breakendsFile, breakendsFilename);
 	
 	cout << "Creating clusters" << endl;
 	
@@ -164,6 +178,8 @@ int main(int argc, char* argv[])
 
 	for (vector<pair<uint32_t,uint32_t> >::const_iterator chrStrIdxPairIter = chrStrIdxPairs.begin(); chrStrIdxPairIter != chrStrIdxPairs.end(); chrStrIdxPairIter++)
 	{
+		pair<string,string> chromosomes = discordantAlignments.GetChromosomePair(*chrStrIdxPairIter);
+		pair<string,string> strands = discordantAlignments.GetStrandPair(*chrStrIdxPairIter);
 		vector<MatePair> matePairs = discordantAlignments.CreateMatePairs(*chrStrIdxPairIter);
 		vector<pair<ReadInfo,ReadInfo> > readInfos = discordantAlignments.CreateReadInfos(*chrStrIdxPairIter);
 
@@ -176,6 +192,10 @@ int main(int argc, char* argv[])
 		{
 			OutputClusterMember(clustersFile, clusterID, 0, readInfos.front().first);
 			OutputClusterMember(clustersFile, clusterID, 1, readInfos.front().second);
+
+			OutputBreakend(clustersFile, clusterID, 0, chromosomes.first, strands.first, matePairs[0].x);
+			OutputBreakend(clustersFile, clusterID, 0, chromosomes.second, strands.second, matePairs[0].y);
+
 			clusterID++;
 			continue;
 		}
@@ -203,6 +223,9 @@ int main(int argc, char* argv[])
 			for (int clusterIndex = 0; clusterIndex < gibbsClusters.size(); clusterIndex++)
 			{
 				const IntegerVec& cluster = gibbsClusters[clusterIndex];
+
+				int clusterX;
+				int clusterY;
 				
 				unordered_set<int> clusterFragmentIndices;
 				for (int elementIndex = 0; elementIndex < cluster.size(); elementIndex++)
@@ -217,8 +240,22 @@ int main(int argc, char* argv[])
 					
 					OutputClusterMember(clustersFile, clusterID, 0, readInfos[alignPairIndex].first);
 					OutputClusterMember(clustersFile, clusterID, 1, readInfos[alignPairIndex].second);
+
+					if (elementIndex == 0)
+					{
+						clusterX = (int)matePairs[alignPairIndex].x;
+						clusterY = (int)matePairs[alignPairIndex].y;
+					}
+					else
+					{
+						clusterX = max(clusterX, (int)matePairs[alignPairIndex].x);
+						clusterY = max(clusterY, (int)matePairs[alignPairIndex].y);
+					}
 				}
 				
+				OutputBreakend(clustersFile, clusterID, 0, chromosomes.first, strands.first, clusterX);
+				OutputBreakend(clustersFile, clusterID, 0, chromosomes.second, strands.second, clusterY);
+
 				clusterID++;
 			}
 		}
