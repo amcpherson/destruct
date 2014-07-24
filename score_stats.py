@@ -5,9 +5,12 @@ from scipy.stats import nbinom
 
 def load_align_data_hist(filename):
     reader = pd.read_table(filename, sep='\t', names=['aligned_length', 'score'], chunksize=1024*1024)
-    align_data_hist = pd.Series()
+    align_data_hist = None
     for chunk in reader:
         chunk_hist = chunk.groupby(['aligned_length', 'score']).size()
+        if align_data_hist is None:
+            align_data_hist = chunk_hist
+            continue
         align_data_hist, chunk_hist = align_data_hist.align(chunk_hist, fill_value=0)
         align_data_hist += chunk_hist
     align_data_hist.name = 'freq'
