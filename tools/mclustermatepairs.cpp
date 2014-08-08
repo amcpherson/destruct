@@ -193,8 +193,8 @@ int main(int argc, char* argv[])
 			OutputClusterMember(clustersFile, clusterID, 0, readInfos.front().first);
 			OutputClusterMember(clustersFile, clusterID, 1, readInfos.front().second);
 
-			OutputBreakend(clustersFile, clusterID, 0, chromosomes.first, strands.first, matePairs[0].x);
-			OutputBreakend(clustersFile, clusterID, 0, chromosomes.second, strands.second, matePairs[0].y);
+			OutputBreakend(breakendsFile, clusterID, 0, chromosomes.first, strands.first, (int)matePairs[0].x);
+			OutputBreakend(breakendsFile, clusterID, 1, chromosomes.second, strands.second, (int)matePairs[0].y);
 
 			clusterID++;
 			continue;
@@ -224,8 +224,8 @@ int main(int argc, char* argv[])
 			{
 				const IntegerVec& cluster = gibbsClusters[clusterIndex];
 
-				int clusterX;
-				int clusterY;
+				int clusterX = -1;
+				int clusterY = -1;
 				
 				unordered_set<int> clusterFragmentIndices;
 				for (int elementIndex = 0; elementIndex < cluster.size(); elementIndex++)
@@ -241,7 +241,7 @@ int main(int argc, char* argv[])
 					OutputClusterMember(clustersFile, clusterID, 0, readInfos[alignPairIndex].first);
 					OutputClusterMember(clustersFile, clusterID, 1, readInfos[alignPairIndex].second);
 
-					if (elementIndex == 0)
+					if (clusterX == -1 && clusterY == -1)
 					{
 						clusterX = (int)matePairs[alignPairIndex].x;
 						clusterY = (int)matePairs[alignPairIndex].y;
@@ -252,9 +252,9 @@ int main(int argc, char* argv[])
 						clusterY = max(clusterY, (int)matePairs[alignPairIndex].y);
 					}
 				}
-				
-				OutputBreakend(clustersFile, clusterID, 0, chromosomes.first, strands.first, clusterX);
-				OutputBreakend(clustersFile, clusterID, 0, chromosomes.second, strands.second, clusterY);
+
+				OutputBreakend(breakendsFile, clusterID, 0, chromosomes.first, strands.first, clusterX);
+				OutputBreakend(breakendsFile, clusterID, 1, chromosomes.second, strands.second, clusterY);
 
 				clusterID++;
 			}

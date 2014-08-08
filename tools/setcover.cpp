@@ -90,9 +90,15 @@ int main(int argc, char* argv[])
 		ifstream weightsFile(weightsFilename.c_str());
 		CheckFile(weightsFile, weightsFilename);
 
+		int clusterID;
 		double weight;
-		while (weightsFile >> weight)
+		while (weightsFile >> clusterID >> weight)
 		{
+			if (clusterID != ids[weights.size()])
+			{
+				cerr << "Error: id mismatch, weights must be ordered identically to clusters" << endl;
+			}
+
 			weights.push_back(weight);
 		}
 

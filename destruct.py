@@ -276,7 +276,7 @@ else:
             breakends_reader = csv.reader(breakends_file, delimiter='\t')
             cluster_iter = itertools.groupby(clusters_reader, lambda row: row[0])
             breakend_iter = itertools.groupby(breakends_reader, lambda row: row[0])
-            for (cluster_id_1, cluster_rows), (cluster_id_2, breakend_rows) in zip(cluster_iter, breakend_iter):
+            for (cluster_id_1, cluster_rows), (cluster_id_2, breakend_rows) in itertools.izip(cluster_iter, breakend_iter):
                 if cluster_id_1 != cluster_id_2:
                     raise ValueError('Consistency issue between clusters and breakends for ' + clusters_filename + ' and ' + breakends_filename)
                 yield cluster_id_1, cluster_rows, breakend_rows
@@ -307,6 +307,7 @@ else:
         with open(breakends_filename, 'r') as breakends_file, open(weights_filename, 'w') as weights_file:
             breakends_reader = csv.reader(breakends_file, delimiter='\t')
             for cluster_id, breakend_rows in itertools.groupby(breakends_reader, lambda row: row[0]):
+                breakend_rows = list(breakend_rows)
                 chromosome1 = breakend_rows[0][2]
                 chromosome2 = breakend_rows[1][2]
                 position1 = int(breakend_rows[0][4])

@@ -299,10 +299,10 @@ public:
 			DebugCheck(mLibIDs[alignmentIdx1] == mLibIDs[alignmentIdx2]);
 
 			MatePair matePair;
-			matePair.x = (strand1 == "+") ? mPositions[alignmentIdx1] : -mPositions[alignmentIdx1];
-			matePair.y = (strand2 == "+") ? mPositions[alignmentIdx2] : -mPositions[alignmentIdx2];
-			matePair.u = mFragmentMeans[mLibIDs[alignmentIdx1]];
-			matePair.s = mFragmentStdDevs[mLibIDs[alignmentIdx1]];
+			matePair.x = (strand1 == "+") ? (double)mPositions[alignmentIdx1] : -(double)mPositions[alignmentIdx1];
+			matePair.y = (strand2 == "+") ? (double)mPositions[alignmentIdx2] : -(double)mPositions[alignmentIdx2];
+			matePair.u = (double)mFragmentMeans[mLibIDs[alignmentIdx1]];
+			matePair.s = (double)mFragmentStdDevs[mLibIDs[alignmentIdx1]];
 
 			matePairs.push_back(matePair);
 		}

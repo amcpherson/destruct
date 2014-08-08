@@ -104,15 +104,19 @@ int CalculateForwardHomology(int maxOffset, const Sequences& sequences, const st
 
 void WriteBreakpoint(ostream& out, int clusterID, const string (&chromosome)[2], const string (&strand)[2], const SplitDefinition& breakpoint, int splitCount, int offset1, int offset2)
 {
-	out << clusterID << "\t";
-	out << chromosome[0] << "\t";
-	out << strand[0] << "\t";
-	out << breakpoint.position[0] + CalculateOffset(strand[0], offset1) << "\t";
-	out << chromosome[1] << "\t";
-	out << strand[1] << "\t";
-	out << breakpoint.position[1] + CalculateOffset(strand[1], offset2) << "\t";
-	out << breakpoint.numInserted << "\t";
-	out << splitCount << endl;
+	BreakpointRecord record;
+	
+	record.clusterID = clusterID;
+	record.chromosome[0] = chromosome[0];
+	record.strand[0] = strand[0];
+	record.position[0] = breakpoint.position[0] + CalculateOffset(strand[0], offset1);
+	record.chromosome[1] = chromosome[1];
+	record.strand[1] = strand[1];
+	record.position[1] = breakpoint.position[1] + CalculateOffset(strand[1], offset2);
+	record.numInserted = breakpoint.numInserted;
+	record.splitCount = splitCount;
+
+	out << record;
 }
 
 struct ClusterSplitInfo

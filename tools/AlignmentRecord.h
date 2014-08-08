@@ -91,6 +91,20 @@ std::ostream & operator<<(std::ostream &os, const BreakendRecord& record);
 
 std::istream & operator>>(std::istream &is, BreakendRecord& record);
 
+struct BreakpointRecord
+{
+	int clusterID;
+	string chromosome[2];
+	string strand[2];
+	int position[2];
+	int numInserted;
+	int splitCount;
+};
+
+std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record);
+
+std::istream & operator>>(std::istream &is, BreakpointRecord& record);
+
 template<typename TRecordType>
 std::ostream & operator<<(std::ostream &os, const vector<TRecordType>& records)
 {

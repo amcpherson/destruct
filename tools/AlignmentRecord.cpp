@@ -157,3 +157,31 @@ std::istream & operator>>(std::istream &is, BreakendRecord& record)
 	return is;
 }
 
+std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record)
+{
+	os << record.clusterID << "\t";
+	for (int clusterEnd = 0; clusterEnd < 2; clusterEnd++)
+	{
+		os << record.chromosome[clusterEnd] << "\t";
+		os << record.strand[clusterEnd] << "\t";
+		os << record.position[clusterEnd] << "\t";
+	}
+	os << record.numInserted << "\t";
+	os << record.splitCount << std::endl;
+	return os;
+}
+
+std::istream & operator>>(std::istream &is, BreakpointRecord& record)
+{
+	is >> record.clusterID;
+	for (int clusterEnd = 0; clusterEnd < 2; clusterEnd++)
+	{
+		is >> record.chromosome[clusterEnd];
+		is >> record.strand[clusterEnd];
+		is >> record.position[clusterEnd];
+	}
+	is >> record.numInserted;
+	is >> record.splitCount;
+	return is;
+}
+
