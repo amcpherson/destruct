@@ -471,8 +471,7 @@ int main(int argc, char* argv[])
 				
 				AlignInfo alignInfo = selfAlignments[alignmentIndex];
 				
-				int seqLength = alignedLength[alignment.readEnd];
-				int score = alignInfo.SeqScores()[alignedLength[alignment.readEnd]];
+				int score = alignInfo.SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
 				
 				SpanningAlignmentRecord record;
 				record.libID = libID;
@@ -481,8 +480,8 @@ int main(int argc, char* argv[])
 				record.alignID = alignmentIndex;
 				record.chromosome = alignment.reference;
 				record.strand = ((alignment.strand == PlusStrand) ? "+" : "-");
-				record.start = alignInfo.AlignmentStart(seqLength);
-				record.end = alignInfo.AlignmentEnd(seqLength);
+				record.start = alignInfo.AlignmentStart(preppedReads.ReadLength(alignment.readEnd));
+				record.end = alignInfo.AlignmentEnd(preppedReads.ReadLength(alignment.readEnd));
 				record.score = score;
 
 				spanningFile << record;
