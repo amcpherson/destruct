@@ -14,6 +14,27 @@ using namespace boost;
 using namespace std;
 
 
+int CalculateRealignedScore(SimpleAligner& aligner, PreppedReads& reads, int readID, int readEnd, const string& breakpointSequence, const string& strand, int position)
+{
+	if (position < 16 || position > breakpointSequence.size() / 2 + 16)
+	{
+		return 0;
+	}
+
+	reads.SetCurrentRead(readID);
+
+	const char* refPtr = &breakpointSequence[position];
+
+	if (strand == "+")
+	{
+		return aligner.AlignBandedSSE2BW7ScoreFwd(refPtr, reads.StartPtr(readEnd, PlusStrand), reads.EndPtr(readEnd, PlusStrand));
+	}
+	else
+	{
+		return aligner.AlignBandedSSE2BW7ScoreRev(refPtr, reads.StartPtr(readEnd, MinusStrand), reads.EndPtr(readEnd, MinusStrand));
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	int matchScore;
@@ -55,6 +76,8 @@ int main(int argc, char* argv[])
 		cerr << "error: " << e.error() << " for arg " << e.argId() << endl;
 		exit(1);
 	}
+
+	SimpleAligner aligner(matchScore, misMatchScore, gapScore);
 
 	cerr << "Reading reference fasta" << endl;
 	
@@ -138,7 +161,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Create a breakpoint sequence for each cluster end with the sequence of the reference maintained (not reverse
-		// complemented) for that breakend.  Also calculate an offset which will be used for calculating the 1-based
+		// complemented) for that breakend.  Also calculate an offset which will be used for calculating the 0-based
 		// positions of alignments in the breakpoint sequence.
 		string breakpointSequence[2];
 		int breakpointOffset[2];
@@ -151,7 +174,7 @@ int main(int argc, char* argv[])
 				ReverseComplement(otherBreakendSequence);
 			}
 
-			breakpointOffset[clusterEnd] = 1 - breakendStart[clusterEnd];
+			breakpointOffset[clusterEnd] = breakendStart[clusterEnd];
 
 			if (breakpointRecord.strand[clusterEnd] == "+")
 			{
@@ -187,8 +210,7 @@ int main(int argc, char* argv[])
 			// Calculate position of alignment in breakpoint sequence
 			int adjustedPosition = spanningRecord.GetOuterPosition() + breakpointOffset[memberRecord.clusterEnd];
 
-			preppedReads.SetCurrentRead(spanningRecord.readID);
-
+			int score = CalculateRealignedScore(aligner, preppedReads, memberRecord.readID, memberRecord.readEnd, breakpointSequence[memberRecord.clusterEnd], spanningRecord.strand, adjustedPosition);
 		}
 	}
 }
