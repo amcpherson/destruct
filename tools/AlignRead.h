@@ -6,7 +6,9 @@
 #include "Common.h"
 #include "DebugCheck.h"
 #include "Sequences.h"
+#include "AlignmentStream.h"
 #include "SimpleAligner.h"
+#include "ReadStream.h"
 
 #include <iostream>
 #include <string>
