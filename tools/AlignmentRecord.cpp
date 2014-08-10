@@ -205,3 +205,27 @@ std::istream & operator>>(std::istream &is, BreakpointRecord& record)
 	return is;
 }
 
+std::ostream & operator<<(std::ostream &os, const ClusterMemberScoreRecord& record)
+{
+	os << record.clusterID << "\t";
+	os << record.clusterEnd << "\t";
+	os << record.libID << "\t";
+	os << record.readID << "\t";
+	os << record.readEnd << "\t";
+	os << record.alignID << "\t";
+	os << record.score << std::endl;
+	return os;
+}
+
+std::istream & operator>>(std::istream &is, ClusterMemberScoreRecord& record)
+{
+	is >> record.clusterID;
+	is >> record.clusterEnd;
+	is >> record.libID;
+	is >> record.readID;
+	is >> record.readEnd;
+	is >> record.alignID;
+	is >> record.score;
+	return is;
+}
+

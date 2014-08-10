@@ -115,6 +115,21 @@ std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record);
 
 std::istream & operator>>(std::istream &is, BreakpointRecord& record);
 
+struct ClusterMemberScoreRecord
+{
+	int clusterID;
+	int clusterEnd;
+	int libID;
+	int readID;
+	int readEnd;
+	int alignID;
+	int score;
+};
+
+std::ostream & operator<<(std::ostream &os, const ClusterMemberScoreRecord& record);
+
+std::istream & operator>>(std::istream &is, ClusterMemberScoreRecord& record);
+
 template<typename TRecordType>
 std::ostream & operator<<(std::ostream &os, const vector<TRecordType>& records)
 {

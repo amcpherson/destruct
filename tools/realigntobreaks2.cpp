@@ -46,6 +46,7 @@ int main(int argc, char* argv[])
 	string spanningFilename;
 	string clustersFilename;
 	string breakpointsFilename;
+	string realignmentsFilename;
 	
 	try
 	{
@@ -58,7 +59,8 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<string> readSeqsFilenameArg("s","seqs","Read Sequences Fastq",true,"","string",cmd);
 		TCLAP::ValueArg<string> spanningFilenameArg("","span","Spanning Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> clustersFilenameArg("c","clusters","Clusters Filename",true,"","string",cmd);
-		TCLAP::ValueArg<string> breakpointsFilenameArg("b","breakpoints","Output Breakpoints Filename",true,"","integer",cmd);
+		TCLAP::ValueArg<string> breakpointsFilenameArg("b","breakpoints","Breakpoints Filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> realignmentsFilenameArg("","realignments","Realignment Scores Filename",true,"","string",cmd);
 		cmd.parse(argc,argv);
 		
 		matchScore = matchScoreArg.getValue();
@@ -70,6 +72,7 @@ int main(int argc, char* argv[])
 		spanningFilename = spanningFilenameArg.getValue();
 		clustersFilename = clustersFilenameArg.getValue();
 		breakpointsFilename = breakpointsFilenameArg.getValue();
+		realignmentsFilename = realignmentsFilenameArg.getValue();
 	}
 	catch (TCLAP::ArgException &e)
 	{
@@ -132,6 +135,9 @@ int main(int argc, char* argv[])
 
 	ifstream breakpointsFile(breakpointsFilename.c_str());
 	CheckFile(breakpointsFile, breakpointsFilename);
+
+	ofstream realignmentsFile(realignmentsFilename.c_str());
+	CheckFile(realignmentsFile, realignmentsFilename);
 
 	BreakpointRecord breakpointRecord;
 	while (breakpointsFile >> breakpointRecord)
@@ -211,6 +217,18 @@ int main(int argc, char* argv[])
 			int adjustedPosition = spanningRecord.GetOuterPosition() + breakpointOffset[memberRecord.clusterEnd];
 
 			int score = CalculateRealignedScore(aligner, preppedReads, memberRecord.readID, memberRecord.readEnd, breakpointSequence[memberRecord.clusterEnd], spanningRecord.strand, adjustedPosition);
+
+			ClusterMemberScoreRecord scoreRecord;
+
+			scoreRecord.clusterID = memberRecord.clusterID;
+			scoreRecord.clusterEnd = memberRecord.clusterEnd;
+			scoreRecord.libID = memberRecord.libID;
+			scoreRecord.readID = memberRecord.readID;
+			scoreRecord.readEnd = memberRecord.readEnd;
+			scoreRecord.alignID = memberRecord.alignID;
+			scoreRecord.score = score;
+
+			realignmentsFile << scoreRecord;
 		}
 	}
 }
