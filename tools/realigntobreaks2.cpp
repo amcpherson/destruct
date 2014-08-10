@@ -16,21 +16,26 @@ using namespace std;
 
 int CalculateRealignedScore(SimpleAligner& aligner, PreppedReads& reads, int readID, int readEnd, const string& breakpointSequence, const string& strand, int position)
 {
-	if (position < 16 || position > breakpointSequence.size() / 2 + 16)
-	{
-		return 0;
-	}
-
 	reads.SetCurrentRead(readID);
 
 	const char* refPtr = &breakpointSequence[position];
 
 	if (strand == "+")
 	{
+		if (position < 16 || position > breakpointSequence.size() / 2)
+		{
+			return 0;
+		}
+		
 		return aligner.AlignBandedSSE2BW7ScoreFwd(refPtr, reads.StartPtr(readEnd, PlusStrand), reads.EndPtr(readEnd, PlusStrand));
 	}
 	else
 	{
+		if (position < breakpointSequence.size() / 2 || position > breakpointSequence.size() - 16)
+		{
+			return 0;
+		}
+		
 		return aligner.AlignBandedSSE2BW7ScoreRev(refPtr, reads.StartPtr(readEnd, MinusStrand), reads.EndPtr(readEnd, MinusStrand));
 	}
 }
@@ -180,7 +185,7 @@ int main(int argc, char* argv[])
 				ReverseComplement(otherBreakendSequence);
 			}
 
-			breakpointOffset[clusterEnd] = breakendStart[clusterEnd];
+			breakpointOffset[clusterEnd] = -breakendStart[clusterEnd];
 
 			if (breakpointRecord.strand[clusterEnd] == "+")
 			{
