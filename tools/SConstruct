@@ -227,6 +227,16 @@ sources = """
 env.Program(target='realign', source=common_sources+sources)
 
 sources = """
+    realigntobreaks2.cpp
+    AlignmentRecord.cpp
+    Parsers.cpp
+    ReadStream.cpp
+    Sequences.cpp
+    SimpleAligner.cpp
+""".split()
+env.Program(target='realigntobreaks2', source=common_sources+sources)
+
+sources = """
     realign_rna.cpp
     AlignmentProbability.cpp
     AlignmentStream.cpp
