@@ -17,6 +17,14 @@ struct ReadRecord
 	int readID;
 };
 
+struct AlignmentKey
+{
+	int libID;
+	int readID;
+	int readEnd;
+	int alignID;
+};
+
 struct AlignmentPairKey
 {
 	int libID;
@@ -36,6 +44,7 @@ struct SpanningAlignmentRecord
 	int end;
 	int score;
 
+	AlignmentKey GetAlignmentKey() const;
 	int GetOuterPosition() const;
 };
 
@@ -72,6 +81,7 @@ struct ClusterMemberRecord
 	int alignID;
 
 	ReadRecord GetReadRecord() const;
+	AlignmentKey GetAlignmentKey() const;
 };
 
 std::ostream & operator<<(std::ostream &os, const ClusterMemberRecord& record);
@@ -189,6 +199,24 @@ inline size_t hash_value(const ReadRecord& record)
 	size_t seed = 0;
 	hash_combine(seed, record.libID);
 	hash_combine(seed, record.readID);
+	return seed;
+}
+
+inline bool operator==(const AlignmentKey& record1, const AlignmentKey& record2)
+{
+	return record1.libID == record2.libID &&
+		   record1.readID == record2.readID &&
+		   record1.readEnd == record2.readEnd &&
+		   record1.alignID == record2.alignID;
+}
+
+inline size_t hash_value(const AlignmentKey& record)
+{
+	size_t seed = 0;
+	hash_combine(seed, record.libID);
+	hash_combine(seed, record.readID);
+	hash_combine(seed, record.readEnd);
+	hash_combine(seed, record.alignID);
 	return seed;
 }
 

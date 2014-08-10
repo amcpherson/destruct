@@ -8,6 +8,16 @@
 
 #include <ostream>
 
+AlignmentKey SpanningAlignmentRecord::GetAlignmentKey() const
+{
+	AlignmentKey alignKey;
+	alignKey.libID = libID;
+	alignKey.readID = readID;
+	alignKey.readEnd = readEnd;
+	alignKey.alignID = alignID;
+	return alignKey;
+}
+
 int SpanningAlignmentRecord::GetOuterPosition() const
 {
 	DebugCheck(strand == "+" || strand == "-");
@@ -135,6 +145,16 @@ ReadRecord ClusterMemberRecord::GetReadRecord() const
 	record.libID = libID;
 	record.readID = readID;
 	return record;
+}
+
+AlignmentKey ClusterMemberRecord::GetAlignmentKey() const
+{
+	AlignmentKey alignKey;
+	alignKey.libID = libID;
+	alignKey.readID = readID;
+	alignKey.readEnd = readEnd;
+	alignKey.alignID = alignID;
+	return alignKey;
 }
 
 std::ostream & operator<<(std::ostream &os, const BreakendRecord& record)
