@@ -83,6 +83,9 @@ else:
 
         sch.commandline('realigntobreaks', ('bylibrary', 'byread'), lowmem, cfg.realigntobreaks2_tool, '-r', cfg.genome_fasta, '-b', sch.ifile('breakpoints'), '-c', sch.ifile('clusters.setcover'), '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'), '--span', sch.ifile('spanning.alignments', ('bylibrary', 'byread')), '--seqs', sch.ifile('reads', ('bylibrary', 'byread')), '--realignments', sch.ofile('realignments', ('bylibrary', 'byread')))
 
+        sch.transform('merge_realignments1', ('bylibrary',), lowmem, merge_files_by_line, None, sch.ifile('realignments', ('bylibrary','byread')), sch.ofile('realignments', ('bylibrary',)))
+        sch.transform('merge_realignments2', (), lowmem, merge_files_by_line, None, sch.ifile('realignments', ('bylibrary',)), sch.ofile('realignments'))
+
         sch.transform('filter', (), medmem, filter_clusters, None, sch.ofile('clusters.filtered'), sch.ifile('clusters.setcover'), float(cfg.cluster_align_threshold), float(cfg.cluster_chimeric_threshold), float(cfg.cluster_valid_threshold), int(cfg.cluster_coverage_threshold), int(cfg.cluster_readcount_threshold))
 
         sch.commandline('getclusterids', (), lowmem, 'cut', '-f1', sch.ifile('clusters.filtered'), '|', 'uniq', '>', sch.ofile('clusters.filtered.ids'))
