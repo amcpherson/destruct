@@ -19,6 +19,7 @@ int main(int argc, char* argv[])
 	int matchScore;
 	int misMatchScore;
 	int gapScore;
+	int maxFragmentLength;
 	string referenceFasta;
 	string readSeqsFilename;
 	string spanningFilename;
@@ -31,6 +32,7 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<int> matchScoreArg("m","match","Match Score",true,0,"int",cmd);
 		TCLAP::ValueArg<int> misMatchScoreArg("x","mismatch","Mismatch Score",true,0,"int",cmd);
 		TCLAP::ValueArg<int> gapScoreArg("g","gap","Gap Score",true,0,"int",cmd);
+		TCLAP::ValueArg<int> maxFragmentLengthArg("","flmax","Maximum Fragment Length",true,0,"int",cmd);
 		TCLAP::ValueArg<string> referenceFastaArg("r","reference","Reference Sequences Fasta",true,"","string",cmd);
 		TCLAP::ValueArg<string> readSeqsFilenameArg("s","seqs","Read Sequences Fastq",true,"","string",cmd);
 		TCLAP::ValueArg<string> spanningFilenameArg("","span","Spanning Filename",true,"","string",cmd);
@@ -41,6 +43,7 @@ int main(int argc, char* argv[])
 		matchScore = matchScoreArg.getValue();
 		misMatchScore = misMatchScoreArg.getValue();
 		gapScore = gapScoreArg.getValue();
+		maxFragmentLength = maxFragmentLengthArg.getValue();
 		referenceFasta = referenceFastaArg.getValue();
 		readSeqsFilename = readSeqsFilenameArg.getValue();
 		spanningFilename = spanningFilenameArg.getValue();
@@ -70,34 +73,36 @@ int main(int argc, char* argv[])
 	
 	cerr << "Reading spanning alignments" << endl;
 
-	ifstream spanningFile(spanningFilename.c_str());
-	CheckFile(spanningFile, spanningFilename);
-
 	unordered_map<AlignmentKey,SpanningAlignmentRecord> spanningAlignments;
-
-	SpanningAlignmentRecord spanningRecord;
-	while (spanningFile >> spanningRecord)
 	{
-		spanningAlignments[spanningRecord.GetAlignmentKey()] = spanningRecord;
+		ifstream spanningFile(spanningFilename.c_str());
+		CheckFile(spanningFile, spanningFilename);
+
+		SpanningAlignmentRecord spanningRecord;
+		while (spanningFile >> spanningRecord)
+		{
+			spanningAlignments[spanningRecord.GetAlignmentKey()] = spanningRecord;
+		}
 	}
 
 	cerr << "Reading cluster memberships" << endl;
 
-	ifstream clustersFile(clustersFilename.c_str());
-	CheckFile(clustersFile, clustersFilename);
-
 	unordered_map<int,vector<ClusterMemberRecord> > clusters;
-
-	ClusterMemberRecord memberRecord;
-	while (clustersFile >> memberRecord)
 	{
-		// Ignore memberships of unknown alignments
-		if (spanningAlignments.find(memberRecord.GetAlignmentKey()) == spanningAlignments.end())
-		{
-			continue;
-		}
+		ifstream clustersFile(clustersFilename.c_str());
+		CheckFile(clustersFile, clustersFilename);
 
-		clusters[memberRecord.clusterID].push_back(memberRecord);
+		ClusterMemberRecord memberRecord;
+		while (clustersFile >> memberRecord)
+		{
+			// Ignore memberships of unknown alignments
+			if (spanningAlignments.find(memberRecord.GetAlignmentKey()) == spanningAlignments.end())
+			{
+				continue;
+			}
+
+			clusters[memberRecord.clusterID].push_back(memberRecord);
+		}
 	}
 
 	cerr << "Iterating breakpoints" << endl;
@@ -108,8 +113,56 @@ int main(int argc, char* argv[])
 	BreakpointRecord breakpointRecord;
 	while (breakpointsFile >> breakpointRecord)
 	{
-		// Reconstruct breakpoint sequence
-		
+		// Create breakend sequences of specific lengths, and record the start and end of the region from which the
+		// sequence originated in the reference genome.
+		string breakendSequence[2];
+		int breakendStart[2];
+		int breakendEnd[2];
+		for (int clusterEnd = 0; clusterEnd <= 1; clusterEnd++)
+		{
+			if (breakpointRecord.strand[clusterEnd] == "+")
+			{
+				breakendStart[clusterEnd] = breakpointRecord.position[clusterEnd] - maxFragmentLength + 1;
+				breakendEnd[clusterEnd] = breakpointRecord.position[clusterEnd];
+			}
+			else
+			{
+				breakendStart[clusterEnd] = breakpointRecord.position[clusterEnd];
+				breakendEnd[clusterEnd] = breakpointRecord.position[clusterEnd] + maxFragmentLength - 1;
+			}
+
+			referenceSequences.Get(breakpointRecord.chromosome[clusterEnd],
+			                       breakendStart[clusterEnd],
+			                       breakendEnd[clusterEnd],
+			                       breakendSequence[clusterEnd]);
+		}
+
+		// Create a breakpoint sequence for each cluster end with the sequence of the reference maintained (not reverse
+		// complemented) for that breakend.  Also calculate an offset which will be used for calculating the 1-based
+		// positions of alignments in the breakpoint sequence.
+		string breakpointSequence[2];
+		int breakpointOffset[2];
+		for (int clusterEnd = 0; clusterEnd <= 1; clusterEnd++)
+		{
+			string otherBreakendSequence = breakendSequence[1-clusterEnd];
+
+			if (breakpointRecord.strand[1-clusterEnd] != breakpointRecord.strand[clusterEnd])
+			{
+				ReverseComplement(otherBreakendSequence);
+			}
+
+			breakpointOffset[clusterEnd] = 1 - breakendStart[clusterEnd];
+
+			if (breakpointRecord.strand[clusterEnd] == "+")
+			{
+				breakpointSequence[clusterEnd] = breakendSequence[clusterEnd] + otherBreakendSequence;
+			}
+			else
+			{
+				breakpointSequence[clusterEnd] = otherBreakendSequence + breakendSequence[clusterEnd];
+				breakpointOffset[clusterEnd] += maxFragmentLength;
+			}
+		}
 
 		// Iterate cluster reads and their alignments
 		unordered_map<int,vector<ClusterMemberRecord> >::const_iterator clusterIter = clusters.find(breakpointRecord.clusterID);
@@ -124,12 +177,15 @@ int main(int argc, char* argv[])
 
 		for (vector<ClusterMemberRecord>::const_iterator memberIter = memberships.begin(); memberIter != memberships.end(); memberIter++)
 		{
+			const ClusterMemberRecord& memberRecord = *memberIter;
+
 			unordered_map<AlignmentKey,SpanningAlignmentRecord>::const_iterator alignIter = spanningAlignments.find(memberRecord.GetAlignmentKey());
 			DebugCheck(alignIter != spanningAlignments.end());
 
 			const SpanningAlignmentRecord& spanningRecord = alignIter->second;
 
 			// Calculate position of alignment in breakpoint sequence
+			int adjustedPosition = spanningRecord.GetOuterPosition() + breakpointOffset[memberRecord.clusterEnd];
 
 			preppedReads.SetCurrentRead(spanningRecord.readID);
 
