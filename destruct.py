@@ -12,6 +12,7 @@ import tarfile
 import collections
 import math
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 
 import pygenes
@@ -19,6 +20,7 @@ import pypeliner
 
 import score_stats
 import utils.plots
+import predict_breaks
 
 __version__ = '0.1.0'
 
@@ -71,17 +73,17 @@ else:
 
         sch.transform('chromosome_args', (), locally, generate_chromosome_args, sch.oobj('chrom.args', ('bychromarg',)), cfg.chromosomes.split(' '))
 
-        sch.commandline('cluster', ('bychromarg',), medmem, cfg.mclustermatepairs_tool, '-a', sch.ifile('spanning.alignments'), '-s', sch.ifile('libstats.tsv'), '-c', sch.ofile('clusters.raw', ('bychromarg',)), '-b', sch.ofile('breakends.raw', ('bychromarg',)), sch.iobj('chrom.args', ('bychromarg',)), '--clustmin', '1', '--fragmax', cfg.fragment_length_max)
+        sch.commandline('cluster', ('bychromarg',), medmem, cfg.mclustermatepairs_tool, '-a', sch.ifile('spanning.alignments'), '-s', sch.ifile('libstats.tsv'), '-c', sch.ofile('clusters.raw', ('bychromarg',)), sch.iobj('chrom.args', ('bychromarg',)), '--clustmin', '1', '--fragmax', cfg.fragment_length_max)
 
-        sch.transform('merge_clusters', (), lowmem, merge_clusters, None, sch.ifile('clusters.raw', ('bychromarg',)), sch.ifile('breakends.raw', ('bychromarg',)), sch.ofile('clusters.raw'), sch.ofile('breakends.raw'), sch.ofile('merge_clusters.debug'))
+        sch.transform('predbreaks', ('bychromarg',), medmem, predict_breaks.predict_breaks, None, sch.ifile('clusters.raw', ('bychromarg',)), sch.ifile('spanning.alignments'), sch.ifile('split.alignments'), sch.ofile('breakpoints.raw', ('bychromarg',)))
 
-        sch.transform('calc_weights', (), lowmem, calculate_cluster_weights, None, sch.ifile('breakends.raw'), sch.ofile('clusters.weights'))
+        sch.transform('merge_clusters', (), lowmem, merge_clusters, None, sch.ifile('clusters.raw', ('bychromarg',)), sch.ifile('breakpoints.raw', ('bychromarg',)), sch.ofile('clusters.raw'), sch.ofile('breakpoints.raw'), sch.ofile('merge_clusters.debug'))
+
+        sch.transform('calc_weights', (), lowmem, predict_breaks.calculate_cluster_weights, None, sch.ifile('breakpoints.raw'), sch.ofile('clusters.weights'))
 
         sch.commandline('setcover', (), himem, cfg.setcover_tool, '-c', sch.ifile('clusters.raw'), '-w', sch.ifile('clusters.weights'), '-a', sch.ofile('clusters.setcover'))
 
-        sch.commandline('breaks', (), himem, cfg.mpredictbreaks_tool, '-r', cfg.genome_fasta, '-c', sch.ifile('clusters.setcover'), '-a', sch.ifile('split.alignments'), '-b', sch.ofile('breakpoints'))
-
-        sch.commandline('realigntobreaks', ('bylibrary', 'byread'), lowmem, cfg.realigntobreaks2_tool, '-r', cfg.genome_fasta, '-b', sch.ifile('breakpoints'), '-c', sch.ifile('clusters.setcover'), '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'), '--span', sch.ifile('spanning.alignments', ('bylibrary', 'byread')), '--seqs', sch.ifile('reads', ('bylibrary', 'byread')), '--realignments', sch.ofile('realignments', ('bylibrary', 'byread')))
+        sch.commandline('realigntobreaks', ('bylibrary', 'byread'), lowmem, cfg.realigntobreaks2_tool, '-r', cfg.genome_fasta, '-b', sch.ifile('breakpoints.raw'), '-c', sch.ifile('clusters.raw'), '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'), '--span', sch.ifile('spanning.alignments', ('bylibrary', 'byread')), '--seqs', sch.ifile('reads', ('bylibrary', 'byread')), '--realignments', sch.ofile('realignments', ('bylibrary', 'byread')))
 
         sch.transform('merge_realignments1', ('bylibrary',), lowmem, merge_files_by_line, None, sch.ifile('realignments', ('bylibrary','byread')), sch.ofile('realignments', ('bylibrary',)))
         sch.transform('merge_realignments2', (), lowmem, merge_files_by_line, None, sch.ifile('realignments', ('bylibrary',)), sch.ofile('realignments'))
@@ -96,7 +98,7 @@ else:
         sch.transform('tabreads', (), medmem, tabulate_reads, None, sch.ifile('clusters.filtered'), sch.ifile('reads1', ('bylibrary',)), sch.ifile('reads2', ('bylibrary',)), sch.ofile('breakreads.table.unsorted'))
         sch.commandline('sortreads', (), medmem, 'sort', '-n', sch.ifile('breakreads.table.unsorted'), '>', breakreads)
 
-        sch.transform('tabulate', (), himem, multilib_tabulate, None, breakpoints, sch.ifile('clusters.filtered'), sch.ifile('clusters.raw'), sch.ifile('clusters.raw'), sch.ifile('breakpoints'), cfg.genome_fasta, cfg.gtf_filename, cfg.dgv_filename, sch.ifile('cycles'), sch.iobj('stats', ('bylibrary',)))
+        sch.transform('tabulate', (), himem, multilib_tabulate, None, breakpoints, sch.ifile('clusters.filtered'), sch.ifile('clusters.raw'), sch.ifile('clusters.raw'), sch.ifile('breakpoints.raw'), cfg.genome_fasta, cfg.gtf_filename, cfg.dgv_filename, sch.ifile('cycles'), sch.iobj('stats', ('bylibrary',)))
         
         sch.transform('merge_plots', (), lowmem, merge_tars, None, plots_tar, sch.ifile('score.stats.plots', ('bylibrary',)), sch.ifile('flen.plots', ('bylibrary',)))
 
@@ -275,54 +277,35 @@ else:
         return dict(enumerate(args))
 
 
-    def read_clusters_breakends(clusters_filename, breakends_filename):
-        with open(clusters_filename, 'r') as clusters_file, open(breakends_filename, 'r') as breakends_file:
+    def read_clusters_breakpoints(clusters_filename, breakpoints_filename):
+        with open(clusters_filename, 'r') as clusters_file, open(breakpoints_filename, 'r') as breakpoints_file:
             clusters_reader = csv.reader(clusters_file, delimiter='\t')
-            breakends_reader = csv.reader(breakends_file, delimiter='\t')
+            breakpoints_reader = csv.reader(breakpoints_file, delimiter='\t')
             cluster_iter = itertools.groupby(clusters_reader, lambda row: row[0])
-            breakend_iter = itertools.groupby(breakends_reader, lambda row: row[0])
+            breakend_iter = itertools.groupby(breakpoints_reader, lambda row: row[0])
             for (cluster_id_1, cluster_rows), (cluster_id_2, breakend_rows) in itertools.izip(cluster_iter, breakend_iter):
                 if cluster_id_1 != cluster_id_2:
-                    raise ValueError('Consistency issue between clusters and breakends for ' + clusters_filename + ' and ' + breakends_filename)
+                    raise ValueError('Consistency issue between clusters and breakpoints for ' + clusters_filename + ' and ' + breakpoints_filename)
                 yield cluster_id_1, cluster_rows, breakend_rows
 
 
-    def merge_clusters(in_clusters_filenames, in_breakends_filenames,
-                       out_clusters_filename, out_breakends_filename, debug_filename):
+    def merge_clusters(in_clusters_filenames, in_breakpoints_filenames,
+                       out_clusters_filename, out_breakpoints_filename, debug_filename):
         new_cluster_id = 0
         with open(out_clusters_filename, 'w') as out_clusters_file, \
-             open(out_breakends_filename, 'w') as out_breakends_file, \
+             open(out_breakpoints_filename, 'w') as out_breakpoints_file, \
              open(debug_filename, 'w') as debug_file:
             for idx, in_clusters_filename in in_clusters_filenames.iteritems():
-                in_breakends_filename = in_breakends_filenames[idx]
-                for cluster_id, cluster_rows, breakend_rows in read_clusters_breakends(in_clusters_filename, in_breakends_filename):
+                in_breakpoints_filename = in_breakpoints_filenames[idx]
+                for cluster_id, cluster_rows, breakend_rows in read_clusters_breakpoints(in_clusters_filename, in_breakpoints_filename):
                     for row in cluster_rows:
                         row[0] = str(new_cluster_id)
                         out_clusters_file.write('\t'.join(row) + '\n')
                     for row in breakend_rows:
                         row[0] = str(new_cluster_id)
-                        out_breakends_file.write('\t'.join(row) + '\n')
+                        out_breakpoints_file.write('\t'.join(row) + '\n')
                     debug_file.write('{0}\t{1}\t{2}\n'.format(new_cluster_id, idx, cluster_id))
                     new_cluster_id += 1
-
-
-    def calculate_cluster_weights(breakends_filename, weights_filename):
-        epsilon = 0.0001
-        itx_distance = 1000000000
-        with open(breakends_filename, 'r') as breakends_file, open(weights_filename, 'w') as weights_file:
-            breakends_reader = csv.reader(breakends_file, delimiter='\t')
-            for cluster_id, breakend_rows in itertools.groupby(breakends_reader, lambda row: row[0]):
-                breakend_rows = list(breakend_rows)
-                chromosome1 = breakend_rows[0][2]
-                chromosome2 = breakend_rows[1][2]
-                position1 = int(breakend_rows[0][4])
-                position2 = int(breakend_rows[1][4])
-                if chromosome1 != chromosome2:
-                    distance = itx_distance
-                else:
-                    distance = abs(position1 - position2)
-                weight = 1.0 + epsilon * math.log(distance)
-                weights_file.write('\t'.join((cluster_id, str(weight))) + '\n')
 
 
     def merge_samples(all_samples, merged_samples):

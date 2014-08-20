@@ -223,10 +223,10 @@ int main(int argc, char* argv[])
 
 			int score = CalculateRealignedScore(aligner, preppedReads, memberRecord.readID, memberRecord.readEnd, breakpointSequence[memberRecord.clusterEnd], spanningRecord.strand, adjustedPosition);
 
-			ClusterMemberScoreRecord scoreRecord;
+			BreakAlignScoreRecord scoreRecord;
 
-			scoreRecord.clusterID = memberRecord.clusterID;
-			scoreRecord.clusterEnd = memberRecord.clusterEnd;
+			scoreRecord.clusterID = breakpointRecord.clusterID;
+			scoreRecord.predictionID = breakpointRecord.predictionID;
 			scoreRecord.libID = memberRecord.libID;
 			scoreRecord.readID = memberRecord.readID;
 			scoreRecord.readEnd = memberRecord.readEnd;

@@ -1,10 +1,15 @@
+
+import collections
 import pandas as pd
 import numpy as np
+
+import utils.misc
 
 
 breakpoint_fields = ['cluster_id', 'prediction_id',
                      'chromosome_1', 'strand_1', 'position_1',
-                     'chromosome_2', 'strand_2', 'position_2']
+                     'chromosome_2', 'strand_2', 'position_2',
+                     'inserted']
 
 def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpoints_filename):
 
@@ -20,7 +25,8 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
     # Read only spanning reads relevant clusters
     fields = ['lib_id', 'read_id', 'read_end', 'align_id', 'chromosome', 'strand', 'start', 'end', 'score']
     csv_iter = pd.read_csv(spanning_filename, sep='\t', iterator=True, chunksize=1000,
-                                              names=fields, converters={'chromosome':str})
+                                              names=fields, converters={'chromosome':str},
+                                              na_values=['.'])
     spanning = pd.concat([read_filter(chunk) for chunk in csv_iter])
 
     span_index_cols = ['lib_id', 'read_id', 'read_end', 'align_id']
@@ -65,37 +71,67 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
         pred = pred.set_index(['cluster_id', 'prediction_id', 'cluster_end']).unstack()
         pred.columns = [a+'_'+str(b+1) for a, b in pred.columns.values]
         pred.reset_index(inplace=True)
+        pred['inserted'] = ''
         
+        # Add spanning read prediction
         predictions.append(pred)
         prediction_id += 1
         
-        paired = cluster_rows.set_index(['lib_id', 'read_id', 'cluster_end'])[['read_end', 'align_id']].unstack()
-        paired.columns = ['read_end_1', 'read_end_2', 'align_id_1', 'align_id_2']
+        paired = cluster_rows.set_index(['lib_id', 'read_id', 'read_end'])[['cluster_end', 'align_id']].unstack()
+        paired.columns = ['cluster_end_1', 'cluster_end_2', 'align_id_1', 'align_id_2']
         
-        paired['flip'] = paired['read_end_1'] != 0
-        paired = paired.drop(['read_end_1', 'read_end_2'], axis=1)
+        paired['flip'] = paired['cluster_end_1'] != 0
+        paired = paired.drop(['cluster_end_1', 'cluster_end_2'], axis=1)
         paired = paired.reset_index()
         
         cluster_split = split.merge(paired, left_index=True, right_on=split_index_cols)
         
-        cluster_split.loc[cluster_split['flip'], 'chromosome_1'], cluster_split.loc[cluster_split['flip'], 'chromosome_2'] =         cluster_split.loc[cluster_split['flip'], 'chromosome_2'], cluster_split.loc[cluster_split['flip'], 'chromosome_1']
-        
-        cluster_split.loc[cluster_split['flip'], 'strand_1'], cluster_split.loc[cluster_split['flip'], 'strand_2'] =         cluster_split.loc[cluster_split['flip'], 'strand_2'], cluster_split.loc[cluster_split['flip'], 'strand_1']
-        
-        cluster_split.loc[cluster_split['flip'], 'position_1'], cluster_split.loc[cluster_split['flip'], 'position_2'] =         cluster_split.loc[cluster_split['flip'], 'position_2'], cluster_split.loc[cluster_split['flip'], 'position_1']
-        
         if len(cluster_split.index) == 0:
             continue
             
-        cluster_split = cluster_split.drop('flip', axis=1)
+        cluster_split.loc[cluster_split['flip'], 'chromosome_1'], cluster_split.loc[cluster_split['flip'], 'chromosome_2'] = \
+            cluster_split.loc[cluster_split['flip'], 'chromosome_2'], cluster_split.loc[cluster_split['flip'], 'chromosome_1']
         
-        cluster_split.set_index(['position_1', 'position_2'], inplace=True)
-        cluster_split['score_sum'] = cluster_split.groupby(level=[0, 1])['score'].sum()
-        cluster_split.reset_index(inplace=True)
+        cluster_split.loc[cluster_split['flip'], 'strand_1'], cluster_split.loc[cluster_split['flip'], 'strand_2'] = \
+            cluster_split.loc[cluster_split['flip'], 'strand_2'], cluster_split.loc[cluster_split['flip'], 'strand_1']
         
-        pred = cluster_split[cluster_split['score_sum'] == cluster_split['score_sum'].max()].iloc[0:1].copy()
+        cluster_split.loc[cluster_split['flip'], 'position_1'], cluster_split.loc[cluster_split['flip'], 'position_2'] = \
+            cluster_split.loc[cluster_split['flip'], 'position_2'], cluster_split.loc[cluster_split['flip'], 'position_1']
+        
+        cluster_split['seed_end'] = np.where(cluster_split['flip'], 1-cluster_split['read_end'], cluster_split['read_end'])
+        
+        def revcomp_inserted(row):
+            if row['seed_end'] == 0:
+                return row['inserted']
+            else:
+                return utils.misc.reverse_complement(row['inserted'])
+        
+        cluster_split['inserted'] = cluster_split.apply(revcomp_inserted, axis=1)
+        
+        cluster_split['inslen'] = cluster_split['inserted'].apply(len)
+                                             
+        cluster_split.set_index(['position_1', 'position_2', 'inslen'], inplace=True)
+        cluster_split = cluster_split.sort_index()
+        
+        # Calculate highest scoring split
+        split_score_sums = cluster_split.groupby(level=[0, 1, 2])['score'].sum()
+        split_score_sums.sort(ascending=False)
+        
+        # Select split alignments for highest scoring split
+        pred = cluster_split.loc[split_score_sums.index[0]:split_score_sums.index[0]].reset_index()
+        
+        # Consensus for inserted sequence
+        inserted = np.array([np.array(list(a)) for a in pred['inserted'].values])
+        consensus = list()
+        for nt_list in inserted.T:
+            consensus.append(collections.Counter(nt_list).most_common(1)[0][0])
+        consensus = ''.join(consensus)
+
+        # Reformat table
+        pred = pred.iloc[0:1].copy()
         pred['cluster_id'] = cluster_id
         pred['prediction_id'] = prediction_id
+        pred['inserted'] = consensus
         pred = pred[breakpoint_fields]
         
         predictions.append(pred)

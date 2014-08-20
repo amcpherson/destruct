@@ -88,37 +88,24 @@ std::ostream & operator<<(std::ostream &os, const ClusterMemberRecord& record);
 
 std::istream & operator>>(std::istream &is, ClusterMemberRecord& record);
 
-struct BreakendRecord
-{
-	int clusterID;
-	int clusterEnd;
-	string chromosome;
-	string strand;
-	int position;
-};
-
-std::ostream & operator<<(std::ostream &os, const BreakendRecord& record);
-
-std::istream & operator>>(std::istream &is, BreakendRecord& record);
-
 struct BreakpointRecord
 {
 	int clusterID;
+	int predictionID;
 	string chromosome[2];
 	string strand[2];
 	int position[2];
-	int numInserted;
-	int splitCount;
+	string inserted;
 };
 
 std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record);
 
 std::istream & operator>>(std::istream &is, BreakpointRecord& record);
 
-struct ClusterMemberScoreRecord
+struct BreakAlignScoreRecord
 {
 	int clusterID;
-	int clusterEnd;
+	int predictionID;
 	int libID;
 	int readID;
 	int readEnd;
@@ -126,9 +113,9 @@ struct ClusterMemberScoreRecord
 	int score;
 };
 
-std::ostream & operator<<(std::ostream &os, const ClusterMemberScoreRecord& record);
+std::ostream & operator<<(std::ostream &os, const BreakAlignScoreRecord& record);
 
-std::istream & operator>>(std::istream &is, ClusterMemberScoreRecord& record);
+std::istream & operator>>(std::istream &is, BreakAlignScoreRecord& record);
 
 template<typename TRecordType>
 std::ostream & operator<<(std::ostream &os, const vector<TRecordType>& records)

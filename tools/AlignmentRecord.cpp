@@ -74,7 +74,7 @@ std::ostream & operator<<(std::ostream &os, const SplitAlignmentRecord& record)
 	}
 	if (record.inserted.empty())
 	{
-		os << "-\t";
+		os << ".\t";
 	}
 	else
 	{
@@ -97,7 +97,7 @@ std::istream & operator>>(std::istream &is, SplitAlignmentRecord& record)
 		is >> record.position[readEnd];
 	}
 	is >> record.inserted;
-	if (record.inserted == "-")
+	if (record.inserted == ".")
 	{
 		record.inserted = "";
 	}
@@ -157,58 +157,38 @@ AlignmentKey ClusterMemberRecord::GetAlignmentKey() const
 	return alignKey;
 }
 
-std::ostream & operator<<(std::ostream &os, const BreakendRecord& record)
-{
-	os << record.clusterID << "\t";
-	os << record.clusterEnd << "\t";
-	os << record.chromosome << "\t";
-	os << record.strand << "\t";
-	os << record.position << std::endl;
-	return os;
-}
-
-std::istream & operator>>(std::istream &is, BreakendRecord& record)
-{
-	is >> record.clusterID;
-	is >> record.clusterEnd;
-	is >> record.chromosome;
-	is >> record.strand;
-	is >> record.position;
-	return is;
-}
-
 std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record)
 {
 	os << record.clusterID << "\t";
+	os << record.predictionID << "\t";
 	for (int clusterEnd = 0; clusterEnd < 2; clusterEnd++)
 	{
 		os << record.chromosome[clusterEnd] << "\t";
 		os << record.strand[clusterEnd] << "\t";
 		os << record.position[clusterEnd] << "\t";
 	}
-	os << record.numInserted << "\t";
-	os << record.splitCount << std::endl;
+	os << record.inserted << std::endl;
 	return os;
 }
 
 std::istream & operator>>(std::istream &is, BreakpointRecord& record)
 {
 	is >> record.clusterID;
+	is >> record.predictionID;
 	for (int clusterEnd = 0; clusterEnd < 2; clusterEnd++)
 	{
 		is >> record.chromosome[clusterEnd];
 		is >> record.strand[clusterEnd];
 		is >> record.position[clusterEnd];
 	}
-	is >> record.numInserted;
-	is >> record.splitCount;
+	is >> record.inserted;
 	return is;
 }
 
-std::ostream & operator<<(std::ostream &os, const ClusterMemberScoreRecord& record)
+std::ostream & operator<<(std::ostream &os, const BreakAlignScoreRecord& record)
 {
 	os << record.clusterID << "\t";
-	os << record.clusterEnd << "\t";
+	os << record.predictionID << "\t";
 	os << record.libID << "\t";
 	os << record.readID << "\t";
 	os << record.readEnd << "\t";
@@ -217,10 +197,10 @@ std::ostream & operator<<(std::ostream &os, const ClusterMemberScoreRecord& reco
 	return os;
 }
 
-std::istream & operator>>(std::istream &is, ClusterMemberScoreRecord& record)
+std::istream & operator>>(std::istream &is, BreakAlignScoreRecord& record)
 {
 	is >> record.clusterID;
-	is >> record.clusterEnd;
+	is >> record.predictionID;
 	is >> record.libID;
 	is >> record.readID;
 	is >> record.readEnd;
