@@ -20,6 +20,7 @@ import pypeliner
 
 import score_stats
 import utils.plots
+import utils.misc
 import predict_breaks
 
 __version__ = '0.1.0'
@@ -554,10 +555,6 @@ else:
             yield (id, ''.join(sequences))
 
 
-    def reverse_complement(sequence):
-        return sequence[::-1].translate(string.maketrans('ACTGactg','TGACtgac'))
-
-
     def create_approximate_sequence(reference_sequences, cluster_info):
         approximate_sequences = ['', '']
         expected_strands = ('+', '-')
@@ -567,7 +564,7 @@ else:
             end = cluster_info[side].end
             approximate_sequences[side] = reference_sequences[chromosome][start-1:end]
             if cluster_info[side].strand != expected_strands[side]:
-                approximate_sequences[side] = reverse_complement(approximate_sequences[side])
+                approximate_sequences[side] = utils.misc.reverse_complement(approximate_sequences[side])
         return approximate_sequences[0] + '[]' + approximate_sequences[1]
 
 
@@ -589,7 +586,7 @@ else:
                 start = breakpoint_info[3][side]
             approximate_sequences[side] = reference_sequences[chromosome][start-1:end]
             if cluster_info[side].strand != expected_strands[side]:
-                approximate_sequences[side] = reverse_complement(approximate_sequences[side])
+                approximate_sequences[side] = utils.misc.reverse_complement(approximate_sequences[side])
         return approximate_sequences[0] + '[' + inserted + ']' + approximate_sequences[1]
 
 
