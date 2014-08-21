@@ -300,14 +300,6 @@ struct MatePair
 
 typedef vector<MatePair> MatePairVec;
 
-struct ReadInfo
-{
-	int libID;
-	int readID;
-	int readEnd;
-	int alignID;
-};
-
 bool FragmentLessThan(const CompactAlignment& a1, const CompactAlignment& a2);
 
 double normalpdf(double x, double mu, double sigma);

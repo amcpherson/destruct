@@ -92,6 +92,13 @@ private:
 	NameIndex mRefNameIndex;
 };
 
+struct ReadInfo
+{
+	int libID;
+	int readID;
+	int readEnd;
+	int alignID;
+};
 
 class DiscordantAlignments
 {
