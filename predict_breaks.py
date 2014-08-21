@@ -25,8 +25,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
     # Read only spanning reads relevant clusters
     fields = ['lib_id', 'read_id', 'read_end', 'align_id', 'chromosome', 'strand', 'start', 'end', 'score']
     csv_iter = pd.read_csv(spanning_filename, sep='\t', iterator=True, chunksize=1000,
-                                              names=fields, converters={'chromosome':str},
-                                              na_values=['.'])
+                                              names=fields, converters={'chromosome':str})
     spanning = pd.concat([read_filter(chunk) for chunk in csv_iter])
 
     span_index_cols = ['lib_id', 'read_id', 'read_end', 'align_id']
@@ -39,12 +38,15 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
               'align_id_2', 'chromosome_2', 'strand_2', 'position_2',
               'inserted', 'score']
     csv_iter = pd.read_csv(split_filename, sep='\t', iterator=True, chunksize=1000,
-                                           names=fields, converters={'chromosome':str})
+                                           names=fields, converters={'chromosome':str},
+                                           na_values=['.'])
     split = pd.concat([read_filter(chunk) for chunk in csv_iter])
 
     split_index_cols = ['lib_id', 'read_id', 'align_id_1', 'align_id_2']
 
     split.set_index(split_index_cols, inplace=True)
+
+    split['inserted'] = split['inserted'].fillna('')
 
     def flip_split_positions(row):
         if row['flip']:
@@ -143,6 +145,8 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
         return
         
     predictions = pd.concat(predictions, ignore_index=True)
+
+    predictions.loc[predictions['inserted'] == '', 'inserted'] = '.'
 
     predictions = predictions[breakpoint_fields]
     predictions.to_csv(breakpoints_filename, sep='\t', index=False, header=False)
