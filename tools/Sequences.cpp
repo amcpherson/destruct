@@ -81,7 +81,7 @@ void Sequences::ReadMappabilityBedGraph(const string& bedGraphFilename)
 	{
 		if (fields.size() < 4)
 		{
-			ReportFailure("Error: line " + line + " has too few fields");
+			ReportFailure("Error: line " << line << " has too few fields");
 		}
 		
 		const string& chromosome = fields[0];
@@ -117,7 +117,7 @@ const string& Sequences::Get(const string& id) const
 {
 	if (mSequences.find(id) == mSequences.end())
 	{
-		ReportFailure("Error: Unable to find sequence " + id);
+		ReportFailure("Error: Unable to find sequence " << id);
 	}
 	
 	return mSequences.find(id)->second;
@@ -127,7 +127,7 @@ void Sequences::Get(const string& id, int start, int end, string& sequence) cons
 {
 	if (mSequences.find(id) == mSequences.end())
 	{
-		ReportFailure("Error: Unable to find sequence " + id);
+		ReportFailure("Error: Unable to find sequence " << id);
 	}
 	
 	const string& fullSequence = mSequences.find(id)->second;
@@ -140,7 +140,7 @@ const char* Sequences::Get(const string& id, int pos) const
 {
 	if (mSequences.find(id) == mSequences.end())
 	{
-		ReportFailure("Error: Unable to find sequence " + id);
+		ReportFailure("Error: Unable to find sequence " << id);
 	}
 	
 	const string& fullSequence = mSequences.find(id)->second;
@@ -152,7 +152,7 @@ void Sequences::Get(const string& id, int strand, int& start, int& length, strin
 {
 	if (mSequences.find(id) == mSequences.end())
 	{
-		ReportFailure("Error: Unable to find sequence " + id);
+		ReportFailure("Error: Unable to find sequence " << id);
 	}
 	
 	const string& fullSequence = mSequences.find(id)->second;
@@ -177,7 +177,7 @@ void Sequences::Get(const string& id, int start, int end, vector<uint8_t>& seque
 {
 	if (mSequences.find(id) == mSequences.end())
 	{
-		ReportFailure("Error: Unable to find sequence " + id);
+		ReportFailure("Error: Unable to find sequence " << id);
 	}
 	
 	const string& fullSequence = mSequences.find(id)->second;
@@ -194,7 +194,7 @@ void Sequences::GetWithDefault(const string& id, int start, int end, uint8_t dva
 {
 	if (mSequences.find(id) == mSequences.end())
 	{
-		ReportFailure("Error: Unable to find sequence " + id);
+		ReportFailure("Error: Unable to find sequence " << id);
 	}
 	
 	const string& fullSequence = mSequences.find(id)->second;
