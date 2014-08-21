@@ -9,7 +9,7 @@
 #include <iostream>
 #include <stdlib.h>
 
-void DebugCheckFailure(const char* expr, const char* file, int line)
+void _ReportFailure(const char* expr, const char* file, int line)
 {
 	std::cerr << "Error: " << expr << " failed on line: " << line << " of " << file << std::endl;
 	print_stacktrace();
