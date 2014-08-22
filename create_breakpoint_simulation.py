@@ -96,12 +96,26 @@ def create_random_breakpoint(genome, num_inserted, adjacent_length, required_hom
 
 def simulate(cfg, sim_info, read_count, sequences_fasta, reads1, reads2, random_reads=True):
     temp_prefix = reads1 + '.dwgsim.temp.prefix'
-    random_reads_flag = ''
+    dwgsim_command = [cfg.dwgsim_bin]
+    dwgsim_command += ['-z', sim_info['dwgsim_seed']]
+    dwgsim_command += ['-d', sim_info['fragment_mean']]
+    dwgsim_command += ['-s', sim_info['fragment_stddev']]
+    dwgsim_command += ['-N', read_count]
+    dwgsim_command += ['-1', sim_info['read_length']]
+    dwgsim_command += ['-2', sim_info['read_length']]
+    dwgsim_command += ['-H']
     if not random_reads:
-        random_reads_flag = '-y 0'
-    dwgsim_command = cfg.dwgsim_bin + ' -H {7} -z {0} -d {1} -s {2} -N {3} -1 {4} -2 {4} {5} {6}'.format(sim_info['dwgsim_seed'], sim_info['fragment_mean'], sim_info['fragment_stddev'], read_count, sim_info['read_length'], sequences_fasta, temp_prefix, random_reads_flag)
-    print dwgsim_command
-    dwgsim_retcode = subprocess.call(dwgsim_command.split())
+        dwgsim_command += ['-y', '0']
+    if sim_info.get('perfect_reads', '') == 'yes':
+        dwgsim_command += ['-e', '0']
+        dwgsim_command += ['-E', '0']
+        dwgsim_command += ['-r', '0']
+        dwgsim_command += ['-R', '0']
+    dwgsim_command += [sequences_fasta]
+    dwgsim_command += [temp_prefix]
+    dwgsim_command = [str(a) for a in dwgsim_command]
+    print ' '.join(dwgsim_command)
+    dwgsim_retcode = subprocess.call(dwgsim_command)
     assert(dwgsim_retcode == 0)
     os.rename(temp_prefix + '.bwa.read1.fastq', reads1)
     os.rename(temp_prefix + '.bwa.read2.fastq', reads2)
