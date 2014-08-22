@@ -38,6 +38,8 @@ def create_score_stats(true_scores_filename, match_score, score_stats_filename, 
 
             expon_lda = 1.0 / np.average(true_scores['penalty'], weights=true_scores['freq'])
 
+            expon_lda = min(expon_lda, 1.0)
+
             score_stats.append((aligned_length, expon_lda))
 
             fig = plt.figure(figsize=(8,8))
