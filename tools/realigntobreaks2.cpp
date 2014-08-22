@@ -163,8 +163,6 @@ int main(int argc, char* argv[])
 		// complemented) for that breakend.  Also calculate an offset which will be used for calculating the 0-based
 		// positions of alignments in the breakpoint sequence.
 		string breakpointSequence[2];
-		int breakpointScale[2];
-		int breakpointOffset[2];
 		for (int clusterEnd = 0; clusterEnd <= 1; clusterEnd++)
 		{
 			string selfbreakendSequence = breakendSequence[clusterEnd];
@@ -173,13 +171,6 @@ int main(int argc, char* argv[])
 			if (breakpointRecord.strand[clusterEnd] == "-")
 			{
 				ReverseComplement(selfbreakendSequence);
-				breakpointScale[clusterEnd] = -1;
-				breakpointOffset[clusterEnd] = breakendEnd[clusterEnd];
-			}
-			else
-			{
-				breakpointScale[clusterEnd] = 1;
-				breakpointOffset[clusterEnd] = -breakendStart[clusterEnd];
 			}
 
 			if (breakpointRecord.strand[1-clusterEnd] == "+")
@@ -218,7 +209,7 @@ int main(int argc, char* argv[])
 			const SpanningAlignmentRecord& spanningRecord = alignIter->second;
 
 			// Calculate position of alignment in breakpoint sequence
-			int adjustedPosition = breakpointScale[memberRecord.clusterEnd] * spanningRecord.GetOuterPosition() + breakpointOffset[memberRecord.clusterEnd];
+			int adjustedPosition = maxFragmentLength - abs(spanningRecord.GetOuterPosition() - breakpointRecord.position[memberRecord.clusterEnd]) - 1;
 
 			int score = CalculateRealignedScore(aligner, preppedReads, memberRecord.readID, memberRecord.readEnd, breakpointSequence[memberRecord.clusterEnd], adjustedPosition);
 
