@@ -162,6 +162,7 @@ int main(int argc, char* argv[])
 	const int cMaxBreakpointHomology = 25;
 	const int cMinAnchor = 8;
 	const int cBreakEndAdjust = 5;
+	const int cInsertedPenalty = -1;
 	
 	cerr << "Reading alignment stats" << endl;
 	
@@ -272,23 +273,17 @@ int main(int argc, char* argv[])
 		}
 		
 		//
-		// Identify best full alignment scores
-		//
 		// Add partial alignment scores to posterior calculation including:
 		//  - self alignments
 		//  - reverse mate alignments, if they exist
 		// Calculate best full alignment scores
 		//
-		int bestSelfScoreFull[2] = {0, 0};
 		AlignmentPosterior alignPosteriorPartial(alignProbability, chimericPrior, alignedLength);
 		for (int alignmentIndex = 0; alignmentIndex < alignments.size(); alignmentIndex++)
 		{
 			const RawAlignment& alignment = alignments[alignmentIndex];
 			
 			int selfScorePart = selfAlignments[alignmentIndex].SeqScores()[alignedLength[alignment.readEnd]];
-			int selfScoreFull = selfAlignments[alignmentIndex].SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
-
-			bestSelfScoreFull[alignment.readEnd] = max(bestSelfScoreFull[alignment.readEnd], selfScoreFull);
 			
 			unordered_map<int,AlignInfo>::const_iterator mateAlignIter = mateRevAlignments.find(alignmentIndex);
 			if (mateAlignIter == mateRevAlignments.end())
@@ -316,13 +311,28 @@ int main(int argc, char* argv[])
 		}
 		
 		//
+		// Calculate the full alignment score of each alignment and threshold
+		// on the CDF of the likelihood of attaining this alignment.  Mark each
+		// alignment index as passing or not passing the CDF threshold.  Also 
+		// mark read ends as having an alignment that passes the CDF threshold.
+		//
 		// Create list of alignment indices for each end, filter
 		// based on partial alignment posterior
 		//
+		bool validSpanningReadEnd[2] = {false, false};
+		vector<bool> validSpanningAlignment(alignments.size(), false);
 		vector<int> alignmentIndices[2];
 		for (int alignmentIndex = 0; alignmentIndex < alignments.size(); alignmentIndex++)
 		{
 			const RawAlignment& alignment = alignments[alignmentIndex];
+
+			int selfScoreFull = selfAlignments[alignmentIndex].SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
+
+			if (alignProbability.AboveThreshold(preppedReads.ReadLength(alignment.readEnd), selfScoreFull))
+			{
+				validSpanningReadEnd[alignment.readEnd] = true;
+				validSpanningAlignment[alignmentIndex] = true;
+			}
 
 			double alignmentPosterior = alignPosteriorPartial.Posterior(alignmentIndex);
 
@@ -346,13 +356,19 @@ int main(int argc, char* argv[])
 		//
 		// Calculate split alignments for selected alignment pairs
 		//
-		// Update best full self score
-		// 
-		// Store split scores and length score arrays
+		// Calculate the best split length and score where best split length equals
+		// read length unless there are insertions at the breakpoint, in which case
+		// the insertion length is subtracked from the read length and the insertion
+		// penalty is subtracted from the score.  Check whether the length and score
+		// pass the CDF threshold.  Output the split read only it passes the 
+		// threshold.  Also store a boolean as True for split reads that pass the
+		// threshold to be used to determine if a spanning read should be output 
+		// regardless of the fully aligned score.  Store a boolean for each read end
+		// if a valid split alignment was found for that read end.
 		//
-		unordered_map<int,int> splitScores[2];
-		unordered_map<int,IntegerVec> splitSeq1Length[2];
-		unordered_map<int,IntegerVec> splitSeq2Length[2];
+		bool validSplitReadEnd[2] = {false, false};
+		vector<bool> validSplitAlignment(alignments.size(), false);
+		vector<SplitAlignmentRecord> splitRecords;
 		for (int readEnd = 0; readEnd <= 1; readEnd++)
 		{
 			int mateEnd = OtherReadEnd(readEnd);
@@ -363,54 +379,6 @@ int main(int argc, char* argv[])
 				const AlignInfo& selfAlignInfo = selfAlignments[selfAlignmentIndex];
 				const RawAlignment& selfAlignment = alignments[selfAlignmentIndex];
 				
-				for (vector<int>::const_iterator mateAlignmentIter = alignmentIndices[mateEnd].begin(); mateAlignmentIter != alignmentIndices[mateEnd].end(); mateAlignmentIter++)
-				{
-					int mateAlignmentIndex = *mateAlignmentIter;
-					unordered_map<int,AlignInfo>::const_iterator mateAlignInfoIter = mateFwdAlignments.find(mateAlignmentIndex);
-					
-					if (mateAlignInfoIter == mateFwdAlignments.end())
-					{
-						continue;
-					}
-					
-					const AlignInfo& mateAlignInfo = mateAlignInfoIter->second;
-					const RawAlignment& mateAlignment = alignments[mateAlignmentIndex];
-					
-					IntegerVec seq1Length;
-					IntegerVec seq2Length;
-					int score = BestSplitAlignment(selfAlignInfo.SeqScores(), selfAlignInfo.SeqScoresLength(), mateAlignInfo.SeqScores(), mateAlignInfo.SeqScoresLength(), -1, seq1Length, seq2Length);
-
-					splitScores[readEnd][selfAlignmentIndex] = score;
-					swap(seq1Length, splitSeq1Length[readEnd][selfAlignmentIndex]);
-					swap(seq2Length, splitSeq2Length[readEnd][selfAlignmentIndex]);
-
-					bestSelfScoreFull[selfAlignment.readEnd] = max(bestSelfScoreFull[selfAlignment.readEnd], score);
-				}
-			}
-		}
-
-		//
-		// Filter reads based on the cdf of the score likelihood
-		//
-		if (!alignProbability.AboveThreshold(preppedReads.ReadLength(0), bestSelfScoreFull[0]) ||
-			!alignProbability.AboveThreshold(preppedReads.ReadLength(1), bestSelfScoreFull[1]))
-		{
-			continue;
-		}
-		
-		// Calculate split alignments exceeding posterior threshold
-		for (int readEnd = 0; readEnd <= 1; readEnd++)
-		{
-			int mateEnd = OtherReadEnd(readEnd);
-			
-			for (vector<int>::const_iterator selfAlignmentIter = alignmentIndices[readEnd].begin(); selfAlignmentIter != alignmentIndices[readEnd].end(); selfAlignmentIter++)
-			{
-				int selfAlignmentIndex = *selfAlignmentIter;
-				const AlignInfo& selfAlignInfo = selfAlignments[selfAlignmentIndex];
-				const RawAlignment& selfAlignment = alignments[selfAlignmentIndex];
-				
-				DebugCheck(selfAlignment.readEnd == readEnd);
-
 				for (vector<int>::const_iterator mateAlignmentIter = alignmentIndices[mateEnd].begin(); mateAlignmentIter != alignmentIndices[mateEnd].end(); mateAlignmentIter++)
 				{
 					int mateAlignmentIndex = *mateAlignmentIter;
@@ -426,15 +394,27 @@ int main(int argc, char* argv[])
 					
 					DebugCheck(mateAlignment.readEnd == mateEnd);
 
-					int score = splitScores[readEnd][selfAlignmentIndex];
-					const IntegerVec& seq1Length = splitSeq1Length[readEnd][selfAlignmentIndex];
-					const IntegerVec& seq2Length = splitSeq2Length[readEnd][selfAlignmentIndex];
+					IntegerVec seq1Length;
+					IntegerVec seq2Length;
+					int score = BestSplitAlignment(selfAlignInfo.SeqScores(), selfAlignInfo.SeqScoresLength(),
+												   mateAlignInfo.SeqScores(), mateAlignInfo.SeqScoresLength(),
+												   cInsertedPenalty, seq1Length, seq2Length);
 
 					string readSeq = preppedReads.Sequence(readEnd);
 					
 					for (int i = 0; i < seq1Length.size(); i++)
 					{
 						if (seq1Length[i] < cMinAnchor || seq2Length[i] < cMinAnchor)
+						{
+							continue;
+						}
+
+						string inserted = readSeq.substr(seq1Length[i], readSeq.size() - seq2Length[i] - seq1Length[i]);
+
+						int alignedLength = readSeq.size() - inserted.size();
+						int alignedScore = score - cInsertedPenalty * (int)inserted.size();
+
+						if (!alignProbability.AboveThreshold(alignedLength, alignedScore))
 						{
 							continue;
 						}
@@ -454,13 +434,33 @@ int main(int argc, char* argv[])
 						record.inserted = readSeq.substr(seq1Length[i], readSeq.size() - seq2Length[i] - seq1Length[i]);
 						record.score = score;
 
-						splitFile << record;
+						splitRecords.push_back(record);
+
+						validSplitReadEnd[readEnd] = true;
+						validSplitAlignment[selfAlignmentIndex] = true;
 					}
 				}
 			}
 		}
 
+		//
+		// Filter reads based on the cdf of the score likelihood
+		//
+		if ((!validSpanningReadEnd[0] && !validSplitReadEnd[0]) || (!validSpanningReadEnd[1] && !validSplitReadEnd[1]))
+		{
+			continue;
+		}
+
+		//
+		// Output split alignment records after cdf test
+		//
+		for (vector<SplitAlignmentRecord>::const_iterator recordIter = splitRecords.begin(); recordIter != splitRecords.end(); recordIter++)
+		{
+			splitFile << *recordIter;
+		}
+
 		// Output spanning alignments exceeding posterior threshold
+		// Reads must also have a valid spanning or split read
 		for (int readEnd = 0; readEnd <= 1; readEnd++)
 		{
 			for (vector<int>::const_iterator alignmentIter = alignmentIndices[readEnd].begin(); alignmentIter != alignmentIndices[readEnd].end(); alignmentIter++)
@@ -472,6 +472,11 @@ int main(int argc, char* argv[])
 				AlignInfo alignInfo = selfAlignments[alignmentIndex];
 				
 				int score = alignInfo.SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
+
+				if (!validSpanningAlignment[alignmentIndex] && !validSplitAlignment[alignmentIndex])
+				{
+					continue;
+				} 
 				
 				SpanningAlignmentRecord record;
 				record.libID = libID;
