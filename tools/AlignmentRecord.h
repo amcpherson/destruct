@@ -110,6 +110,8 @@ struct BreakAlignScoreRecord
 	int readID;
 	int readEnd;
 	int alignID;
+	int alignedLength;
+	int templateLength;
 	int score;
 };
 

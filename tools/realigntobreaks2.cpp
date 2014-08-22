@@ -14,20 +14,6 @@ using namespace boost;
 using namespace std;
 
 
-int CalculateRealignedScore(SimpleAligner& aligner, PreppedReads& reads, int readID, int readEnd, const string& breakpointSequence, int position)
-{
-	reads.SetCurrentRead(readID);
-
-	const char* refPtr = &breakpointSequence[position];
-
-	if (position < 16 || position > breakpointSequence.size() / 2)
-	{
-		return 0;
-	}
-	
-	return aligner.AlignBandedSSE2BW7ScoreFwd(refPtr, reads.StartPtr(readEnd, PlusStrand), reads.EndPtr(readEnd, PlusStrand));
-}
-
 int main(int argc, char* argv[])
 {
 	int matchScore;
@@ -208,10 +194,24 @@ int main(int argc, char* argv[])
 
 			const SpanningAlignmentRecord& spanningRecord = alignIter->second;
 
-			// Calculate position of alignment in breakpoint sequence
-			int adjustedPosition = maxFragmentLength - abs(spanningRecord.GetOuterPosition() - breakpointRecord.position[memberRecord.clusterEnd]) - 1;
+			// Calculate the length between the breakend and the start of the read
+			int templateLength = abs(spanningRecord.GetOuterPosition() - breakpointRecord.position[memberRecord.clusterEnd]) + 1;
 
-			int score = CalculateRealignedScore(aligner, preppedReads, memberRecord.readID, memberRecord.readEnd, breakpointSequence[memberRecord.clusterEnd], adjustedPosition);
+			// Calculate position of alignment in breakpoint sequence
+			int adjustedPosition = maxFragmentLength - templateLength;
+
+			// Set current read in prepped read set
+			preppedReads.SetCurrentRead(memberRecord.readID);
+
+			int score = 0;
+			if (adjustedPosition >= 16 && adjustedPosition <= breakpointSequence[memberRecord.clusterEnd].size() / 2)
+			{
+				// Pointer to first position to which the read should align
+				const char* refPtr = &breakpointSequence[memberRecord.clusterEnd][adjustedPosition];
+
+				// Align to forward strand of breakpoint sequence
+				score = aligner.AlignBandedSSE2BW7ScoreFwd(refPtr, preppedReads.StartPtr(memberRecord.readEnd, PlusStrand), preppedReads.EndPtr(memberRecord.readEnd, PlusStrand));
+			}
 
 			BreakAlignScoreRecord scoreRecord;
 
@@ -221,6 +221,8 @@ int main(int argc, char* argv[])
 			scoreRecord.readID = memberRecord.readID;
 			scoreRecord.readEnd = memberRecord.readEnd;
 			scoreRecord.alignID = memberRecord.alignID;
+			scoreRecord.alignedLength = preppedReads.ReadLength(memberRecord.readEnd);
+			scoreRecord.templateLength = templateLength;
 			scoreRecord.score = score;
 
 			realignmentsFile << scoreRecord;

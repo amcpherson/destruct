@@ -193,6 +193,8 @@ std::ostream & operator<<(std::ostream &os, const BreakAlignScoreRecord& record)
 	os << record.readID << "\t";
 	os << record.readEnd << "\t";
 	os << record.alignID << "\t";
+	os << record.alignedLength << "\t";
+	os << record.templateLength << "\t";
 	os << record.score << std::endl;
 	return os;
 }
@@ -205,6 +207,8 @@ std::istream & operator>>(std::istream &is, BreakAlignScoreRecord& record)
 	is >> record.readID;
 	is >> record.readEnd;
 	is >> record.alignID;
+	is >> record.alignedLength;
+	is >> record.templateLength;
 	is >> record.score;
 	return is;
 }
