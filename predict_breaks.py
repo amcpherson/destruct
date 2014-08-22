@@ -32,7 +32,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
 
     spanning.set_index(span_index_cols, inplace=True)
 
-    # Read only spanning reads relevant clusters
+    # Read only split reads relevant clusters
     fields = ['lib_id', 'read_id', 'read_end',
               'align_id_1', 'chromosome_1', 'strand_1', 'position_1',
               'align_id_2', 'chromosome_2', 'strand_2', 'position_2',
@@ -111,7 +111,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
         cluster_split['inserted'] = cluster_split.apply(revcomp_inserted, axis=1)
         
         cluster_split['inslen'] = cluster_split['inserted'].apply(len)
-                                             
+        
         cluster_split.set_index(['position_1', 'position_2', 'inslen'], inplace=True)
         cluster_split = cluster_split.sort_index()
         
