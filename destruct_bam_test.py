@@ -136,20 +136,7 @@ else:
 
         config = ConfigParser.ConfigParser()
         config.read(config_filename)
-        section = 'main'
-
-        sim_info = dict()
-        sim_info['read_length'] = config.get(section, 'read_length')
-        sim_info['fragment_mean'] = config.get(section, 'fragment_mean')
-        sim_info['fragment_stddev'] = config.get(section, 'fragment_stddev')
-        sim_info['coverage_fraction'] = config.get(section, 'coverage_fraction')
-        sim_info['num_inserted'] = config.get(section, 'num_inserted')
-        sim_info['homology'] = config.get(section, 'homology')
-        sim_info['adjacent_length'] = config.get(section, 'adjacent_length')
-        sim_info['breakpoints_seed'] = config.get(section, 'breakpoints_seed')
-        sim_info['dwgsim_seed'] = config.get(section, 'dwgsim_seed')
-        sim_info['num_breakpoints'] = config.get(section, 'num_breakpoints')
-        sim_info['num_concordant'] = config.get(section, 'num_concordant')
+        sim_info = dict(config.items('main'))
 
         return sim_info
 
