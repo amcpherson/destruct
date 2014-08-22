@@ -200,7 +200,7 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     data = realignments.merge(breakpoints[['cluster_id', 'prediction_id', 'inslen']],
                               on=['cluster_id', 'prediction_id'])
 
-    data = data.drop_duplicates(['cluster_id', 'prediction_id', 'read_id', 'read_end'])
+    data = data.drop_duplicates(['cluster_id', 'prediction_id', 'library_id', 'read_id', 'read_end'])
 
     data = data.merge(score_stats, on='aligned_length')
 
@@ -212,7 +212,7 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     agg_f = {'score_log_likelihood':sum,
              'template_length':sum,
              'inslen':max}
-    data = data.groupby(['cluster_id', 'prediction_id', 'read_id']).agg(agg_f)
+    data = data.groupby(['cluster_id', 'prediction_id', 'library_id', 'read_id']).agg(agg_f)
     data['template_length'] += data['inslen']
 
     constant = 1. / ((2 * np.pi)**0.5 * fragment_stddev)
