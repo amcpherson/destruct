@@ -11,6 +11,15 @@ breakpoint_fields = ['cluster_id', 'prediction_id',
                      'chromosome_2', 'strand_2', 'position_2',
                      'inserted']
 
+
+realignment_fields = ['cluster_id', 'prediction_id',
+                      'library_id', 'read_id', 'read_end', 'align_id',
+                      'aligned_length', 'template_length', 'score']
+
+
+score_stats_fields = ['aligned_length', 'expon_lda']
+
+
 def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpoints_filename):
 
     # Read all clusters
@@ -167,5 +176,54 @@ def calculate_cluster_weights(breakpoints_filename, weights_filename):
 
     breakpoints = breakpoints.sort('cluster_id')
     breakpoints[['cluster_id', 'weight']].to_csv(weights_filename, sep='\t', index=False, header=False)
+
+
+def calculate_realignment_likelihoods(breakpoints_filename, realignments_filename, score_stats_filename,
+                                      likelihoods_filename, match_score, fragment_mean, fragment_stddev):
+
+    match_score = float(match_score)
+    fragment_mean = float(fragment_mean)
+    fragment_stddev = float(fragment_stddev)
+
+    score_stats = pd.read_csv(score_stats_filename, sep='\t', names=score_stats_fields)
+
+    realignments = pd.read_csv(realignments_filename, sep='\t', names=realignment_fields)
+
+    breakpoints = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
+                              converters={'chromosome_1':str, 'chromosome_2':str},
+                              na_values=['.'])
+
+    breakpoints['inserted'] = breakpoints['inserted'].fillna('')
+
+    breakpoints['inslen'] = breakpoints['inserted'].apply(len)
+
+    data = realignments.merge(breakpoints[['cluster_id', 'prediction_id', 'inslen']],
+                              on=['cluster_id', 'prediction_id'])
+
+    data = data.drop_duplicates(['cluster_id', 'prediction_id', 'read_id', 'read_end'])
+
+    data = data.merge(score_stats, on='aligned_length')
+
+    data['max_score'] = match_score * data['aligned_length']
+    data['score_diff'] = data['max_score'] - data['score']
+    data['score_log_likelihood'] = np.log(data['expon_lda']) - \
+                                           data['expon_lda'] * data['score_diff']
+
+    agg_f = {'score_log_likelihood':sum,
+             'template_length':sum,
+             'inslen':max}
+    data = data.groupby(['cluster_id', 'prediction_id', 'read_id']).agg(agg_f)
+    data['template_length'] += data['inslen']
+
+    constant = 1. / ((2 * np.pi)**0.5 * fragment_stddev)
+    data['length_log_likelihood'] = -np.log(constant) - \
+                                            np.square(data['template_length'] - fragment_mean) / (2. * fragment_stddev**2)
+
+    data['log_likelihood'] = data['score_log_likelihood'] + data['length_log_likelihood']
+
+    data = data['log_likelihood'].reset_index()
+
+    data.to_csv(likelihoods_filename, sep='\t', index=False)
+
 
 

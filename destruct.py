@@ -76,20 +76,31 @@ else:
 
         sch.commandline('cluster', ('bychromarg',), medmem, cfg.mclustermatepairs_tool, '-a', sch.ifile('spanning.alignments'), '-s', sch.ifile('libstats.tsv'), '-c', sch.ofile('clusters.raw', ('bychromarg',)), sch.iobj('chrom.args', ('bychromarg',)), '--clustmin', '1', '--fragmax', cfg.fragment_length_max)
 
-        sch.transform('predbreaks', ('bychromarg',), medmem, predict_breaks.predict_breaks, None, sch.ifile('clusters.raw', ('bychromarg',)), sch.ifile('spanning.alignments'), sch.ifile('split.alignments'), sch.ofile('breakpoints.raw', ('bychromarg',)))
+        sch.transform('predict_breaks', ('bychromarg',), medmem, predict_breaks.predict_breaks, None, sch.ifile('clusters.raw', ('bychromarg',)), sch.ifile('spanning.alignments'), sch.ifile('split.alignments'), sch.ofile('breakpoints.raw', ('bychromarg',)))
 
         sch.transform('merge_clusters', (), lowmem, merge_clusters, None, sch.ifile('clusters.raw', ('bychromarg',)), sch.ifile('breakpoints.raw', ('bychromarg',)), sch.ofile('clusters.raw'), sch.ofile('breakpoints.raw'), sch.ofile('merge_clusters.debug'))
+
+        sch.commandline('realigntobreaks', ('bylibrary', 'byread'), lowmem, cfg.realigntobreaks2_tool, '-r', cfg.genome_fasta, '-b', sch.ifile('breakpoints.raw'), '-c', sch.ifile('clusters.raw'), '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'), '--span', sch.ifile('spanning.alignments', ('bylibrary', 'byread')), '--seqs', sch.ifile('reads', ('bylibrary', 'byread')), '--realignments', sch.ofile('realignments', ('bylibrary', 'byread')))
+
+        sch.transform('calculate_alignment_likelihoods', ('bylibrary', 'byread'), lowmem,
+            predict_breaks.calculate_realignment_likelihoods,
+            None,
+            sch.ifile('breakpoints.raw'),
+            sch.ifile('realignments', ('bylibrary', 'byread')),
+            sch.ifile('score.stats', ('bylibrary',)),
+            sch.ofile('alignment_likelihoods', ('bylibrary', 'byread')),
+            cfg.match_score,
+            sch.iobj('stats', ('bylibrary',)).prop('fragment_length_mean'),
+            sch.iobj('stats', ('bylibrary',)).prop('fragment_length_stddev'))
 
         sch.transform('calc_weights', (), lowmem, predict_breaks.calculate_cluster_weights, None, sch.ifile('breakpoints.raw'), sch.ofile('clusters.weights'))
 
         sch.commandline('setcover', (), himem, cfg.setcover_tool, '-c', sch.ifile('clusters.raw'), '-w', sch.ifile('clusters.weights'), '-a', sch.ofile('clusters.setcover'))
 
-        sch.commandline('realigntobreaks', ('bylibrary', 'byread'), lowmem, cfg.realigntobreaks2_tool, '-r', cfg.genome_fasta, '-b', sch.ifile('breakpoints.raw'), '-c', sch.ifile('clusters.raw'), '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'), '--span', sch.ifile('spanning.alignments', ('bylibrary', 'byread')), '--seqs', sch.ifile('reads', ('bylibrary', 'byread')), '--realignments', sch.ofile('realignments', ('bylibrary', 'byread')))
-
         sch.transform('merge_realignments1', ('bylibrary',), lowmem, merge_files_by_line, None, sch.ifile('realignments', ('bylibrary','byread')), sch.ofile('realignments', ('bylibrary',)))
         sch.transform('merge_realignments2', (), lowmem, merge_files_by_line, None, sch.ifile('realignments', ('bylibrary',)), sch.ofile('realignments'))
 
-        sch.transform('filter', (), medmem, filter_clusters, None, sch.ofile('clusters.filtered'), sch.ifile('clusters.setcover'), float(cfg.cluster_align_threshold), float(cfg.cluster_chimeric_threshold), float(cfg.cluster_valid_threshold), int(cfg.cluster_coverage_threshold), int(cfg.cluster_readcount_threshold))
+        sch.transform('filter', (), medmem, filter_clusters, None, sch.ofile('clusters.filtered'), sch.ifile('realignments'), float(cfg.cluster_align_threshold), float(cfg.cluster_chimeric_threshold), float(cfg.cluster_valid_threshold), int(cfg.cluster_coverage_threshold), int(cfg.cluster_readcount_threshold))
 
         sch.commandline('getclusterids', (), lowmem, 'cut', '-f1', sch.ifile('clusters.filtered'), '|', 'uniq', '>', sch.ofile('clusters.filtered.ids'))
         sch.transform('splitclusterids', (), lowmem, split_file_byline, None, sch.ifile('clusters.filtered.ids'), int(cfg.clusters_per_split), sch.ofile('clusters.filtered.ids', ('bycluster',)))
