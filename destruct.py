@@ -117,8 +117,21 @@ else:
         sch.commandline('cycles', ('bycluster',), himem, cfg.cycles_tool, '-b', sch.ifile('breakpoints'), '--idsfile', sch.ifile('clusters.ids', ('bycluster',)), '-s', cfg.cycles_scoremax, '-v', cfg.cycles_visitmax, '-y', cfg.cycles_lambda, '>', sch.ofile('cycles', ('bycluster',)))
         sch.transform('mergecycles', (), lowmem, merge_files_by_line, None, sch.ifile('cycles', ('bycluster',)), sch.ofile('cycles'))
 
-        sch.transform('tabreads', (), medmem, tabulate_reads, None, sch.ifile('clusters'), sch.ifile('reads1', ('bylibrary',)), sch.ifile('reads2', ('bylibrary',)), sch.ofile('breakreads.table.unsorted'))
-        sch.commandline('sortreads', (), medmem, 'sort', '-n', sch.ifile('breakreads.table.unsorted'), '>', breakreads)
+        sch.transform('tabreads', (), medmem,
+            tabulate_reads,
+            None,
+            sch.ifile('clusters'),
+            sch.iobj('libinfo', ('bylibrary',)),
+            sch.ifile('reads1', ('bylibrary',)),
+            sch.ifile('reads2', ('bylibrary',)),
+            sch.ofile('breakreads.table.unsorted'))
+
+        sch.commandline('sortreads', (), medmem,
+            'sort',
+            '-n',
+            sch.ifile('breakreads.table.unsorted'),
+            '>',
+            breakreads)
 
         sch.transform('tabulate', (), himem, multilib_tabulate, None, breakpoints, sch.ifile('clusters'), sch.ifile('clusters'), sch.ifile('clusters'), sch.ifile('breakpoints'), cfg.genome_fasta, cfg.gtf_filename, cfg.dgv_filename, sch.ifile('cycles'), sch.iobj('stats', ('bylibrary',)))
         
@@ -405,22 +418,14 @@ else:
             raise Exception('mpredictbreaks process %s produced exit code %s' % (' '.join(mpredictbreaks_arguments), mpredictbreaks_process.returncode))
 
 
-    def read_cluster_fragments(input_file):
-        for row in csv.reader(input_file, delimiter='\t'):
-            cluster_id = int(row[0])
-            fragment_id = int(row[2])
-            lib_id = row[11]
-            yield cluster_id, fragment_id, lib_id
-
-
-    def tabulate_reads(clusters_filename, reads1_filenames, reads2_filenames, reads_table_filename):
-        cluster_fragments = collections.defaultdict(set)
-        with open(clusters_filename, 'r') as clusters_file:
-            for cluster_id, fragment_id, lib_id in read_cluster_fragments(clusters_file):
-                cluster_fragments[(fragment_id, lib_id)].add(cluster_id)
+    def tabulate_reads(clusters_filename, lib_infos, reads1_filenames, reads2_filenames, reads_table_filename):
+        fields = ['cluster_id', 'cluster_end', 'lib_id', 'read_id', 'read_end', 'align_id']
+        clusters = pd.read_csv(clusters_filename, sep='\t', names=fields, usecols=['cluster_id', 'lib_id', 'read_id'])
+        clusters = clusters.drop_duplicates().set_index(['lib_id', 'read_id']).sort_index()['cluster_id']
         with open(reads_table_filename, 'w') as reads_table_file:
-            for lib_id in set(reads1_filenames.keys()).union(set(reads2_filenames.keys())):
-                for reads_filename in [reads1_filenames[lib_id], reads2_filenames[lib_id]]:
+            for lib_name in set(reads1_filenames.keys()).union(set(reads2_filenames.keys())):
+                lib_id = lib_infos[lib_name].id
+                for reads_filename in [reads1_filenames[lib_name], reads2_filenames[lib_name]]:
                     with open(reads_filename, 'r') as reads_file:
                         for name, seq, comment, qual in itertools.izip_longest(*[(a.rstrip() for a in reads_file)]*4):
                             assert name[0] == '@'
@@ -428,8 +433,12 @@ else:
                             assert name[-2] == '/'
                             fragment_id = int(name[1:-2])
                             read_end = name[-1]
-                            for cluster_id in cluster_fragments.get((fragment_id, lib_id), set([])):
-                                reads_table_file.write('\t'.join([str(cluster_id), lib_id, str(fragment_id), read_end, seq, qual, comment]) + '\n')
+                            try:
+                                cluster_ids = clusters.loc[(lib_id, fragment_id):(lib_id, fragment_id)]
+                            except KeyError:
+                                continue
+                            for cluster_id in cluster_ids:
+                                reads_table_file.write('\t'.join([str(cluster_id), str(lib_id), str(fragment_id), read_end, seq, qual, comment]) + '\n')
 
 
     GenomicRegion = collections.namedtuple('GenomicRegion', ['chromosome', 'strand', 'start', 'end'])
