@@ -4,9 +4,9 @@
 
 #include "Common.h"
 #include "DebugCheck.h"
+#include "AlignmentRecord.h"
 #include "ShortestPath.h"
 #include "BreakpointGraph.h"
-#include "Parsers.h"
 #include "Indexer.h"
 
 #include <iostream>
@@ -62,7 +62,7 @@ bool FindPath(BreakpointGraph* breakpointGraph, int clusterID, double clusterSco
 	}
 }
 
-bool PrintCycle(const vector<pair<unsigned int,int> >& cycle, double cycleScore, int numVisited)
+void PrintCycle(const vector<pair<unsigned int,int> >& cycle, double cycleScore, int numVisited)
 {
 	cerr << "Found cycle in " << numVisited << endl;
 	
@@ -78,7 +78,7 @@ bool PrintCycle(const vector<pair<unsigned int,int> >& cycle, double cycleScore,
 
 int main(int argc, char* argv[])
 {
-	string clustersFilename;
+	string breakpointsFilename;
 	string probsFilename;
 	int startClusterID;
 	string startClusterIDsFilename;
@@ -90,8 +90,8 @@ int main(int argc, char* argv[])
 	try
 	{
 		TCLAP::CmdLine cmd("Search for cycles in the breakpoint graph");
-		TCLAP::ValueArg<string> clustersFilenameArg("c","clusters","Clusters Filename",true,"","string",cmd);
-		TCLAP::ValueArg<string> probsFilenameArg("p","probs","Cluster Probabilities Filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> breakpointsFilenameArg("b","breakpoints","Breakpoints Filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> probsFilenameArg("p","probs","Cluster Probabilities Filename",false,"","string",cmd);
 		TCLAP::ValueArg<int> startClusterIDArg("i","id","Starting Cluster ID",false,-1,"integer");
 		TCLAP::ValueArg<string> startClusterIDsFilenameArg("","idsfile","Starting Cluster IDs Filename",false,"","string");
 		TCLAP::ValueArg<double> startProbThresholdArg("t","threshold","Starting Cluster Probability Threshold",false,0.0,"float");
@@ -107,7 +107,7 @@ int main(int argc, char* argv[])
 		
 		cmd.parse(argc,argv);
 		
-		clustersFilename = clustersFilenameArg.getValue();
+		breakpointsFilename = breakpointsFilenameArg.getValue();
 		probsFilename = probsFilenameArg.getValue();
 		startClusterID = startClusterIDArg.getValue();
 		startClusterIDsFilename = startClusterIDsFilenameArg.getValue();
@@ -121,18 +121,7 @@ int main(int argc, char* argv[])
 		cerr << "error: " << e.error() << " for arg " << e.argId() << endl;
 		exit(1);
 	}
-	
-	cerr << "Reading clusters" << endl;
-	
-	CompactLocationVecMap dnaClusters;
-	NameIndex references;
-	ReadClusters(clustersFilename, dnaClusters, references);
-	
-	cerr << "Reading cluster probabilities" << endl;
-	
-	DoubleMap dnaClusterProb;
-	ReadClusterProbabilities(probsFilename, dnaClusterProb);
-	
+
 	unordered_set<int> startClustersIDs;
 	if (startClusterID != -1)
 	{
@@ -165,37 +154,48 @@ int main(int argc, char* argv[])
 		
 		startClusterIDsFile.close();
 	}
-	else if (startProbThreshold != 0.0)
-	{
-		for (DoubleMapConstIter dnaClusterIter = dnaClusterProb.begin(); dnaClusterIter != dnaClusterProb.end(); dnaClusterIter++)
-		{
-			if (dnaClusterIter->second >= startProbThreshold)
-			{
-				startClustersIDs.insert(dnaClusterIter->first);
-			}
-		}
-	}
 	
 	cerr << "Creating breakpoint graph" << endl;
 	
+	ifstream breakpointsFile(breakpointsFilename.c_str());
+	CheckFile(breakpointsFile, breakpointsFilename);
+
+	NameIndex chromosomeIndex;
+
 	BreakpointGraph breakpointGraph(distanceLambda, distanceLambda);
-	for (CompactLocationVecMapConstIter dnaClusterIter = dnaClusters.begin(); dnaClusterIter != dnaClusters.end(); dnaClusterIter++)
+
+	int numBreakpoints = 0;
+
+	BreakpointRecord breakpointRecord;
+	while (breakpointsFile >> breakpointRecord)
 	{
-		DebugCheck(dnaClusterIter->second.size() == 2);
+		// REVISIT
+		// This is currently a cludge.  The cycle detection should not care about
+		// the breakpoint predictions, only the approximate breakpoint for each
+		// cluster.
+		if (breakpointRecord.predictionID != 0)
+		{
+			continue;
+		}
+
+		unsigned int refID1 = chromosomeIndex.Index(breakpointRecord.chromosome[0]);
+		unsigned int refID2 = chromosomeIndex.Index(breakpointRecord.chromosome[1]);
+
+		int strand1 = (breakpointRecord.strand[0] == "+") ? PlusStrand : MinusStrand;
+		int strand2 = (breakpointRecord.strand[1] == "+") ? PlusStrand : MinusStrand;
+
+		unsigned int position1 = breakpointRecord.position[0];
+		unsigned int position2 = breakpointRecord.position[1];
 		
-		unsigned int refID1 = dnaClusterIter->second[0].refStrand.referenceIndex;
-		int strand1 = dnaClusterIter->second[0].refStrand.strand;
-		unsigned int position1 = (strand1 == PlusStrand) ? dnaClusterIter->second[0].region.end : dnaClusterIter->second[0].region.start;
-		
-		unsigned int refID2 = dnaClusterIter->second[1].refStrand.referenceIndex;
-		int strand2 = dnaClusterIter->second[1].refStrand.strand;
-		unsigned int position2 = (strand2 == PlusStrand) ? dnaClusterIter->second[1].region.end : dnaClusterIter->second[1].region.start;
-		
-		breakpointGraph.AddBreakpoint(dnaClusterIter->first, refID1, strand1, position1, refID2, strand2, position2, -log(dnaClusterProb[dnaClusterIter->first]));
+		// REVISIT
+		// We are now not using cluster probabilities.  Not sure if this matters.
+		breakpointGraph.AddBreakpoint(breakpointRecord.clusterID, refID1, strand1, position1, refID2, strand2, position2, 0.0);
+
+		numBreakpoints++;
 	}
 	breakpointGraph.ConstructGraph();
 	
-	cerr << "Starting search on " << startClustersIDs.size() << " clusters" << endl;
+	cerr << "Starting search on " << numBreakpoints << " clusters" << endl;
 	
 	for (unordered_set<int>::const_iterator clusterIDIter = startClustersIDs.begin(); clusterIDIter != startClustersIDs.end(); clusterIDIter++)
 	{
@@ -207,7 +207,9 @@ int main(int argc, char* argv[])
 		double cycleScore;
 		int numVisited;
 		
-		if (!FindPath(&breakpointGraph, clusterID, -log(dnaClusterProb[clusterID]), visitMax, scoreMax, blockedEmpty, cycle, cycleScore, numVisited))
+		// REVISIT
+		// Cluster score again assumed to be 0.0
+		if (!FindPath(&breakpointGraph, clusterID, 0.0, visitMax, scoreMax, blockedEmpty, cycle, cycleScore, numVisited))
 		{
 			cerr << "No Cycle" << endl;
 			continue;

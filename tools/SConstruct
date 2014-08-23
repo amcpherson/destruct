@@ -295,7 +295,7 @@ env.Program(target='rankclusters', source=common_sources+sources)
 
 sources = """
     ShortestPath.cpp
-    Parsers.cpp
+    AlignmentRecord.cpp
     cycles.cpp
 """.split()
 env.Program(target='cycles', source=common_sources+sources)
