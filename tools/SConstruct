@@ -63,25 +63,6 @@ sources = """
 env.Program(target='mclustermatepairs', source=common_sources+sources)
 
 sources = """
-    AlignmentRecord.cpp
-    Parsers.cpp
-    Sequences.cpp
-    mpredictbreaks.cpp
-""".split()
-env.Program(target='mpredictbreaks', source=common_sources+sources)
-
-sources = """
-    AlignmentStream.cpp
-    MatePairGibbs.cpp
-    Parsers.cpp
-    asa136.cpp
-    asa241.cpp
-    clustermatepairs.cpp
-    ../external/Triangle/triangle.c
-""".split()
-env.Program(target='clustermatepairs', source=common_sources+sources)
-
-sources = """
     AlignmentStream.cpp
     Parsers.cpp
     Sequences.cpp
@@ -100,13 +81,6 @@ sources = """
     setcover.cpp
 """.split()
 env.Program(target='setcover', source=common_sources+sources)
-
-sources = """
-    Algorithms.cpp
-    Parsers.cpp
-    setcover_dnarna.cpp
-""".split()
-env.Program(target='setcover_dnarna', source=common_sources+sources)
 
 sources = """
     AlignmentStream.cpp
