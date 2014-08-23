@@ -167,6 +167,7 @@ std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record)
 		os << record.strand[clusterEnd] << "\t";
 		os << record.position[clusterEnd] << "\t";
 	}
+	os << record.count << "\t";
 	os << record.inserted << std::endl;
 	return os;
 }
@@ -181,6 +182,7 @@ std::istream & operator>>(std::istream &is, BreakpointRecord& record)
 		is >> record.strand[clusterEnd];
 		is >> record.position[clusterEnd];
 	}
+	is >> record.count;
 	is >> record.inserted;
 	return is;
 }

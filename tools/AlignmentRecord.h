@@ -95,6 +95,7 @@ struct BreakpointRecord
 	string chromosome[2];
 	string strand[2];
 	int position[2];
+	int count;
 	string inserted;
 };
 

@@ -11,7 +11,7 @@ import utils.misc
 breakpoint_fields = ['cluster_id', 'prediction_id',
                      'chromosome_1', 'strand_1', 'position_1',
                      'chromosome_2', 'strand_2', 'position_2',
-                     'inserted']
+                     'count', 'inserted']
 
 
 realignment_fields = ['cluster_id', 'prediction_id',
@@ -89,6 +89,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
         pred = pred.set_index(['cluster_id', 'prediction_id', 'cluster_end']).unstack()
         pred.columns = [a+'_'+str(b+1) for a, b in pred.columns.values]
         pred.reset_index(inplace=True)
+        pred['count'] = 0
         pred['inserted'] = ''
         
         # Add spanning read prediction
@@ -136,19 +137,20 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
         split_score_sums.sort(ascending=False)
         
         # Select split alignments for highest scoring split
-        pred = cluster_split.loc[split_score_sums.index[0]:split_score_sums.index[0]].reset_index()
+        highscoring = cluster_split.loc[split_score_sums.index[0]:split_score_sums.index[0]].reset_index()
         
         # Consensus for inserted sequence
-        inserted = np.array([np.array(list(a)) for a in pred['inserted'].values])
+        inserted = np.array([np.array(list(a)) for a in highscoring['inserted'].values])
         consensus = list()
         for nt_list in inserted.T:
             consensus.append(collections.Counter(nt_list).most_common(1)[0][0])
         consensus = ''.join(consensus)
 
         # Reformat table
-        pred = pred.iloc[0:1].copy()
+        pred = highscoring.iloc[0:1].copy()
         pred['cluster_id'] = cluster_id
         pred['prediction_id'] = prediction_id
+        pred['count'] = len(highscoring.index)
         pred['inserted'] = consensus
         pred = pred[breakpoint_fields]
         
