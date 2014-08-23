@@ -2,6 +2,8 @@
 import collections
 import pandas as pd
 import numpy as np
+import scipy
+import scipy.stats
 
 import utils.misc
 
@@ -18,6 +20,11 @@ realignment_fields = ['cluster_id', 'prediction_id',
 
 
 score_stats_fields = ['aligned_length', 'expon_lda']
+
+
+likelihoods_fields = ['cluster_id', 'prediction_id',
+                      'library_id', 'read_id',
+                      'log_likelihood', 'log_cdf']
 
 
 def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpoints_filename):
@@ -207,23 +214,28 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     data['max_score'] = match_score * data['aligned_length']
     data['score_diff'] = data['max_score'] - data['score']
     data['score_log_likelihood'] = np.log(data['expon_lda']) - \
-                                           data['expon_lda'] * data['score_diff']
+                                          data['expon_lda'] * data['score_diff']
+    data['score_log_cdf'] = -data['expon_lda'] * data['score_diff']
 
     agg_f = {'score_log_likelihood':sum,
+             'score_log_cdf':sum,
              'template_length':sum,
              'inslen':max}
     data = data.groupby(['cluster_id', 'prediction_id', 'library_id', 'read_id']).agg(agg_f)
     data['template_length'] += data['inslen']
 
     constant = 1. / ((2 * np.pi)**0.5 * fragment_stddev)
-    data['length_log_likelihood'] = -np.log(constant) - \
-                                            np.square(data['template_length'] - fragment_mean) / (2. * fragment_stddev**2)
+    data['length_z_score'] = (data['template_length'] - fragment_mean) / fragment_stddev
+    data['length_log_likelihood'] = -np.log(constant) - np.square(data['length_z_score']) / 2.
+    data['length_log_cdf'] = np.log(2. * scipy.stats.norm.sf(data['length_z_score'].abs()))
 
     data['log_likelihood'] = data['score_log_likelihood'] + data['length_log_likelihood']
+    data['log_cdf'] = data['score_log_cdf'] + data['length_log_cdf']
 
-    data = data['log_likelihood'].reset_index()
+    data = data[['log_likelihood', 'log_cdf']].reset_index()
 
-    data.to_csv(likelihoods_filename, sep='\t', index=False)
+    data = data[likelihoods_fields]
 
+    data.to_csv(likelihoods_filename, sep='\t', index=False, header=False)
 
 
