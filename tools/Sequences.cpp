@@ -7,7 +7,6 @@
 
 #include "Sequences.h"
 #include "DebugCheck.h"
-#include "Parsers.h"
 
 #include <fstream>
 #include <algorithm>

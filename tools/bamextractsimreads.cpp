@@ -9,7 +9,6 @@
 #include "Indexer.h"
 #include "AlignmentStream.h"
 #include "RegionDB.h"
-#include "Parsers.h"
 #include "Sequences.h"
 #include "api/BamReader.h"
 #include "utils/bamtools_pileup_engine.h"

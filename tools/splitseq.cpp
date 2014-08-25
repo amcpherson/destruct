@@ -11,7 +11,6 @@
 #include "ExonRegions.h"
 #include "Sequences.h"
 #include "SplitAlignment.h"
-#include "Parsers.h"
 #include "ReadIndex.h"
 
 #include <fstream>

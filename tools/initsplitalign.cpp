@@ -10,7 +10,6 @@
 #include "ExonRegions.h"
 #include "Sequences.h"
 #include "SplitAlignment.h"
-#include "Parsers.h"
 #include "PathFinder.h"
 
 #include <fstream>

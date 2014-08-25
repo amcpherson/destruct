@@ -12,7 +12,6 @@
 #include "AlignmentStream.h"
 #include "Sequences.h"
 #include "SimpleAligner.h"
-#include "Parsers.h"
 
 #include <fstream>
 #include <iostream>

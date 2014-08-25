@@ -7,7 +7,6 @@
 
 #include "Common.h"
 #include "DebugCheck.h"
-#include "Parsers.h"
 #include "api/BamReader.h"
 
 #include <fstream>

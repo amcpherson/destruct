@@ -7,7 +7,6 @@
 
 #include "SplitAlignmentGen.h"
 #include "Common.h"
-#include "Parsers.h"
 #include "DebugCheck.h"
 #include "ReadStream.h"
 

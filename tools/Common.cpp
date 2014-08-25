@@ -190,3 +190,57 @@ void Print(const IntegerTable& clusters)
 	}
 }
 
+bool ReadTSV(istream& file, StringVec& fields)
+{
+	string line;
+	if (!getline(file, line))
+	{
+		return false;
+	}
+	
+	split(fields, line, is_any_of("\t"));
+	
+	return true;
+}
+
+void ReadFAI(const string& faiFilename, vector<string>& referenceNames, vector<long>& referenceLengths)
+{
+	ifstream faiFile(faiFilename.c_str());
+	if (!faiFile)
+	{
+		cerr << "Error: unable to fai file" << endl;
+		exit(1);
+	}
+	
+	string line;
+	int lineNumber = 0;
+	while (getline(faiFile, line))
+	{
+		lineNumber++;
+		
+		if (line.length() == 0)
+		{
+			cerr << "Error: Empty fai line " << lineNumber << " of " << faiFilename << endl;
+			exit(1);
+		}
+		
+		vector<string> faiFields;
+		split(faiFields, line, is_any_of("\t"));
+		
+		if (faiFields.size() < 2)
+		{
+			cerr << "Error: Format error for fai line " << lineNumber << " of " << faiFilename << endl;
+			exit(1);
+		}
+		
+		string referenceName = faiFields[0];
+		long referenceLength = SAFEPARSE(long, faiFields[1]);
+		
+		referenceNames.push_back(referenceName);
+		referenceLengths.push_back(referenceLength);
+	}
+	
+	faiFile.close();
+}
+
+

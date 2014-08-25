@@ -6,7 +6,6 @@
  */
 
 #include "DebugCheck.h"
-#include "Parsers.h"
 #include "DiscordantAlignments.h"
 #include "MatePairDelauny.h"
 #include "MatePairGibbs.h"

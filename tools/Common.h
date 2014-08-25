@@ -398,4 +398,8 @@ void Print(const IntegerVecMap& clusters);
 void Print(const IntegerVec& cluster);
 void Print(const IntegerTable& cluster);
 
+bool ReadTSV(istream& file, StringVec& fields);
+
+void ReadFAI(const string& faiFilename, vector<string>& referenceNames, vector<long>& referenceLengths);
+
 #endif

@@ -5,7 +5,6 @@
 
 #include "DebugCheck.h"
 #include "Sequences.h"
-#include "Parsers.h"
 #include "api/BamReader.h"
 
 #include <fstream>

@@ -9,7 +9,6 @@
 #include "DiscordantAlignments.h"
 #include "MatePairDelauny.h"
 #include "MatePairGibbs.h"
-#include "Parsers.h"
 #include "Sequences.h"
 
 #include <fstream>
