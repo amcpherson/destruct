@@ -86,6 +86,9 @@ else:
             sch.ifile('split.alignments', ('bylibrary',)),
             sch.ofile('split.alignments'))
 
+
+        # Cluster spanning reads
+
         sch.transform('chromosome_args', (), locally,
             generate_chromosome_args,
             sch.oobj('chrom.args', ('bychromarg',)),
@@ -100,27 +103,33 @@ else:
             '--clustmin', '1',
             '--fragmax', cfg.fragment_length_max)
 
+        
+        # Predict breakpoints from split reads
+
         sch.transform('predict_breaks', ('bychromarg',), medmem,
             predict_breaks.predict_breaks,
             None,
             sch.ifile('clusters', ('bychromarg',)),
             sch.ifile('spanning.alignments'),
             sch.ifile('split.alignments'),
-            sch.ofile('breakpoints', ('bychromarg',)))
+            sch.ofile('breakpoints_2', ('bychromarg',)))
 
         sch.transform('merge_clusters', (), lowmem,
             merge_clusters,
             None,
             sch.ifile('clusters', ('bychromarg',)),
-            sch.ifile('breakpoints', ('bychromarg',)),
+            sch.ifile('breakpoints_2', ('bychromarg',)),
             sch.ofile('clusters'),
-            sch.ofile('breakpoints'),
+            sch.ofile('breakpoints_2'),
             sch.ofile('merge_clusters.debug'))
+
+
+        # Realign reads to breakpoints
 
         sch.commandline('realigntobreaks', ('bylibrary', 'byread'), lowmem,
             cfg.realigntobreaks2_tool,
             '-r', cfg.genome_fasta,
-            '-b', sch.ifile('breakpoints'),
+            '-b', sch.ifile('breakpoints_2'),
             '-c', sch.ifile('clusters'),
             '-g', cfg.gap_score,
             '-x', cfg.mismatch_score,
@@ -130,13 +139,16 @@ else:
             '--seqs', sch.ifile('reads', ('bylibrary', 'byread')),
             '--realignments', sch.ofile('realignments', ('bylibrary', 'byread')))
 
+
+        # Calculate likelihoods based on realignments
+
         sch.transform('calculate_realignment_likelihoods', ('bylibrary', 'byread'), lowmem,
             predict_breaks.calculate_realignment_likelihoods,
             None,
-            sch.ifile('breakpoints'),
+            sch.ifile('breakpoints_2'),
             sch.ifile('realignments', ('bylibrary', 'byread')),
             sch.ifile('score.stats', ('bylibrary',)),
-            sch.ofile('likelihoods', ('bylibrary', 'byread')),
+            sch.ofile('likelihoods_2', ('bylibrary', 'byread')),
             cfg.match_score,
             sch.iobj('stats', ('bylibrary',)).prop('fragment_length_mean'),
             sch.iobj('stats', ('bylibrary',)).prop('fragment_length_stddev'))
@@ -144,7 +156,7 @@ else:
         sch.transform('merge_likelihoods1', ('bylibrary',), lowmem,
             merge_files_by_line,
             None,
-            sch.ifile('likelihoods', ('bylibrary','byread')),
+            sch.ifile('likelihoods_2', ('bylibrary','byread')),
             sch.ofile('likelihoods_unsorted', ('bylibrary',)))
 
         sch.transform('merge_likelihoods2', (), lowmem,
@@ -154,27 +166,48 @@ else:
             sch.ofile('likelihoods_unsorted'))
 
         sch.commandline('sort_likelihoods', (), medmem,
-            'sort', '-n', sch.ifile('likelihoods_unsorted'), '>', sch.ofile('likelihoods'))
+            'sort', '-n', sch.ifile('likelihoods_unsorted'), '>', sch.ofile('likelihoods_2'))
 
-        sch.transform('select_prediction', (), lowmem,
-            predict_breaks.select_predictions,
-            None,
-            sch.ifile('breakpoints'),
-            sch.ofile('selected_breakpoints'),
-            sch.ifile('likelihoods'),
-            sch.ofile('selected_likelihoods'))
+
+        # Set cover for multi mapping reads
 
         sch.transform('calc_weights', (), lowmem,
             predict_breaks.calculate_cluster_weights,
             None,
-            sch.ifile('selected_breakpoints'),
-            sch.ofile('clusters.weights'))
+            sch.ifile('breakpoints_2'),
+            sch.ofile('cluster_weights'))
 
         sch.commandline('setcover', (), himem,
             cfg.setcover_tool,
             '-c', sch.ifile('clusters'),
-            '-w', sch.ifile('clusters.weights'),
-            '-a', sch.ofile('clusters.setcover'))
+            '-w', sch.ifile('cluster_weights'),
+            '-a', sch.ofile('clusters_setcover'))
+
+
+        # Select cluster based on setcover
+
+        sch.transform('select_clusters', (), lowmem,
+            predict_breaks.select_clusters,
+            None,
+            sch.ifile('clusters_setcover'),
+            sch.ifile('breakpoints_2'),
+            sch.ofile('breakpoints_1'),
+            sch.ifile('likelihoods_2'),
+            sch.ofile('likelihoods_1'))
+
+
+        # Select prediction based on max likelihood
+
+        sch.transform('select_predictions', (), lowmem,
+            predict_breaks.select_predictions,
+            None,
+            sch.ifile('breakpoints_1'),
+            sch.ofile('breakpoints'),
+            sch.ifile('likelihoods_2'),
+            sch.ofile('likelihoods'))
+
+
+        # Predict rearrangement cycles
 
         sch.commandline('getclusterids', (), lowmem,
             'cut', '-f1', sch.ifile('clusters'), '|', 'uniq', '>', sch.ofile('clusters.ids'))
@@ -201,6 +234,9 @@ else:
             sch.ifile('cycles', ('bycluster',)),
             sch.ofile('cycles'))
 
+
+        # Tabulate results
+
         sch.transform('tabreads', (), medmem,
             tabulate_reads,
             None,
@@ -216,8 +252,8 @@ else:
         sch.transform('tabulate', (), himem,
             tabulate_results,
             None,
-            sch.ifile('selected_breakpoints'),
-            sch.ifile('selected_likelihoods'),
+            sch.ifile('breakpoints'),
+            sch.ifile('likelihoods'),
             sch.ifile('cycles'),
             sch.iobj('libinfo', ('bylibrary',)),
             cfg.genome_fasta,
@@ -625,11 +661,15 @@ else:
 
         lib_names = dict([(info.id, info.name) for info in lib_infos.values()])
 
-        breakpoints = pd.read_csv(breakpoints_filename, sep='\t', converters=converters)
+        breakpoints = pd.read_csv(breakpoints_filename, sep='\t',
+                                  names=predict_breaks.breakpoint_fields,
+                                  converters=converters)
         breakpoints = breakpoints.drop(['prediction_id'], axis=1)
         breakpoints = breakpoints.rename(columns={'count':'num_split'})
 
-        likelihoods = pd.read_csv(likelihoods_filename, sep='\t', converters=converters)
+        likelihoods = pd.read_csv(likelihoods_filename, sep='\t',
+                                  names=predict_breaks.likelihoods_fields,
+                                  converters=converters)
         likelihoods = likelihoods.drop(['prediction_id'], axis=1)
 
         agg_f = {'log_likelihood':sum,

@@ -8,6 +8,10 @@ import scipy.stats
 import utils.misc
 
 
+cluster_fields = ['cluster_id', 'cluster_end',
+                  'library_id', 'read_id', 'read_end', 'align_id']
+
+
 breakpoint_fields = ['cluster_id', 'prediction_id',
                      'chromosome_1', 'strand_1', 'position_1',
                      'chromosome_2', 'strand_2', 'position_2',
@@ -38,26 +42,25 @@ likelihoods_fields = ['cluster_id', 'prediction_id',
 def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpoints_filename):
 
     # Read all clusters
-    fields = ['cluster_id', 'cluster_end', 'lib_id', 'read_id', 'read_end', 'align_id']
-    clusters = pd.read_csv(clusters_filename, sep='\t', names=fields)
+    clusters = pd.read_csv(clusters_filename, sep='\t', names=cluster_fields)
 
-    reads = clusters[['lib_id', 'read_id']].drop_duplicates()
+    reads = clusters[['library_id', 'read_id']].drop_duplicates()
 
     def read_filter(df):
-        return df.merge(reads, on=['lib_id', 'read_id'], how='inner')
+        return df.merge(reads, on=['library_id', 'read_id'], how='inner')
 
     # Read only spanning reads relevant clusters
-    fields = ['lib_id', 'read_id', 'read_end', 'align_id', 'chromosome', 'strand', 'start', 'end', 'score']
+    fields = ['library_id', 'read_id', 'read_end', 'align_id', 'chromosome', 'strand', 'start', 'end', 'score']
     csv_iter = pd.read_csv(spanning_filename, sep='\t', iterator=True, chunksize=1000,
                                               names=fields, converters={'chromosome':str})
     spanning = pd.concat([read_filter(chunk) for chunk in csv_iter])
 
-    span_index_cols = ['lib_id', 'read_id', 'read_end', 'align_id']
+    span_index_cols = ['library_id', 'read_id', 'read_end', 'align_id']
 
     spanning.set_index(span_index_cols, inplace=True)
 
     # Read only split reads relevant clusters
-    fields = ['lib_id', 'read_id', 'read_end',
+    fields = ['library_id', 'read_id', 'read_end',
               'align_id_1', 'chromosome_1', 'strand_1', 'position_1',
               'align_id_2', 'chromosome_2', 'strand_2', 'position_2',
               'inserted', 'score']
@@ -66,7 +69,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
                                            na_values=['.'])
     split = pd.concat([read_filter(chunk) for chunk in csv_iter])
 
-    split_index_cols = ['lib_id', 'read_id', 'align_id_1', 'align_id_2']
+    split_index_cols = ['library_id', 'read_id', 'align_id_1', 'align_id_2']
 
     split.set_index(split_index_cols, inplace=True)
 
@@ -104,7 +107,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
         predictions.append(pred)
         prediction_id += 1
         
-        paired = cluster_rows.set_index(['lib_id', 'read_id', 'read_end'])[['cluster_end', 'align_id']].unstack()
+        paired = cluster_rows.set_index(['library_id', 'read_id', 'read_end'])[['cluster_end', 'align_id']].unstack()
         paired.columns = ['cluster_end_1', 'cluster_end_2', 'align_id_1', 'align_id_2']
         
         paired['flip'] = paired['cluster_end_1'] != 0
@@ -183,7 +186,9 @@ def calculate_cluster_weights(breakpoints_filename, weights_filename):
     epsilon = 0.0001
     itx_distance = 1000000000
     
-    breakpoints = pd.read_csv(breakpoints_filename, sep='\t')
+    breakpoints = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields)
+    
+    breakpoints = breakpoints[breakpoints['prediction_id'] == 0]
 
     breakpoints['distance'] = np.absolute(breakpoints['position_1'] - breakpoints['position_2'])
     breakpoints.loc[breakpoints['chromosome_1'] != breakpoints['chromosome_2'], 'distance'] = itx_distance
@@ -265,15 +270,37 @@ def read_merge_write(in_filename, in_names, to_merge, merge_cols, out_filename):
     for chunk in csv_iter:
         chunk = chunk.merge(to_merge, left_on=merge_cols,
                             right_index=True, how='inner')
-        chunk.to_csv(out_filename, sep='\t', mode=('a', 'w')[first], index=False, header=first)
+        chunk.to_csv(out_filename, sep='\t', mode=('a', 'w')[first], index=False, header=False)
         first = False
+
+
+def select_clusters(clusters_filename,
+                    breakpoints_filename, selected_breakpoints_filename,
+                    likelihoods_filename, selected_likelihoods_filename):
+
+    clusters = pd.read_csv(clusters_filename, sep='\t', names=cluster_fields,
+                           usecols=['cluster_id', 'library_id', 'read_id'])
+
+    likelihoods_index = ['cluster_id', 'library_id', 'read_id']
+    selected = clusters[likelihoods_index].drop_duplicates().set_index(likelihoods_index)
+
+    read_merge_write(likelihoods_filename, likelihoods_fields, selected,
+                     ['cluster_id', 'library_id', 'read_id'],
+                     selected_likelihoods_filename)
+
+    breakpoints_index = ['cluster_id']
+    selected = clusters[breakpoints_index].drop_duplicates().set_index(breakpoints_index)
+
+    read_merge_write(breakpoints_filename, breakpoint_fields, selected,
+                     ['cluster_id'],
+                     selected_breakpoints_filename)
 
 
 def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                        likelihoods_filename, selected_likelihoods_filename):
 
     likelihoods = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
-                          usecols=['cluster_id', 'prediction_id', 'log_likelihood'])
+                              usecols=['cluster_id', 'prediction_id', 'log_likelihood'])
 
     selected = likelihoods.set_index(['cluster_id', 'prediction_id'])\
                           .groupby(level=[0])['log_likelihood']\
@@ -289,7 +316,6 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
     read_merge_write(breakpoints_filename, breakpoint_fields, selected,
                      ['cluster_id', 'prediction_id'],
                      selected_breakpoints_filename)
-
 
 
 
