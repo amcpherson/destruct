@@ -187,9 +187,3 @@ sources = """
 """.split()
 env.Program(target='estimategc', source=common_sources+bamtools_sources+sources)
 
-sources = """
-    RegionDB.cpp
-    samplemappable.cpp
-""".split()
-env.Program(target='samplemappable', source=common_sources+sources)
-
