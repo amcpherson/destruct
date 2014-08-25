@@ -373,32 +373,6 @@ else:
                     new_cluster_id += 1
 
 
-    def merge_samples(all_samples, merged_samples):
-        samples = []
-        for sample_filename in all_samples.values():
-            with open(sample_filename, 'r') as sample_file:
-                for idx, line in enumerate(sample_file):
-                    if idx >= len(samples):
-                        samples.extend([0] * (idx - len(samples) + 1))
-                    samples[idx] += int(line)
-        with open(merged_samples, 'w') as merged_file:
-            for sample in samples:
-                merged_file.write('%d\n' % (sample,))
-
-
-    def segregate_mitochondrial(mitochondrial_chromosome, input_filename, output_filename):
-        with open(input_filename, 'r') as input_file, open(output_filename, 'w') as output_file:
-            for cluster_id, rows in itertools.groupby(csv.reader(input_file, delimiter='\t'), lambda row: row[0]):
-                rows = list(rows)
-                chromosomes = [None,None]
-                for row in rows:
-                    chromosomes[int(row[1])] = row[4]
-                if chromosomes[0] != chromosomes[1] and (chromosomes[0] == mitochondrial_chromosome or chromosomes[1] == mitochondrial_chromosome):
-                    continue
-                for row in rows:
-                    output_file.write('\t'.join(row) + '\n')
-
-
     def remove_duplicates(input_filename, output_filename):
         with open(input_filename, 'r') as input_file, open(output_filename, 'w') as output_file:
             for cluster_id, cluster_rows in itertools.groupby(csv.reader(input_file, delimiter='\t'), lambda row: row[0]):
@@ -438,16 +412,6 @@ else:
         os.symlink(os.path.abspath(target_bam_filename), link_bam_filename)
 
 
-    def run_mpredictbreaks(mpredictbreaks_bin, genome_fasta, clusters_filename, split_alignments, breakpoints):
-        mpredictbreaks_arguments = [mpredictbreaks_bin, '-r', genome_fasta, '-c', clusters_filename, '-b', breakpoints, '-l', '-']
-        mpredictbreaks_process = subprocess.Popen(mpredictbreaks_arguments, stdin=subprocess.PIPE, stdout=sys.stdout, stderr=sys.stderr)
-        for lib_name, lib_split_alignments in split_alignments.iteritems():
-            mpredictbreaks_process.stdin.write('\t'.join([lib_name, lib_split_alignments]) + '\n')
-        mpredictbreaks_process.stdin.close()
-        if mpredictbreaks_process.wait() != 0:
-            raise Exception('mpredictbreaks process %s produced exit code %s' % (' '.join(mpredictbreaks_arguments), mpredictbreaks_process.returncode))
-
-
     def tabulate_reads(clusters_filename, lib_infos, reads1_filenames, reads2_filenames, reads_table_filename):
         fields = ['cluster_id', 'cluster_end', 'lib_id', 'read_id', 'read_end', 'align_id']
         clusters = pd.read_csv(clusters_filename, sep='\t', names=fields, usecols=['cluster_id', 'lib_id', 'read_id'])
@@ -471,132 +435,6 @@ else:
                                 reads_table_file.write('\t'.join([str(cluster_id), str(lib_id), str(fragment_id), read_end, seq, qual, comment]) + '\n')
 
 
-    GenomicRegion = collections.namedtuple('GenomicRegion', ['chromosome', 'strand', 'start', 'end'])
-
-    def read_cluster_regions(input_file):
-        for cluster_id, rows in itertools.groupby(csv.reader(input_file, delimiter='\t'), lambda row: row[0]):
-            rows = list(rows)
-            chromosomes = [None, None]
-            strands = [None, None]
-            starts = [[], []]
-            ends = [[], []]
-            lib_counts = Counter()
-            for row in rows:
-                cluster_end = int(row[1])
-                chromosomes[cluster_end] = row[4]
-                strands[cluster_end] = row[5]
-                starts[cluster_end].append(int(row[6]))
-                ends[cluster_end].append(int(row[7]))
-                if cluster_end == 0:
-                    lib_counts[row[11]] += 1
-            regions = list()
-            for cluster_end in (0, 1):
-                regions.append(GenomicRegion(chromosomes[cluster_end], strands[cluster_end], min(starts[cluster_end]), max(ends[cluster_end])))
-            yield cluster_id, regions, lib_counts, rows
-
-
-    def read_breakpoints(input_file):
-        for cluster_id, rows in itertools.groupby(csv.reader(input_file, delimiter='\t'), lambda row: row[0]):
-            rows = list(rows)
-            homology = 0
-            prev_pos = None
-            prev_dist = None
-            for row in sorted(rows, key=lambda row: int(row[3])):
-                current_pos = int(row[3])
-                if row[2] == row[5]:
-                    current_dist = int(row[3]) + int(row[6])
-                else:
-                    current_dist = int(row[3]) - int(row[6])
-                if prev_pos is not None:
-                    if current_pos == prev_pos + 1 and current_dist == prev_dist:
-                        homology += 1
-                    else:
-                        homology = 0
-                prev_pos = current_pos
-                prev_dist = current_dist
-            yield cluster_id, [int(rows[0][3]), int(rows[0][6])], int(rows[0][7]), int(rows[0][8]), homology
-
-
-    def clusters_table_header(lib_names):
-        header = 'cluster_id\t'
-        for cluster_end in ('1', '2'):
-            header += 'chromosome_' + cluster_end + '\t'
-            header += 'strand_' + cluster_end + '\t'
-            header += 'start_' + cluster_end + '\t'
-            header += 'end_' + cluster_end + '\t'
-            header += 'gene_id' + cluster_end + '\t'
-            header += 'gene_name' + cluster_end + '\t'
-            header += 'gene_location' + cluster_end + '\t'
-            header += 'break_' + cluster_end + '\t'
-        for lib_name in lib_names:
-            header += lib_name + '_count' + '\t'
-        header += 'exact_break' + '\t'
-        header += 'align_prob' + '\t'
-        header += 'chimeric_prob' + '\t'
-        header += 'valid_prob' + '\t'
-        header += 'type' + '\t'
-        header += 'setcover_ratio' + '\t'
-        header += 'num_split' + '\t'
-        header += 'num_inserted' + '\t'
-        header += 'homology' + '\t'
-        header += 'cycle_score' + '\t'
-        header += 'cycle_num_breaks' + '\t'
-        header += 'cycle_ids' + '\t'
-        header += 'dgv_ids' + '\t'
-        header += 'sequence_approx' + '\t'
-        header += 'sequence_exact'
-        header += '\n'
-        return header
-
-
-    def clusters_table_row(lib_names, cluster_id, cluster_info, probs, setcover_ratio, breakpoint_info, dgv_info, cycle_info, sequences, gene_models):
-        exact_break = 1
-        break_positions = breakpoint_info[3]
-        if break_positions is None:
-            exact_break = 0
-            break_positions = []
-            for cluster_end in (0, 1):
-                break_positions.append((cluster_info[0][cluster_end].start, cluster_info[0][cluster_end].end)[cluster_info[0][cluster_end].strand == '+'])
-        row = cluster_id + '\t'
-        for cluster_end in (0, 1):
-            row += cluster_info[0][cluster_end].chromosome + '\t'
-            row += cluster_info[0][cluster_end].strand + '\t'
-            row += str(cluster_info[0][cluster_end].start) + '\t'
-            row += str(cluster_info[0][cluster_end].end) + '\t'
-            mid = (cluster_info[0][cluster_end].start + cluster_info[0][cluster_end].end) / 2
-            nearest_gene_ids = gene_models.find_nearest_genes(cluster_info[0][cluster_end].chromosome, mid)
-            gene_id = 'NA'
-            gene_name = 'NA'
-            gene_location = 'NA'
-            if len(nearest_gene_ids) > 0:
-                gene_id = nearest_gene_ids[0]
-                gene_name = gene_models.get_gene(gene_id).name
-                gene_location = gene_models.calculate_gene_location(gene_id, mid)
-            row += gene_id + '\t'
-            row += gene_name + '\t'
-            row += gene_location + '\t'
-            row += str(break_positions[cluster_end]) + '\t'
-        for lib_name in lib_names:
-            row += str(cluster_info[1].get(lib_name, 0)) + '\t'
-        row += str(exact_break) + '\t'
-        row += str(probs[cluster_id][0]) + '\t'
-        row += str(probs[cluster_id][1]) + '\t'
-        row += str(probs[cluster_id][2]) + '\t'
-        row += rearrangement_type(cluster_info[0]) + '\t'
-        row += str(setcover_ratio) + '\t'
-        row += str(breakpoint_info[0]) + '\t'
-        row += str(breakpoint_info[1]) + '\t'
-        row += str(breakpoint_info[2]) + '\t'
-        row += str(cycle_info[0]) + '\t'
-        row += str(len(cycle_info[1])) + '\t'
-        row += (', '.join(cycle_info[1]), 'NA')[len(cycle_info[1]) == 0] + '\t'
-        row += (', '.join(dgv_info[cluster_id]), 'NA')[len(dgv_info[cluster_id]) == 0] + '\t'
-        row += create_approximate_sequence(sequences, cluster_info[0]) + '\t'
-        row += create_exact_sequence(sequences, cluster_info[0], breakpoint_info)
-        row += '\n'
-        return row
-
-
     def read_sequences(fasta):
         id = None
         sequences = []
@@ -613,79 +451,6 @@ else:
                 sequences.append(line)
         if id is not None:
             yield (id, ''.join(sequences))
-
-
-    def create_approximate_sequence(reference_sequences, cluster_info):
-        approximate_sequences = ['', '']
-        expected_strands = ('+', '-')
-        for side in (0, 1):
-            chromosome = cluster_info[side].chromosome
-            start = cluster_info[side].start
-            end = cluster_info[side].end
-            approximate_sequences[side] = reference_sequences[chromosome][start-1:end]
-            if cluster_info[side].strand != expected_strands[side]:
-                approximate_sequences[side] = utils.misc.reverse_complement(approximate_sequences[side])
-        return approximate_sequences[0] + '[]' + approximate_sequences[1]
-
-
-    def create_exact_sequence(reference_sequences, cluster_info, breakpoint_info):
-        if breakpoint_info[0] == 0:
-            return 'NA'
-        approximate_sequences = ['', '']
-        expected_strands = ('+', '-')
-        inserted = ''
-        if breakpoint_info[0] != 0:
-            inserted = 'N' * breakpoint_info[1]
-        for side in (0, 1):
-            chromosome = cluster_info[side].chromosome
-            start = cluster_info[side].start
-            end = cluster_info[side].end
-            if cluster_info[side].strand == '+':
-                end = breakpoint_info[3][side]
-            else:
-                start = breakpoint_info[3][side]
-            approximate_sequences[side] = reference_sequences[chromosome][start-1:end]
-            if cluster_info[side].strand != expected_strands[side]:
-                approximate_sequences[side] = utils.misc.reverse_complement(approximate_sequences[side])
-        return approximate_sequences[0] + '[' + inserted + ']' + approximate_sequences[1]
-
-
-    def rearrangement_type(cluster):
-        if cluster[0].chromosome != cluster[1].chromosome:
-            return 'translocation'
-        if cluster[0].strand == cluster[1].strand:
-            return 'inversion'
-        for side1, side2 in ((0, 1), (1, 0)):
-            if cluster[side1].strand == '+' and cluster[side2].strand == '-' and cluster[side1].end < cluster[side2].start:
-                return 'deletion'
-        return 'eversion'
-
-
-    def filter_clusters(clusters_out_filename, clusters_filename, clusters_prob_filename, align_prob_threshold, chimeric_prob_threshold, valid_prob_threshold, coverage_threshold, readcount_threshold):
-        filtered_clusters = set()
-        with open(clusters_prob_filename, 'r') as clusters_prob_file:
-            for row in csv.reader(clusters_prob_file, delimiter='\t'):
-                cluster_id = row[0]
-                align_prob = float(row[1])
-                chimeric_prob = float(row[2])
-                valid_prob = float(row[3])
-                if align_prob < align_prob_threshold:
-                    continue
-                if chimeric_prob < chimeric_prob_threshold:
-                    continue
-                if valid_prob < valid_prob_threshold:
-                    continue
-                filtered_clusters.add(cluster_id)
-        with open(clusters_filename, 'r') as clusters_file, open(clusters_out_filename, 'w') as clusters_out_file:
-            for cluster_id, regions, lib_counts, rows in read_cluster_regions(clusters_file):
-                if cluster_id not in filtered_clusters:
-                    continue
-                if any((regions[cluster_end].end - regions[cluster_end].start + 1 < coverage_threshold for cluster_end in (0, 1))):
-                    continue
-                if sum(lib_counts.values()) < readcount_threshold:
-                    continue
-                for row in rows:
-                    clusters_out_file.write('\t'.join(row) + '\n')
 
 
     class DGVDatabase(object):
@@ -715,56 +480,6 @@ else:
                 enddiff = abs(end - self.variations[idx][2])
                 if startdiff < 500 and enddiff < 500:
                     yield self.variations[idx][0]
-
-
-    def multilib_tabulate(clusters_table, clusters_filename, clusters_prob_filename, clusters_all_filename, breakpoints_filename, genome_fasta, gtf_filename, dgv_filename, cycles_filename, stats):
-        cluster_infos = dict()
-        lib_names = set(stats.keys())
-        with open(clusters_filename, 'r') as clusters_file:
-            for cluster_id, regions, lib_counts, rows in read_cluster_regions(clusters_file):
-                lib_names.update(lib_counts.keys())
-                cluster_infos[cluster_id] = (regions, lib_counts)
-        probs = dict()
-        with open(clusters_prob_filename, 'r') as clusters_prob_file:
-            for row in csv.reader(clusters_prob_file, delimiter='\t'):
-                cluster_id = row[0]
-                align_prob = float(row[1])
-                chimeric_prob = float(row[2])
-                valid_prob = float(row[3])
-                probs[row[0]] = (align_prob, chimeric_prob, valid_prob)
-        breakpoint_infos = dict()
-        with open(breakpoints_filename, 'r') as breakpoints_file:
-            for cluster_id, breakpoints, num_inserted, split_count, homology in read_breakpoints(breakpoints_file):
-                if cluster_id not in cluster_infos:
-                    continue
-                breakpoint_infos[cluster_id] = (split_count, num_inserted, homology, breakpoints)
-        dgv = DGVDatabase(dgv_filename)
-        dgv_info = dict()
-        for cluster_id, cluster_info in cluster_infos.iteritems():
-            dgv_info[cluster_id] = list(dgv.query(cluster_info[0]))
-        setcover_ratios = dict()
-        with open(clusters_all_filename, 'r') as clusters_all_file:
-            for cluster_id, regions, lib_counts, rows in read_cluster_regions(clusters_all_file):
-                if cluster_id in cluster_infos:
-                    setcover_ratios[cluster_id] = float(sum(cluster_infos[cluster_id][1].values())) / float(sum(lib_counts.values()))
-        cycle_infos = dict()
-        with open(cycles_filename, 'r') as cycles_file:
-            for row in csv.reader(cycles_file, delimiter='\t'):
-                score = row[0]
-                ids = row[1::4]
-                cycle_infos[ids[0]] = (score, ids)
-        sequences = dict()
-        for id, seq in read_sequences(open(genome_fasta, 'r')):
-            sequences[id] = seq
-        gene_models = pygenes.GeneModels()
-        gene_models.load_ensembl_gtf(gtf_filename)
-        with open(clusters_table, 'w') as clusters_table_file:
-            clusters_table_file.write(clusters_table_header(lib_names))
-            for cluster_id, cluster_info in cluster_infos.iteritems():
-                setcover_ratio = setcover_ratios[cluster_id]
-                breakpoint_info = breakpoint_infos.get(cluster_id, (0, 0, 0, None))
-                cycle_info = cycle_infos.get(cluster_id, ('NA', []))
-                clusters_table_file.write(clusters_table_row(lib_names, cluster_id, cluster_info, probs, setcover_ratio, breakpoint_info, dgv_info, cycle_info, sequences, gene_models))
 
 
     def merge_tars(output_filename, *input_filename_sets):
