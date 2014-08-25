@@ -88,7 +88,7 @@ else:
             sch.ifile('breakpoints'),
             sch.ifile('realignments', ('bylibrary', 'byread')),
             sch.ifile('score.stats', ('bylibrary',)),
-            sch.ofile('realignment_likelihoods', ('bylibrary', 'byread')),
+            sch.ofile('likelihoods', ('bylibrary', 'byread')),
             cfg.match_score,
             sch.iobj('stats', ('bylibrary',)).prop('fragment_length_mean'),
             sch.iobj('stats', ('bylibrary',)).prop('fragment_length_stddev'))
@@ -96,21 +96,41 @@ else:
         sch.transform('merge_likelihoods1', ('bylibrary',), lowmem,
             merge_files_by_line,
             None,
-            sch.ifile('realignment_likelihoods', ('bylibrary','byread')),
-            sch.ofile('realignment_likelihoods', ('bylibrary',)))
+            sch.ifile('likelihoods', ('bylibrary','byread')),
+            sch.ofile('likelihoods_unsorted', ('bylibrary',)))
 
         sch.transform('merge_likelihoods2', (), lowmem,
             merge_files_by_line,
             None,
-            sch.ifile('realignment_likelihoods', ('bylibrary',)),
-            sch.ofile('realignment_likelihoods'))
+            sch.ifile('likelihoods_unsorted', ('bylibrary',)),
+            sch.ofile('likelihoods_unsorted'))
 
-        sch.transform('calc_weights', (), lowmem, predict_breaks.calculate_cluster_weights, None, sch.ifile('breakpoints'), sch.ofile('clusters.weights'))
+        sch.commandline('sort_likelihoods', (), medmem,
+            'sort',
+            '-n',
+            sch.ifile('likelihoods_unsorted'),
+            '>',
+            sch.ofile('likelihoods'))
 
-        sch.commandline('setcover', (), himem, cfg.setcover_tool, '-c', sch.ifile('clusters'), '-w', sch.ifile('clusters.weights'), '-a', sch.ofile('clusters.setcover'))
+        sch.transform('select_prediction', (), lowmem,
+            predict_breaks.select_predictions,
+            None,
+            sch.ifile('breakpoints'),
+            sch.ofile('selected_breakpoints'),
+            sch.ifile('likelihoods'),
+            sch.ofile('selected_likelihoods'))
 
-        sch.transform('merge_realignments1', ('bylibrary',), lowmem, merge_files_by_line, None, sch.ifile('realignments', ('bylibrary','byread')), sch.ofile('realignments', ('bylibrary',)))
-        sch.transform('merge_realignments2', (), lowmem, merge_files_by_line, None, sch.ifile('realignments', ('bylibrary',)), sch.ofile('realignments'))
+        sch.transform('calc_weights', (), lowmem,
+            predict_breaks.calculate_cluster_weights,
+            None,
+            sch.ifile('selected_breakpoints'),
+            sch.ofile('clusters.weights'))
+
+        sch.commandline('setcover', (), himem,
+            cfg.setcover_tool,
+            '-c', sch.ifile('clusters'),
+            '-w', sch.ifile('clusters.weights'),
+            '-a', sch.ofile('clusters.setcover'))
 
         sch.commandline('getclusterids', (), lowmem, 'cut', '-f1', sch.ifile('clusters'), '|', 'uniq', '>', sch.ofile('clusters.ids'))
         sch.transform('splitclusterids', (), lowmem, split_file_byline, None, sch.ifile('clusters.ids'), int(cfg.clusters_per_split), sch.ofile('clusters.ids', ('bycluster',)))
@@ -133,8 +153,18 @@ else:
             '>',
             breakreads)
 
-        sch.transform('tabulate', (), himem, multilib_tabulate, None, breakpoints, sch.ifile('clusters'), sch.ifile('clusters'), sch.ifile('clusters'), sch.ifile('breakpoints'), cfg.genome_fasta, cfg.gtf_filename, cfg.dgv_filename, sch.ifile('cycles'), sch.iobj('stats', ('bylibrary',)))
-        
+        sch.transform('tabulate', (), himem,
+            tabulate_results,
+            None,
+            sch.ifile('selected_breakpoints'),
+            sch.ifile('selected_likelihoods'),
+            sch.ifile('cycles'),
+            sch.iobj('libinfo', ('bylibrary',)),
+            cfg.genome_fasta,
+            cfg.gtf_filename,
+            cfg.dgv_filename,
+            breakpoints)
+
         sch.transform('merge_plots', (), lowmem, merge_tars, None, plots_tar, sch.ifile('score.stats.plots', ('bylibrary',)), sch.ifile('flen.plots', ('bylibrary',)))
 
 
@@ -661,7 +691,7 @@ else:
     class DGVDatabase(object):
         def __init__(self, dgv_filename):
             self.variations = list()
-            chrvars = defaultdict(list)
+            chrvars = collections.defaultdict(list)
             with open(dgv_filename, 'r') as dgv_file:
                 dgv_reader = csv.reader(dgv_file, delimiter='\t')
                 dgv_header = next(dgv_reader)
@@ -676,15 +706,10 @@ else:
             self.intervals = dict()
             for chr, vars in chrvars.iteritems():
                 self.intervals[chr] = pygenes.IntervalTree(vars)
-        def query(self, regions):
-            if regions[0].chromosome != regions[1].chromosome:
+        def query(self, chromosome, start, end):
+            if chromosome not in self.intervals:
                 return
-            if regions[0].chromosome not in self.intervals:
-                return
-            break1 = (regions[0].start, regions[0].end)[regions[0].strand == '+']
-            break2 = (regions[1].start, regions[1].end)[regions[1].strand == '+']
-            start, end = sorted([break1, break2])
-            idxs = self.intervals[regions[0].chromosome].find_overlapping(start, end)
+            idxs = self.intervals[chromosome].find_overlapping(start, end)
             for idx in [idxs[a] for a in range(0, len(idxs))]:
                 startdiff = abs(start - self.variations[idx][1])
                 enddiff = abs(end - self.variations[idx][2])
@@ -750,4 +775,164 @@ else:
                         for tarinfo in in_tar:
                             output_tar.addfile(tarinfo, in_tar.extractfile(tarinfo))
 
+
+    converters = {'chromosome':str,
+                  'chromosome_1':str,
+                  'chromosome_2':str}
+
+
+    def create_sequence(row, reference_sequences):
+        breakend_sequences = ['', '']
+        expected_strands = ('+', '-')
+        inserted = ''
+        if inserted != '.':
+            inserted = row['inserted']
+        for side in (0, 1):
+            chromosome = row['chromosome_{0}'.format(side+1)]
+            strand = row['strand_{0}'.format(side+1)]
+            position = row['position_{0}'.format(side+1)]
+            length = row['template_length_{0}'.format(side+1)]
+            if strand == '+':
+                start = position - length + 1
+                end = position
+            else:
+                start = position
+                end = position + length - 1
+            breakend_sequences[side] = reference_sequences[chromosome][start-1:end]
+            if strand != expected_strands[side]:
+                breakend_sequences[side] = utils.misc.reverse_complement(breakend_sequences[side])
+        return breakend_sequences[0] + '[' + inserted + ']' + breakend_sequences[1]
+
+
+    def annotate_genes(row, gene_models):
+
+        for side in (0, 1):
+
+            chromosome = row['chromosome_{0}'.format(side+1)]
+            position = row['position_{0}'.format(side+1)]
+
+            nearest_gene_ids = gene_models.find_nearest_genes(chromosome, position)
+            gene_id = 'NA'
+            gene_name = 'NA'
+            gene_location = 'NA'
+            if len(nearest_gene_ids) > 0:
+                gene_id = nearest_gene_ids[0]
+                gene_name = gene_models.get_gene(gene_id).name
+                gene_location = gene_models.calculate_gene_location(gene_id, position)
+
+            row['gene_id_{0}'.format(side+1)] = gene_id
+            row['gene_name_{0}'.format(side+1)] = gene_name
+            row['gene_location_{0}'.format(side+1)] = gene_location
+
+        return row
+
+
+    def query_dgv(row, dgv):
+
+        if row['chromosome_1'] != row['chromosome_2']:
+            return 'NA'
+
+        chromosome = row['chromosome_1']
+        start, end = sorted((row['position_1'], row['position_2']))
+
+        variants = list(dgv.query(chromosome, start, end))
+
+        if len(variants) == 0:
+            return 'NA'
+
+        return ', '.join(variants)
+
+
+    def tabulate_results(breakpoints_filename, likelihoods_filename,
+                         cycles_filename, lib_infos,
+                         genome_fasta, gtf_filename, dgv_filename,
+                         results_filename):
+
+        lib_names = dict([(info.id, info.name) for info in lib_infos.values()])
+
+        breakpoints = pd.read_csv(breakpoints_filename, sep='\t', converters=converters)
+        breakpoints = breakpoints.drop(['prediction_id'], axis=1)
+        breakpoints = breakpoints.rename(columns={'count':'split_count'})
+
+        likelihoods = pd.read_csv(likelihoods_filename, sep='\t', converters=converters)
+        likelihoods = likelihoods.drop(['prediction_id'], axis=1)
+
+        agg_f = {'log_likelihood':sum,
+                 'log_cdf':sum,
+                 'template_length_1':max,
+                 'template_length_2':max}
+
+        breakpoint_stats = likelihoods.groupby('cluster_id').agg(agg_f)
+
+        breakpoint_counts = likelihoods.groupby(['cluster_id', 'library_id'])\
+                                       .size()\
+                                       .unstack()\
+                                       .rename(columns=lib_names)
+        breakpoint_counts.columns = [a+'_count' for a in breakpoint_counts.columns]
+
+        breakpoints = breakpoints.merge(breakpoint_stats, left_on='cluster_id', right_index=True, how='left')
+
+        breakpoints = breakpoints.merge(breakpoint_counts, left_on='cluster_id', right_index=True, how='left')
+
+        # Calculate breakpoint type
+        def breakpoint_type(row):
+            if row['chromosome_1'] != row['chromosome_2']:
+                return 'translocation'
+            if row['strand_1'] == row['strand_2']:
+                return 'inversion'
+            positions = sorted([(row['position_{0}'.format(side)], row['strand_{0}'.format(side)]) for side in (1, 2)])
+            if positions[0][1] == '+':
+                return 'deletion'
+            else:
+                return 'duplication'
+
+        breakpoints['type'] = breakpoints.apply(breakpoint_type, axis=1)
+
+        # Calculate number inserted at the breakpoint
+        def calculate_num_inserted(row):
+            if row['inserted'] == '.':
+                return 0
+            else:
+                return len(row['inserted'])
+
+        breakpoints['num_inserted'] = breakpoints.apply(calculate_num_inserted, axis=1)
+
+        # Annotate sequence
+        reference_sequences = dict()
+        for id, seq in read_sequences(open(genome_fasta, 'r')):
+            reference_sequences[id] = seq
+
+        breakpoints['sequence'] = breakpoints.apply(lambda row: create_sequence(row, reference_sequences), axis=1)
+
+        # Annotate gene information
+        gene_models = pygenes.GeneModels()
+        gene_models.load_ensembl_gtf(gtf_filename)
+
+        breakpoints = breakpoints.apply(lambda row: annotate_genes(row, gene_models), axis=1)
+
+        # Annotate database of genomic variants
+        dgv = DGVDatabase(dgv_filename)
+
+        breakpoints['dgv_ids'] = breakpoints.apply(lambda row: query_dgv(row, dgv), axis=1)
+
+        # Annotate rearrangement cycles
+        cycles_table = list()
+        with open(cycles_filename, 'r') as cycles_file:
+            for row in csv.reader(cycles_file, delimiter='\t'):
+                score = row[0]
+                ids = row[1::4]
+                cluster_id = ids[0]
+                num_cycle_breaks = len(ids)
+                cycles_table.append((cluster_id, score_num_cycle_breaks, ', '.join(ids)))
+
+        cycles_columns = ['cluster_id', 'cycle_score', 'cycle_num_breaks', 'cycle_ids']
+
+        if len(cycles_table) == 0:
+            cycles_table = pd.DataFrame(columns=cycles_columns)
+        else:
+            cycles_table = pd.DataFrame(cycles_table, columns=cycles_columns)
+
+        breakpoints = breakpoints.merge(cycles_table, on='cluster_id', how='left')
+
+        breakpoints.to_csv(results_filename, sep='\t', na_rep='NA')
 

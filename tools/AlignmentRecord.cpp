@@ -191,6 +191,7 @@ std::ostream & operator<<(std::ostream &os, const BreakAlignScoreRecord& record)
 {
 	os << record.clusterID << "\t";
 	os << record.predictionID << "\t";
+	os << record.clusterEnd << "\t";
 	os << record.libID << "\t";
 	os << record.readID << "\t";
 	os << record.readEnd << "\t";
@@ -205,6 +206,7 @@ std::istream & operator>>(std::istream &is, BreakAlignScoreRecord& record)
 {
 	is >> record.clusterID;
 	is >> record.predictionID;
+	is >> record.clusterEnd;
 	is >> record.libID;
 	is >> record.readID;
 	is >> record.readEnd;

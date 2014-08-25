@@ -217,6 +217,7 @@ int main(int argc, char* argv[])
 
 			scoreRecord.clusterID = breakpointRecord.clusterID;
 			scoreRecord.predictionID = breakpointRecord.predictionID;
+			scoreRecord.clusterEnd = memberRecord.clusterEnd;
 			scoreRecord.libID = memberRecord.libID;
 			scoreRecord.readID = memberRecord.readID;
 			scoreRecord.readEnd = memberRecord.readEnd;

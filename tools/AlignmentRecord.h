@@ -107,6 +107,7 @@ struct BreakAlignScoreRecord
 {
 	int clusterID;
 	int predictionID;
+	int clusterEnd;
 	int libID;
 	int readID;
 	int readEnd;
