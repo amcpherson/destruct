@@ -852,7 +852,7 @@ else:
 
         breakpoints = pd.read_csv(breakpoints_filename, sep='\t', converters=converters)
         breakpoints = breakpoints.drop(['prediction_id'], axis=1)
-        breakpoints = breakpoints.rename(columns={'count':'split_count'})
+        breakpoints = breakpoints.rename(columns={'count':'num_split'})
 
         likelihoods = pd.read_csv(likelihoods_filename, sep='\t', converters=converters)
         likelihoods = likelihoods.drop(['prediction_id'], axis=1)
