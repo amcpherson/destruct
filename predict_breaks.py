@@ -88,13 +88,10 @@ def predict_breaks_split(clusters, split):
     data['position_1'] = data['position_1'].astype(int)
     data['position_2'] = data['position_2'].astype(int)
 
-    def column_flip(df, cond, col_1, col_2):
-        df.loc[cond, col_1], df.loc[cond, col_2] = df.loc[cond, col_2], df.loc[cond, col_1]
-
     # Flip columns to make them consistent across clusters
-    column_flip(data, data['flip'], 'chromosome_1', 'chromosome_2')
-    column_flip(data, data['flip'], 'strand_1', 'strand_2')
-    column_flip(data, data['flip'], 'position_1', 'position_2')
+    utils.misc.column_flip(data, data['flip'], 'chromosome_1', 'chromosome_2')
+    utils.misc.column_flip(data, data['flip'], 'strand_1', 'strand_2')
+    utils.misc.column_flip(data, data['flip'], 'position_1', 'position_2')
 
     # Calculate advancement due to homology based on strand
     data['advance_1'] = np.where(data['strand_1'] == "+", data['homology'], -data['homology'])
