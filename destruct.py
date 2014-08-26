@@ -666,6 +666,7 @@ else:
                                   converters=converters)
         breakpoints = breakpoints.drop(['prediction_id'], axis=1)
         breakpoints = breakpoints.rename(columns={'count':'num_split'})
+        breakpoints.loc[breakpoints['inserted'] == '.', 'inserted'] = ''
 
         likelihoods = pd.read_csv(likelihoods_filename, sep='\t',
                                   names=predict_breaks.likelihoods_fields,
@@ -682,6 +683,8 @@ else:
         breakpoint_counts = likelihoods.groupby(['cluster_id', 'library_id'])\
                                        .size()\
                                        .unstack()\
+				       .fillna(0)\
+				       .astype(int)\
                                        .rename(columns=lib_names)
         breakpoint_counts.columns = [a+'_count' for a in breakpoint_counts.columns]
 
@@ -749,5 +752,5 @@ else:
 
         breakpoints = breakpoints.merge(cycles_table, on='cluster_id', how='left')
 
-        breakpoints.to_csv(results_filename, sep='\t', na_rep='NA')
+        breakpoints.to_csv(results_filename, sep='\t', na_rep='NA', header=True, index=False)
 
