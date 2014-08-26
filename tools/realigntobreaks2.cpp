@@ -121,6 +121,15 @@ int main(int argc, char* argv[])
 	BreakpointRecord breakpointRecord;
 	while (breakpointsFile >> breakpointRecord)
 	{
+		// Find reads that support this breakpoint
+		unordered_map<int,vector<ClusterMemberRecord> >::const_iterator clusterIter = clusters.find(breakpointRecord.clusterID);
+
+		// Skip this breakpoint since there are no reads for it in the current read set
+		if (clusterIter == clusters.end())
+		{
+			continue;
+		}
+
 		// Create breakend sequences of specific lengths, and record the start and end of the region from which the
 		// sequence originated in the reference genome.
 		string breakendSequence[2];
@@ -175,16 +184,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Iterate cluster reads and their alignments
-		unordered_map<int,vector<ClusterMemberRecord> >::const_iterator clusterIter = clusters.find(breakpointRecord.clusterID);
-
-		if (clusterIter == clusters.end())
-		{
-			cerr << "Error: No matching cluster for breakpoint " << breakpointRecord.clusterID << endl;
-			exit(1);
-		}
-
 		const vector<ClusterMemberRecord>& memberships = clusterIter->second;
-
 		for (vector<ClusterMemberRecord>::const_iterator memberIter = memberships.begin(); memberIter != memberships.end(); memberIter++)
 		{
 			const ClusterMemberRecord& memberRecord = *memberIter;
