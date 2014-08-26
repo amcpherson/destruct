@@ -28,7 +28,10 @@ using namespace boost;
 using namespace std;
 
 
-int BestSplitAlignment(const short int* scores1Fwd, int scores1FwdLength, const short int* scores2Rev, int scores2RevLength, int breakInsertScore, IntegerVec& seq1Lengths, IntegerVec& seq2Lengths)
+bool BestSplitAlignment(const short int* scores1Fwd, int scores1FwdLength,
+                        const short int* scores2Rev, int scores2RevLength,
+                        int breakInsertScore, int minAnchor, int& score,
+                        int& seq1Length, int& seq2Length)
 {
 	IntegerVec scores1FwdBreakInsert(scores1FwdLength);
 	IntegerVec scores1FwdPrevMax(scores1FwdLength);
@@ -51,7 +54,7 @@ int BestSplitAlignment(const short int* scores1Fwd, int scores1FwdLength, const 
 	
 	IntegerVec seq1LengthMax;
 	
-	int score = numeric_limits<int>::min();
+	score = numeric_limits<int>::min();
 	for (int seq1Length = 0; seq1Length < scores1FwdLength; seq1Length++)
 	{
 		int seq2Length = scores2RevLength - seq1Length - 1;
@@ -70,24 +73,111 @@ int BestSplitAlignment(const short int* scores1Fwd, int scores1FwdLength, const 
 	
 	for (int idx = 0; idx < seq1LengthMax.size(); idx++)
 	{
-		int seq1Length = seq1LengthMax[idx];
-		int seq2Length = scores2RevLength - seq1Length - 1;
+		seq1Length = seq1LengthMax[idx];
+		seq2Length = scores2RevLength - seq1Length - 1;
 		
 		if (scores1FwdBreakInsert[seq1Length] == scores1Fwd[seq1Length])
 		{
-			seq1Lengths.push_back(seq1Length);
-			seq2Lengths.push_back(seq2Length);
+			if ((seq1Length >= minAnchor) && (seq2Length >= minAnchor))
+			{
+				return true;
+			}
 		}
 		
 		if (scores1FwdPrevMax[seq1Length] != seq1Length)
 		{
-			seq1Lengths.push_back(scores1FwdPrevMax[seq1Length]);
-			seq2Lengths.push_back(seq2Length);
+			seq1Length = scores1FwdPrevMax[seq1Length];
+
+			if ((seq1Length >= minAnchor) && (seq2Length >= minAnchor))
+			{
+				return true;
+			}
 		}
 	}
 	
-	return score;
+	return false;
 }
+
+
+void Complement(char& nucleotide)
+{
+	switch (nucleotide)
+	{
+		case 'A': nucleotide = 'T'; break;
+		case 'C': nucleotide = 'G'; break;
+		case 'T': nucleotide = 'A'; break;
+		case 'G': nucleotide = 'C'; break;
+		case 'a': nucleotide = 't'; break;
+		case 'c': nucleotide = 'g'; break;
+		case 't': nucleotide = 'a'; break;
+		case 'g': nucleotide = 'c'; break;
+	}
+}
+
+
+int CalculateOffset(const string& strand, int offset)
+{
+	int dir = (strand == "+") ? 1 : -1;
+	return offset * dir;
+}
+
+
+int CalculateForwardHomology(const Sequences& sequences,
+                             const string (&chromosome)[2],
+                             const string (&strand)[2],
+                             const int (&position)[2],
+                             int maxOffset,
+                             bool flip=false)
+{
+	int idx1 = (flip) ? 1 : 0;
+	int idx2 = 1 - idx1;
+
+	const char* seqPtr1 = sequences.Get(chromosome[idx1], position[idx1]);
+	const char* seqPtr2 = sequences.Get(chromosome[idx2], position[idx2]);
+
+	int homology = 0;
+	for (int offset = 1; offset <= maxOffset; offset++)
+	{
+		char nt1 = *(seqPtr1 + CalculateOffset(strand[idx1], offset));
+		char nt2 = *(seqPtr2 + CalculateOffset(strand[idx2], 1 - offset));
+		
+		if (strand[idx1] != "+")
+		{
+			Complement(nt1);
+		}
+		
+		if (strand[idx2] != "-")
+		{
+			Complement(nt2);
+		}
+		
+		if (nt1 != nt2)
+		{
+			break;
+		}
+		
+		homology = offset;
+	}
+	
+	return homology;
+}
+
+
+void HomologyConsistentBreakpoint(const Sequences& sequences,
+                                  const string (&chromosome)[2],
+                                  const string (&strand)[2],
+                                  int (&position)[2],
+                                  int& homology,
+                                  int maxOffset)
+{
+	int maxOffset1 = CalculateForwardHomology(sequences, chromosome, strand, position, maxOffset, false);
+	int maxOffset2 = CalculateForwardHomology(sequences, chromosome, strand, position, maxOffset, true);
+
+	position[0] += CalculateOffset(strand[0], -maxOffset2);
+	position[1] += CalculateOffset(strand[1], maxOffset2);
+	homology = maxOffset1 + maxOffset2;
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -394,51 +484,56 @@ int main(int argc, char* argv[])
 					
 					DebugCheck(mateAlignment.readEnd == mateEnd);
 
-					IntegerVec seq1Length;
-					IntegerVec seq2Length;
-					int score = BestSplitAlignment(selfAlignInfo.SeqScores(), selfAlignInfo.SeqScoresLength(),
-												   mateAlignInfo.SeqScores(), mateAlignInfo.SeqScoresLength(),
-												   cInsertedPenalty, seq1Length, seq2Length);
+					int score;
+					int seq1Length;
+					int seq2Length;
+					bool hasSplit = BestSplitAlignment(selfAlignInfo.SeqScores(), selfAlignInfo.SeqScoresLength(),
+					                                   mateAlignInfo.SeqScores(), mateAlignInfo.SeqScoresLength(),
+					                                   cInsertedPenalty, cMinAnchor, score, seq1Length, seq2Length);
+
+					if (!hasSplit)
+					{
+						continue;
+					}
 
 					string readSeq = preppedReads.Sequence(readEnd);
-					
-					for (int i = 0; i < seq1Length.size(); i++)
+
+					string inserted = readSeq.substr(seq1Length, readSeq.size() - seq2Length - seq1Length);
+
+					int alignedLength = readSeq.size() - inserted.size();
+					int alignedScore = score - cInsertedPenalty * (int)inserted.size();
+
+					if (!alignProbability.AboveThreshold(alignedLength, alignedScore))
 					{
-						if (seq1Length[i] < cMinAnchor || seq2Length[i] < cMinAnchor)
-						{
-							continue;
-						}
-
-						string inserted = readSeq.substr(seq1Length[i], readSeq.size() - seq2Length[i] - seq1Length[i]);
-
-						int alignedLength = readSeq.size() - inserted.size();
-						int alignedScore = score - cInsertedPenalty * (int)inserted.size();
-
-						if (!alignProbability.AboveThreshold(alignedLength, alignedScore))
-						{
-							continue;
-						}
-
-						SplitAlignmentRecord record;
-						record.libID = libID;
-						record.readID = readID;
-						record.readEnd = selfAlignment.readEnd;
-						record.alignID[readEnd] = selfAlignmentIndex;
-						record.chromosome[readEnd] = selfAlignment.reference;
-						record.strand[readEnd] = ((selfAlignment.strand == PlusStrand) ? "+" : "-");
-						record.position[readEnd] = selfAlignInfo.BreakPosition(seq1Length[i]);
-						record.alignID[mateEnd] = mateAlignmentIndex;
-						record.chromosome[mateEnd] = mateAlignment.reference;
-						record.strand[mateEnd] = ((mateAlignment.strand == PlusStrand) ? "+" : "-");
-						record.position[mateEnd] = mateAlignInfo.BreakPosition(seq2Length[i]);
-						record.inserted = readSeq.substr(seq1Length[i], readSeq.size() - seq2Length[i] - seq1Length[i]);
-						record.score = score;
-
-						splitRecords.push_back(record);
-
-						validSplitReadEnd[readEnd] = true;
-						validSplitAlignment[selfAlignmentIndex] = true;
+						continue;
 					}
+
+					SplitAlignmentRecord record;
+					record.libID = libID;
+					record.readID = readID;
+					record.readEnd = selfAlignment.readEnd;
+					record.alignID[readEnd] = selfAlignmentIndex;
+					record.chromosome[readEnd] = selfAlignment.reference;
+					record.strand[readEnd] = ((selfAlignment.strand == PlusStrand) ? "+" : "-");
+					record.position[readEnd] = selfAlignInfo.BreakPosition(seq1Length);
+					record.alignID[mateEnd] = mateAlignmentIndex;
+					record.chromosome[mateEnd] = mateAlignment.reference;
+					record.strand[mateEnd] = ((mateAlignment.strand == PlusStrand) ? "+" : "-");
+					record.position[mateEnd] = mateAlignInfo.BreakPosition(seq2Length);
+					record.homology = 0;
+					record.inserted = readSeq.substr(seq1Length, readSeq.size() - seq2Length - seq1Length);
+					record.score = score;
+
+					if (record.inserted.empty())
+					{
+						HomologyConsistentBreakpoint(referenceSequences, record.chromosome, record.strand,
+						                             record.position, record.homology, readSeq.size());
+					}
+
+					splitRecords.push_back(record);
+
+					validSplitReadEnd[readEnd] = true;
+					validSplitAlignment[selfAlignmentIndex] = true;
 				}
 			}
 		}

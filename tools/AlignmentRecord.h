@@ -61,6 +61,7 @@ struct SplitAlignmentRecord
 	string chromosome[2];
 	string strand[2];
 	int position[2];
+	int homology;
 	string inserted;
 	int score;
 
@@ -96,6 +97,7 @@ struct BreakpointRecord
 	string strand[2];
 	int position[2];
 	int count;
+	int homology;
 	string inserted;
 };
 

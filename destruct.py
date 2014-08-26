@@ -683,8 +683,8 @@ else:
         breakpoint_counts = likelihoods.groupby(['cluster_id', 'library_id'])\
                                        .size()\
                                        .unstack()\
-				       .fillna(0)\
-				       .astype(int)\
+                                       .fillna(0)\
+                                       .astype(int)\
                                        .rename(columns=lib_names)
         breakpoint_counts.columns = [a+'_count' for a in breakpoint_counts.columns]
 

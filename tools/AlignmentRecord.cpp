@@ -72,6 +72,7 @@ std::ostream & operator<<(std::ostream &os, const SplitAlignmentRecord& record)
 		os << record.strand[readEnd] << "\t";
 		os << record.position[readEnd] << "\t";
 	}
+	os << record.homology << "\t";
 	if (record.inserted.empty())
 	{
 		os << ".\t";
@@ -96,6 +97,7 @@ std::istream & operator>>(std::istream &is, SplitAlignmentRecord& record)
 		is >> record.strand[readEnd];
 		is >> record.position[readEnd];
 	}
+	is >> record.homology;
 	is >> record.inserted;
 	if (record.inserted == ".")
 	{
@@ -168,6 +170,7 @@ std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record)
 		os << record.position[clusterEnd] << "\t";
 	}
 	os << record.count << "\t";
+	os << record.homology << "\t";
 	os << record.inserted << std::endl;
 	return os;
 }
@@ -183,7 +186,12 @@ std::istream & operator>>(std::istream &is, BreakpointRecord& record)
 		is >> record.position[clusterEnd];
 	}
 	is >> record.count;
+	is >> record.homology;
 	is >> record.inserted;
+	if (record.inserted == ".")
+	{
+		record.inserted = "";
+	}
 	return is;
 }
 
