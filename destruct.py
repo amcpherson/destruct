@@ -738,7 +738,7 @@ else:
                 ids = row[1::4]
                 cluster_id = ids[0]
                 num_cycle_breaks = len(ids)
-                cycles_table.append((cluster_id, score_num_cycle_breaks, ', '.join(ids)))
+                cycles_table.append((cluster_id, score, num_cycle_breaks, ', '.join(ids)))
 
         cycles_columns = ['cluster_id', 'cycle_score', 'cycle_num_breaks', 'cycle_ids']
 
