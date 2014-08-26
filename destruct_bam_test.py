@@ -162,15 +162,15 @@ else:
             matched_ids = list()
             for side in ('1', '2'):
                 chrom_strand_positions = self.positions[(row['chromosome_'+side], row['strand_'+side])]
-                idx = bisect.bisect_left(chrom_strand_positions, row['break_'+side] - extend)
+                idx = bisect.bisect_left(chrom_strand_positions, row['position_'+side] - extend)
                 side_matched_ids = list()
                 while idx < len(chrom_strand_positions):
                     pos = chrom_strand_positions[idx]
-                    dist = abs(pos - row['break_'+side])
-                    if pos >= row['break_'+side] - extend and pos <= row['break_'+side] + extend:
+                    dist = abs(pos - row['position_'+side])
+                    if pos >= row['position_'+side] - extend and pos <= row['position_'+side] + extend:
                         for break_id in self.break_ids[(row['chromosome_'+side], row['strand_'+side], pos)]:
                             side_matched_ids.append((break_id, dist))
-                    if pos > row['break_'+side] + extend:
+                    if pos > row['position_'+side] + extend:
                         break
                     idx += 1
                 matched_ids.append(side_matched_ids)
@@ -209,7 +209,7 @@ else:
 
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
-        identified_columns = ['align_prob', 'valid_prob', 'chimeric_prob', 'tumour_count', 'num_split']
+        identified_columns = ['tumour_count', 'num_split']
 
         identified = breakpoints[['break_id']]
         identified = identified.merge(results[['cluster_id', 'true_pos_id'] + identified_columns], left_on='break_id', right_on='true_pos_id', how='outer')
@@ -227,7 +227,7 @@ else:
 
         fig = plt.figure(figsize=(16,16))
 
-        for feature in ('align_prob', 'valid_prob', 'chimeric_prob', 'tumour_count', 'num_split'):
+        for feature in ('tumour_count', 'num_split'):
             probs = np.concatenate([results[feature], np.array([0.0]*num_missed)])
             fpr, tpr, thresholds = roc_curve(y_test, probs)
             roc_auc = auc(fpr, tpr)
