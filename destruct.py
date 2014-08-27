@@ -668,7 +668,7 @@ else:
         breakpoints = breakpoints.rename(columns={'count':'num_split'})
         breakpoints.loc[breakpoints['inserted'] == '.', 'inserted'] = ''
 
-        breakpoints = normalize_breakpoints(breakpoints)
+        breakpoints = utils.misc.normalize_breakpoints(breakpoints)
 
         likelihoods = pd.read_csv(likelihoods_filename, sep='\t',
                                   names=predict_breaks.likelihoods_fields,
