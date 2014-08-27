@@ -126,7 +126,7 @@ else:
 
         # Realign reads to breakpoints
 
-        sch.commandline('realigntobreaks', ('bylibrary', 'byread'), lowmem,
+        sch.commandline('realigntobreaks', ('bylibrary', 'byread'), medmem,
             cfg.realigntobreaks2_tool,
             '-r', cfg.genome_fasta,
             '-b', sch.ifile('breakpoints_2'),
