@@ -260,14 +260,14 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
 
 
 def read_merge_write(in_filename, in_names, to_merge, merge_cols, out_filename):
-    csv_iter = pd.read_csv(in_filename, sep='\t', names=in_names,
-                           iterator=True, chunksize=1000)
-    first = True
-    for chunk in csv_iter:
-        chunk = chunk.merge(to_merge, left_on=merge_cols,
-                            right_index=True, how='inner')
-        chunk.to_csv(out_filename, sep='\t', mode=('a', 'w')[first], index=False, header=False)
-        first = False
+
+    to_merge = to_merge[merge_cols].drop_duplicates()
+
+    data = pd.read_csv(in_filename, sep='\t', names=in_names)
+
+    data = data.merge(to_merge, on=merge_cols, how='inner')
+
+    data.to_csv(out_filename, sep='\t', index=False, header=False)
 
 
 def select_clusters(clusters_filename,
@@ -277,17 +277,11 @@ def select_clusters(clusters_filename,
     clusters = pd.read_csv(clusters_filename, sep='\t', names=cluster_fields,
                            usecols=['cluster_id', 'library_id', 'read_id'])
 
-    likelihoods_index = ['cluster_id', 'library_id', 'read_id']
-    selected = clusters[likelihoods_index].drop_duplicates().set_index(likelihoods_index)
-
-    read_merge_write(likelihoods_filename, likelihoods_fields, selected,
+    read_merge_write(likelihoods_filename, likelihoods_fields, clusters,
                      ['cluster_id', 'library_id', 'read_id'],
                      selected_likelihoods_filename)
 
-    breakpoints_index = ['cluster_id']
-    selected = clusters[breakpoints_index].drop_duplicates().set_index(breakpoints_index)
-
-    read_merge_write(breakpoints_filename, breakpoint_fields, selected,
+    read_merge_write(breakpoints_filename, breakpoint_fields, clusters,
                      ['cluster_id'],
                      selected_breakpoints_filename)
 
@@ -302,8 +296,6 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                           .groupby(level=[0])['log_likelihood']\
                           .idxmax()
     selected = pd.DataFrame(list(selected.values), columns=['cluster_id', 'prediction_id'])
-
-    selected.set_index(['cluster_id', 'prediction_id'], inplace=True)
 
     read_merge_write(likelihoods_filename, likelihoods_fields, selected,
                      ['cluster_id', 'prediction_id'],
