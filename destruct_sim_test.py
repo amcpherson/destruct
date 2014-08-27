@@ -178,10 +178,10 @@ else:
 
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
-        identified_columns = ['simulated_count', 'num_split']
+        features = ['simulated_count', 'num_split', 'log_likelihood', 'log_cdf']
 
         identified = breakpoints[['break_id']]
-        identified = identified.merge(results[['cluster_id', 'true_pos_id'] + identified_columns], left_on='break_id', right_on='true_pos_id', how='outer')
+        identified = identified.merge(results[['cluster_id', 'true_pos_id'] + features], left_on='break_id', right_on='true_pos_id', how='outer')
         identified = identified.drop('true_pos_id', axis=1)
 
         identified.to_csv(identified_filename, sep='\t', index=False, na_rep='NA')
@@ -196,7 +196,7 @@ else:
 
         fig = plt.figure(figsize=(16,16))
 
-        for feature in ('simulated_count', 'num_split'):
+        for feature in features:
             probs = np.concatenate([results[feature], np.array([0.0]*num_missed)])
             fpr, tpr, thresholds = roc_curve(y_test, probs)
             roc_auc = auc(fpr, tpr)

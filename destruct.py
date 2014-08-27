@@ -675,8 +675,8 @@ else:
                                   converters=converters)
         likelihoods = likelihoods.drop(['prediction_id'], axis=1)
 
-        agg_f = {'log_likelihood':sum,
-                 'log_cdf':sum,
+        agg_f = {'log_likelihood':np.average,
+                 'log_cdf':np.average,
                  'template_length_1':max,
                  'template_length_2':max}
 
