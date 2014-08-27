@@ -293,8 +293,8 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                               usecols=['cluster_id', 'prediction_id', 'log_likelihood'])
 
     selected = likelihoods.set_index(['cluster_id', 'prediction_id'])\
-                          .groupby(level=[0])['log_likelihood']\
-                          .idxmax()
+                          .groupby(level=[0, 1])['log_likelihood'].sum()\
+                          .groupby(level=[0]).idxmax()
     selected = pd.DataFrame(list(selected.values), columns=['cluster_id', 'prediction_id'])
 
     read_merge_write(likelihoods_filename, likelihoods_fields, selected,

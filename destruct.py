@@ -203,7 +203,7 @@ else:
             None,
             sch.ifile('breakpoints_1'),
             sch.ofile('breakpoints'),
-            sch.ifile('likelihoods_2'),
+            sch.ifile('likelihoods_1'),
             sch.ofile('likelihoods'))
 
 
