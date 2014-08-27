@@ -186,7 +186,7 @@ def calculate_cluster_weights(breakpoints_filename, weights_filename):
     
     breakpoints = breakpoints[breakpoints['prediction_id'] == 0]
 
-    breakpoints['distance'] = np.absolute(breakpoints['position_1'] - breakpoints['position_2'])
+    breakpoints['distance'] = np.absolute(breakpoints['position_1'] - breakpoints['position_2']) + 1.0
     breakpoints.loc[breakpoints['chromosome_1'] != breakpoints['chromosome_2'], 'distance'] = itx_distance
     breakpoints['weight'] = 1.0 + epsilon * np.log(breakpoints['distance'])
 
