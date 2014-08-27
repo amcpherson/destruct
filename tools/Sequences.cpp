@@ -37,6 +37,7 @@ void Sequences::Read(const string& fastaFilename)
 			if (!id.empty())
 			{
 				sequence.append(string(mPadding,'N'));
+				sequence.reserve(0);
 				mSequences[id] = sequence;
 				mNames.push_back(id);
 			}
