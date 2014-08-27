@@ -52,7 +52,7 @@ else:
 
     locally = {'local':True}
     lowmem = {'mem':1}
-    medmem = {'mem':8}
+    medmem = {'mem':6}
     himem = {'mem':32}
 
     def multilib_predict_breakpoints(sch, cfg, bams, breakpoints, breakreads, plots_tar):
@@ -142,7 +142,7 @@ else:
 
         # Calculate likelihoods based on realignments
 
-        sch.transform('calculate_realignment_likelihoods', ('bylibrary', 'byread'), lowmem,
+        sch.transform('calculate_realignment_likelihoods', ('bylibrary', 'byread'), medmem,
             predict_breaks.calculate_realignment_likelihoods,
             None,
             sch.ifile('breakpoints_2'),
@@ -171,7 +171,7 @@ else:
 
         # Set cover for multi mapping reads
 
-        sch.transform('calc_weights', (), lowmem,
+        sch.transform('calc_weights', (), medmem,
             predict_breaks.calculate_cluster_weights,
             None,
             sch.ifile('breakpoints_2'),
