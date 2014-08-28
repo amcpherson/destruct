@@ -177,7 +177,7 @@ else:
             sch.ifile('breakpoints_2'),
             sch.ofile('cluster_weights'))
 
-        sch.commandline('setcover', (), himem,
+        sch.commandline('setcover', (), medmem,
             cfg.setcover_tool,
             '-c', sch.ifile('clusters'),
             '-w', sch.ifile('cluster_weights'),
@@ -186,7 +186,7 @@ else:
 
         # Select cluster based on setcover
 
-        sch.transform('select_clusters', (), lowmem,
+        sch.transform('select_clusters', (), medmem,
             predict_breaks.select_clusters,
             None,
             sch.ifile('clusters_setcover'),
@@ -198,7 +198,7 @@ else:
 
         # Select prediction based on max likelihood
 
-        sch.transform('select_predictions', (), lowmem,
+        sch.transform('select_predictions', (), medmem,
             predict_breaks.select_predictions,
             None,
             sch.ifile('breakpoints_1'),
@@ -219,7 +219,7 @@ else:
             int(cfg.clusters_per_split),
             sch.ofile('clusters.ids', ('bycluster',)))
 
-        sch.commandline('cycles', ('bycluster',), himem,
+        sch.commandline('cycles', ('bycluster',), medmem,
             cfg.cycles_tool,
             '-b', sch.ifile('breakpoints'),
             '--idsfile', sch.ifile('clusters.ids', ('bycluster',)),
@@ -249,7 +249,7 @@ else:
         sch.commandline('sortreads', (), medmem,
             'sort', '-n', sch.ifile('breakreads.table.unsorted'), '>', breakreads)
 
-        sch.transform('tabulate', (), himem,
+        sch.transform('tabulate', (), medmem,
             tabulate_results,
             None,
             sch.ifile('breakpoints'),
