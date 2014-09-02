@@ -55,7 +55,7 @@ bool BestSplitAlignment(const short int* scores1Fwd, int scores1FwdLength,
 	IntegerVec seq1LengthMax;
 	
 	score = numeric_limits<int>::min();
-	for (int seq1Length = 0; seq1Length < scores1FwdLength; seq1Length++)
+	for (seq1Length = 0; seq1Length < scores1FwdLength; seq1Length++)
 	{
 		int seq2Length = scores2RevLength - seq1Length - 1;
 		
