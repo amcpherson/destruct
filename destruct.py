@@ -240,7 +240,7 @@ else:
         sch.transform('tabreads', (), medmem,
             tabulate_reads,
             None,
-            sch.ifile('clusters'),
+            sch.ifile('clusters_setcover'),
             sch.iobj('libinfo', ('bylibrary',)),
             sch.ifile('reads1', ('bylibrary',)),
             sch.ifile('reads2', ('bylibrary',)),
