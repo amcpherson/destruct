@@ -53,7 +53,7 @@ else:
     locally = {'local':True}
     lowmem = {'mem':1}
     medmem = {'mem':6}
-    himem = {'mem':32}
+    himem = {'mem':16}
 
     def multilib_predict_breakpoints(sch, cfg, bams, breakpoints, breakreads, plots_tar):
 
@@ -198,7 +198,7 @@ else:
 
         # Select prediction based on max likelihood
 
-        sch.transform('select_predictions', (), medmem,
+        sch.transform('select_predictions', (), himem,
             predict_breaks.select_predictions,
             None,
             sch.ifile('breakpoints_1'),
@@ -240,7 +240,7 @@ else:
         sch.transform('tabreads', (), medmem,
             tabulate_reads,
             None,
-            sch.ifile('clusters'),
+            sch.ifile('clusters_setcover'),
             sch.iobj('libinfo', ('bylibrary',)),
             sch.ifile('reads1', ('bylibrary',)),
             sch.ifile('reads2', ('bylibrary',)),
@@ -249,7 +249,7 @@ else:
         sch.commandline('sortreads', (), medmem,
             'sort', '-n', sch.ifile('breakreads.table.unsorted'), '>', breakreads)
 
-        sch.transform('tabulate', (), medmem,
+        sch.transform('tabulate', (), himem,
             tabulate_results,
             None,
             sch.ifile('breakpoints'),
