@@ -97,6 +97,7 @@ int main(int argc, char* argv[])
 			if (clusterID != ids[weights.size()])
 			{
 				cerr << "Error: id mismatch, weights must be ordered identically to clusters" << endl;
+				exit(1);
 			}
 
 			weights.push_back(weight);

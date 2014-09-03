@@ -100,6 +100,7 @@ struct BreakpointRecord
 	int count;
 	int homology;
 	string inserted;
+	float mateScore;
 };
 
 std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record);
