@@ -161,7 +161,8 @@ std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record)
 	}
 	os << record.count << "\t";
 	os << record.homology << "\t";
-	os << record.inserted << std::endl;
+	os << record.inserted << "\t";
+	os << record.mateScore << std::endl;
 	return os;
 }
 
@@ -182,6 +183,7 @@ std::istream & operator>>(std::istream &is, BreakpointRecord& record)
 	{
 		record.inserted = "";
 	}
+	is >> record.mateScore;
 	return is;
 }
 

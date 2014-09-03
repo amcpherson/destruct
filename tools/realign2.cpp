@@ -577,8 +577,7 @@ int main(int argc, char* argv[])
 				unordered_map<int,AlignInfo>::const_iterator mateAlignIter = mateRevAlignments.find(alignmentIndex);
 				if (mateAlignIter != mateRevAlignments.end())
 				{
-
-					mateScore = mateAlignIter->second.SeqScores()[alignedLength[mateEnd]];
+					mateScore = max((short)0, mateAlignIter->second.SeqScores()[alignedLength[mateEnd]]);
 				}
 
 				if (!validSpanningAlignment[alignmentIndex] && !validSplitAlignment[alignmentIndex])
