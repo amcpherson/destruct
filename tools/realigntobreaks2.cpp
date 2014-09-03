@@ -195,7 +195,7 @@ int main(int argc, char* argv[])
 			const SpanningAlignmentRecord& spanningRecord = alignIter->second;
 
 			// Calculate the length between the breakend and the start of the read
-			int templateLength = abs(spanningRecord.GetOuterPosition() - breakpointRecord.position[memberRecord.clusterEnd]) + 1;
+			int templateLength = abs(spanningRecord.position - breakpointRecord.position[memberRecord.clusterEnd]) + 1;
 
 			// Calculate position of alignment in breakpoint sequence
 			int adjustedPosition = maxFragmentLength - templateLength;

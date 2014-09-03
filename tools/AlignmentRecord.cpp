@@ -18,20 +18,6 @@ AlignmentKey SpanningAlignmentRecord::GetAlignmentKey() const
 	return alignKey;
 }
 
-int SpanningAlignmentRecord::GetOuterPosition() const
-{
-	DebugCheck(strand == "+" || strand == "-");
-
-	if (strand == "+")
-	{
-		return start;
-	}
-	else
-	{
-		return end;
-	}
-}
-
 std::ostream & operator<<(std::ostream &os, const SpanningAlignmentRecord& record)
 {
 	os << record.libID << "\t";
@@ -40,9 +26,11 @@ std::ostream & operator<<(std::ostream &os, const SpanningAlignmentRecord& recor
 	os << record.alignID << "\t";
 	os << record.chromosome << "\t";
 	os << record.strand << "\t";
-	os << record.start << "\t";
-	os << record.end << "\t";
-	os << record.score << std::endl;
+	os << record.position << "\t";
+	os << record.selfLength << "\t";
+	os << record.selfScore << "\t";
+	os << record.mateLength << "\t";
+	os << record.mateScore << std::endl;
 	return os;
 }
 
@@ -54,9 +42,11 @@ std::istream & operator>>(std::istream &is, SpanningAlignmentRecord& record)
 	is >> record.alignID;
 	is >> record.chromosome;
 	is >> record.strand;
-	is >> record.start;
-	is >> record.end;
-	is >> record.score;
+	is >> record.position;
+	is >> record.selfLength;
+	is >> record.selfScore;
+	is >> record.mateLength;
+	is >> record.mateScore;
 	return is;
 }
 

@@ -40,12 +40,13 @@ struct SpanningAlignmentRecord
 	int alignID;
 	string chromosome;
 	string strand;
-	int start;
-	int end;
-	int score;
+	int position;
+	int selfLength;
+	int selfScore;
+	int mateLength;
+	int mateScore;
 
 	AlignmentKey GetAlignmentKey() const;
-	int GetOuterPosition() const;
 };
 
 std::ostream & operator<<(std::ostream &os, const SpanningAlignmentRecord& record);
