@@ -682,6 +682,8 @@ else:
 
         breakpoint_stats = likelihoods.groupby('cluster_id').agg(agg_f)
 
+        breakpoint_stats['template_length_min'] = breakpoint_stats[['template_length_1', 'template_length_2']].min(axis=1)
+
         breakpoint_counts = likelihoods.groupby(['cluster_id', 'library_id'])\
                                        .size()\
                                        .unstack()\

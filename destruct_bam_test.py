@@ -209,7 +209,7 @@ else:
 
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
-        features = ['tumour_count', 'num_split', 'log_likelihood', 'log_cdf']
+        features = ['tumour_count', 'num_split', 'log_likelihood', 'log_cdf', 'mate_score', 'template_length_min']
 
         identified = breakpoints[['break_id']]
         identified = identified.merge(results[['cluster_id', 'true_pos_id'] + features], left_on='break_id', right_on='true_pos_id', how='outer')
