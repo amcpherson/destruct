@@ -564,9 +564,22 @@ int main(int argc, char* argv[])
 
 				const RawAlignment& alignment = alignments[alignmentIndex];
 				
+				DebugCheck(alignment.readEnd == readEnd);
+				
+				int mateEnd = OtherReadEnd(readEnd);
+
 				AlignInfo alignInfo = selfAlignments[alignmentIndex];
 				
-				int score = alignInfo.SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
+				int selfScore = alignInfo.SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
+
+				int mateScore = 0;
+
+				unordered_map<int,AlignInfo>::const_iterator mateAlignIter = mateRevAlignments.find(alignmentIndex);
+				if (mateAlignIter != mateRevAlignments.end())
+				{
+
+					mateScore = mateAlignIter->second.SeqScores()[alignedLength[mateEnd]];
+				}
 
 				if (!validSpanningAlignment[alignmentIndex] && !validSplitAlignment[alignmentIndex])
 				{
@@ -580,9 +593,11 @@ int main(int argc, char* argv[])
 				record.alignID = alignmentIndex;
 				record.chromosome = alignment.reference;
 				record.strand = ((alignment.strand == PlusStrand) ? "+" : "-");
-				record.start = alignInfo.AlignmentStart(preppedReads.ReadLength(alignment.readEnd));
-				record.end = alignInfo.AlignmentEnd(preppedReads.ReadLength(alignment.readEnd));
-				record.score = score;
+				record.position = alignInfo.OuterPosition();
+				record.selfLength = preppedReads.ReadLength(readEnd);
+				record.selfScore = selfScore;
+				record.mateLength = preppedReads.ReadLength(mateEnd);
+				record.mateScore = mateScore;
 
 				spanningFile << record;
 			}

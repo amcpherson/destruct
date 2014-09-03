@@ -13,7 +13,9 @@ cluster_fields = ['cluster_id', 'cluster_end',
 
 
 spanning_fields = ['library_id', 'read_id', 'read_end', 'align_id',
-                   'chromosome', 'strand', 'start', 'end', 'score']
+                   'chromosome', 'strand', 'position',
+                   'self_length', 'self_score',
+                   'mate_length', 'mate_score']
 
 
 split_fields = ['library_id', 'read_id', 'read_end',
@@ -53,6 +55,11 @@ def predict_breaks_spanning(clusters, spanning):
 
     # Create a table of spanning alignments for this cluster
     data = spanning.merge(clusters, on=['library_id', 'read_id', 'read_end', 'align_id'])
+
+    # Add start and end based on position and read length, assuming
+    # the full read length aligns
+    data['start'] = np.where(data['strand'] == '+', data['position'], data['position'] - data['self_length'] + 1)
+    data['end'] = np.where(data['strand'] == '+', data['position'] + data['self_length'] - 1, data['position'])
 
     # Predict based on spanning reads
     agg_f = {'chromosome':max, 'strand':max, 'start':min, 'end':max}
