@@ -252,7 +252,6 @@ int main(int argc, char* argv[])
 	CheckFile(splitFile, splitFilename);
 	
 	const int cSeedScoreThreshold = 8;
-	const int cMaxBreakpointHomology = 25;
 	const int cMinAnchor = 8;
 	const int cBreakEndAdjust = 5;
 	const int cInsertedPenalty = -1;
