@@ -210,6 +210,7 @@ else:
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
         features = ['tumour_count', 'num_split', 'log_likelihood', 'log_cdf', 'mate_score', 'template_length_min']
+        invalid_value = -1e9
 
         identified = breakpoints[['break_id']]
         identified = identified.merge(results[['cluster_id', 'true_pos_id'] + features], left_on='break_id', right_on='true_pos_id', how='outer')
@@ -223,13 +224,17 @@ else:
 
         num_missed = num_positive - np.sum(y_test)
 
-        y_test = np.concatenate([y_test, np.array([False]*num_missed)])
+        y_test = np.concatenate([y_test, np.array([True]*num_missed)])
+
+        if y_test.sum() == len(y_test):
+            y_test = np.concatenate([y_test, np.array([False])])
 
         fig = plt.figure(figsize=(16,16))
 
         for feature in features:
-            probs = np.concatenate([results[feature], np.array([0.0]*num_missed)])
-            fpr, tpr, thresholds = roc_curve(y_test, probs)
+            values = results[feature].values
+            values = np.concatenate([values, np.array([invalid_value] * (len(y_test) - len(values)))])
+            fpr, tpr, thresholds = roc_curve(y_test, values)
             roc_auc = auc(fpr, tpr)
             plt.plot(fpr, tpr, label='{0} AUC = {1:.2f}'.format(feature, roc_auc))
 
