@@ -6,18 +6,16 @@ import matplotlib.pyplot as plt
 
 import utils.plots
 
+
 def load_align_data_hist(filename):
-    reader = pd.read_table(filename, sep='\t', names=['aligned_length', 'score'], chunksize=1024*1024)
-    align_data_hist = None
-    for chunk in reader:
-        chunk_hist = chunk.groupby(['aligned_length', 'score']).size()
-        if align_data_hist is None:
-            align_data_hist = chunk_hist
-            continue
-        align_data_hist, chunk_hist = align_data_hist.align(chunk_hist, fill_value=0)
-        align_data_hist += chunk_hist
+
+    data = pd.read_table(filename, sep='\t', names=['aligned_length', 'score'])
+
+    align_data_hist = data.groupby(['aligned_length', 'score']).size()
     align_data_hist.name = 'freq'
+
     return align_data_hist.reset_index()
+
 
 def create_score_stats(true_scores_filename, match_score, score_stats_filename, plots_tar_filename, library_id):
     ''' Infer distribution of null alignment scores and true alignment scores from samples of null and true scores.
