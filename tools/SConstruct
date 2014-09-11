@@ -92,6 +92,7 @@ env.Program(target='testsplit', source=common_sources+sources)
 sources = """
     aligntrue.cpp
     AlignmentStream.cpp
+    ReadStream.cpp
     Sequences.cpp
     SimpleAligner.cpp
 """.split()

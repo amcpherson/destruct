@@ -126,10 +126,6 @@ if __name__ == '__main__':
         pypeliner.commandline.execute(cfg.bowtie_build_bin, cfg.genome_fasta, cfg.genome_fasta)
     auto_sentinal.run(bowtie_build)
 
-    def bowtie2_build():
-        pypeliner.commandline.execute(cfg.bowtie2_build_bin, cfg.genome_fasta, cfg.genome_fasta)
-    auto_sentinal.run(bowtie2_build)
-
     def samtools_faidx():
         pypeliner.commandline.execute(cfg.samtools_bin, 'faidx', cfg.genome_fasta)
     auto_sentinal.run(samtools_faidx)

@@ -299,12 +299,48 @@ else:
 
         '''
         inputs: 'sample1', 'sample2'
-        outputs: 'samples.align.true', 'samples.align.null'
+        outputs: 'samples.align.true'
         '''
 
-        sch.commandline('bwtsample', axes, medmem, cfg.bowtie2_bin, '--no-mixed', '--no-discordant', '--very-sensitive', '-X', cfg.fragment_length_max, cfg.bowtie2_options, '-x', cfg.genome_fasta, '-1', sch.ifile('sample1', axes), '-2', sch.ifile('sample2', axes), '>', sch.ofile('sample.sam', axes))
-        sch.commandline('aligntrue', axes, medmem, cfg.aligntrue_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-r', cfg.genome_fasta, '-a', sch.ifile('sample.sam', axes), '>', sch.ofile('samples.align.true', axes))
-        sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), int(cfg.match_score), sch.ofile('score.stats', axes), sch.ofile('score.stats.plots', axes), sch.inst('bylibrary'))
+        sch.transform('prepseed_sample', axes, medmem, 
+            prepare_seed_fastq,
+            None,
+            sch.ifile('sample1', axes),
+            sch.ifile('sample2', axes),
+            36,
+            sch.ofile('sample.seed', axes))
+
+        sch.commandline('bwtrealign_sample', axes, medmem,
+            cfg.bowtie_bin,
+            cfg.genome_fasta,
+            sch.ifile('sample.seed', axes),
+            '--chunkmbs', '512',
+            '-k', '1000',
+            '-m', '1000',
+            '--strata',
+            '--best',
+            '-S',
+            '|',
+            cfg.aligntrue_tool,
+            '-a', '-',
+            '-1', sch.ifile('sample1', axes),
+            '-2', sch.ifile('sample2', axes),
+            '-r', cfg.genome_fasta,
+            '-g', cfg.gap_score,
+            '-x', cfg.mismatch_score,
+            '-m', cfg.match_score,
+            '--flmin', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_min'),
+            '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'),
+            '-s', sch.ofile('samples.align.true', axes))
+
+        sch.transform('scorestats', axes, medmem,
+            score_stats.create_score_stats,
+            None,
+            sch.ifile('samples.align.true', axes),
+            int(cfg.match_score),
+            sch.ofile('score.stats', axes),
+            sch.ofile('score.stats.plots', axes),
+            sch.inst('bylibrary'))
 
 
     def align_reads(sch, cfg, axes):
