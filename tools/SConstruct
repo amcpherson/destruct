@@ -112,11 +112,6 @@ sources = """
 env.Program(target='filterreads', source=common_sources+sources)
 
 sources = """
-    qualtrimfastq.cpp
-""".split()
-env.Program(target='qualtrimfastq', source=common_sources+sources)
-
-sources = """
     SimpleAligner.cpp
     testssealign.cpp
 """.split()
