@@ -136,7 +136,8 @@ else:
             '-m', cfg.match_score,
             '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'),
             '--span', sch.ifile('spanning.alignments', ('bylibrary', 'byread')),
-            '--seqs', sch.ifile('reads', ('bylibrary', 'byread')),
+            '-1', sch.ifile('reads1', ('bylibrary', 'byread')),
+            '-2', sch.ifile('reads2', ('bylibrary', 'byread')),
             '--realignments', sch.ofile('realignments', ('bylibrary', 'byread')))
 
 
@@ -313,9 +314,43 @@ else:
         outputs: 'spanning.alignments', 'split.alignments'
         '''
 
-        sch.transform('prepseed', axes, medmem, prepare_seed_fastq, None, sch.ifile('reads1', axes), sch.ifile('reads2', axes), 36, sch.ofile('reads.seed', axes))
-        sch.commandline('prepreads', axes, medmem, 'cat', sch.ifile('reads1', axes), sch.ifile('reads2', axes), '>', sch.ofile('reads', axes))
-        sch.commandline('bwtrealign', axes, medmem, cfg.bowtie_bin, cfg.genome_fasta, sch.ifile('reads.seed', axes), '--chunkmbs', '512', '-k', '1000', '-m', '1000', '--strata', '--best', '-S', '|', cfg.realign2_tool, '-l', sch.iobj('libinfo', ('bylibrary',)).prop('id'), '-a', '-', '-s', sch.ifile('reads', axes), '-r', cfg.genome_fasta, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmin', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_min'), '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'), '--tchimer', cfg.chimeric_threshold, '--talign', cfg.alignment_threshold, '--pchimer', cfg.chimeric_prior, '--tvalid', cfg.readvalid_threshold, '-z', sch.ifile('score.stats', ('bylibrary',)), '--span', sch.ofile('spanning.alignments', axes), '--split', sch.ofile('split.alignments', axes))
+        sch.transform('prepseed', axes, medmem, 
+            prepare_seed_fastq,
+            None,
+            sch.ifile('reads1', axes),
+            sch.ifile('reads2', axes),
+            36,
+            sch.ofile('reads.seed', axes))
+
+        sch.commandline('bwtrealign', axes, medmem,
+            cfg.bowtie_bin,
+            cfg.genome_fasta,
+            sch.ifile('reads.seed', axes),
+            '--chunkmbs', '512',
+            '-k', '1000',
+            '-m', '1000',
+            '--strata',
+            '--best',
+            '-S',
+            '|',
+            cfg.realign2_tool,
+            '-l', sch.iobj('libinfo', ('bylibrary',)).prop('id'),
+            '-a', '-',
+            '-1', sch.ifile('reads1', axes),
+            '-2', sch.ifile('reads2', axes),
+            '-r', cfg.genome_fasta,
+            '-g', cfg.gap_score,
+            '-x', cfg.mismatch_score,
+            '-m', cfg.match_score,
+            '--flmin', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_min'),
+            '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'),
+            '--tchimer', cfg.chimeric_threshold,
+            '--talign', cfg.alignment_threshold,
+            '--pchimer', cfg.chimeric_prior,
+            '--tvalid', cfg.readvalid_threshold,
+            '-z', sch.ifile('score.stats', ('bylibrary',)),
+            '--span', sch.ofile('spanning.alignments', axes),
+            '--split', sch.ofile('split.alignments', axes))
 
 
     def prepare_seed_fastq(reads_1_fastq, reads_2_fastq, seed_length, seed_fastq):
