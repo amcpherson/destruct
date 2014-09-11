@@ -272,15 +272,42 @@ else:
         outputs: 'spanning.alignments', 'split.alignments'
         '''
 
-        sch.transform('splitfastq1', axes, lowmem, split_fastq, None, sch.ifile('reads1', axes), int(cfg.reads_per_split), sch.ofile('reads1', axes + ('byread',)))
-        sch.transform('splitfastq2', axes, lowmem, split_fastq, None, sch.ifile('reads2', axes), int(cfg.reads_per_split), sch.ofile('reads2', axes + ('byread2',)))
+        sch.transform('splitfastq1', axes, lowmem,
+            split_fastq,
+            None,
+            sch.ifile('reads1', axes),
+            int(cfg.reads_per_split),
+            sch.ofile('reads1', axes + ('byread',)))
+
+        sch.transform('splitfastq2', axes, lowmem,
+            split_fastq,
+            None,
+            sch.ifile('reads2', axes),
+            int(cfg.reads_per_split),
+            sch.ofile('reads2', axes + ('byread2',)))
+
         sch.changeaxis('fastq2axis', axes, 'reads2', 'byread2', 'byread')
 
         align_reads(sch, cfg, axes + ('byread',))
 
-        sch.transform('mergespan', axes, lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', axes + ('byread',)), sch.ofile('spanning.alignments.unfiltered', axes))
-        sch.commandline('filterreads', axes, lowmem, cfg.filterreads_tool, '-n', '2', '-a', sch.ifile('spanning.alignments.unfiltered', axes), '-r', cfg.satellite_regions, '>', sch.ofile('spanning.alignments', axes))
-        sch.transform('mergesplt', axes, lowmem, merge_files_by_line, None, sch.ifile('split.alignments', axes + ('byread',)), sch.ofile('split.alignments', axes))
+        sch.transform('mergespan', axes, lowmem,
+            merge_files_by_line,
+            None,
+            sch.ifile('spanning.alignments', axes + ('byread',)),
+            sch.ofile('spanning.alignments.unfiltered', axes))
+
+        sch.commandline('filterreads', axes, lowmem,
+            cfg.filterreads_tool,
+            '-n', '2',
+            '-a', sch.ifile('spanning.alignments.unfiltered', axes),
+            '-r', cfg.satellite_regions,
+            '>', sch.ofile('spanning.alignments', axes))
+
+        sch.transform('mergesplt', axes, lowmem,
+            merge_files_by_line,
+            None,
+            sch.ifile('split.alignments', axes + ('byread',)),
+            sch.ofile('split.alignments', axes))
 
 
     def retrieve_from_bam(sch, cfg, bams, axes):
@@ -290,9 +317,32 @@ else:
         outputs: 'reads1', 'reads2', 'stats', 'sample1', 'sample2'
         '''
 
-        sch.commandline('bamdisc', axes, medmem, cfg.bamdiscordantfastq_tool, '-r', '-c', cfg.bam_max_soft_clipped, '-f', cfg.bam_max_fragment_length, '-b', bams, '-s', sch.ofile('stats.file', axes), '-1', sch.ofile('reads1', axes), '-2', sch.ofile('reads2', axes), '-t', sch.tmpfile('bamdisc.tempspace', axes))
-        sch.commandline('bamsample', axes, medmem, cfg.bamsamplefastq_tool, '-r', '-b', bams, '-n', cfg.num_read_samples, '-1', sch.ofile('sample1', axes), '-2', sch.ofile('sample2', axes))
-        sch.transform('readstats', axes, lowmem, read_stats, sch.oobj('stats', axes), sch.ifile('stats.file', axes), float(cfg.fragment_length_num_stddevs), sch.ofile('flen.plots', axes), sch.inst('bylibrary'))
+        sch.commandline('bamdisc', axes, medmem,
+            cfg.bamdiscordantfastq_tool,
+            '-r',
+            '-c', cfg.bam_max_soft_clipped,
+            '-f', cfg.bam_max_fragment_length,
+            '-b', bams,
+            '-s', sch.ofile('stats.file', axes),
+            '-1', sch.ofile('reads1', axes),
+            '-2', sch.ofile('reads2', axes),
+            '-t', sch.tmpfile('bamdisc.tempspace', axes))
+
+        sch.commandline('bamsample', axes, medmem,
+            cfg.bamsamplefastq_tool,
+            '-r',
+            '-b', bams,
+            '-n', cfg.num_read_samples,
+            '-1', sch.ofile('sample1', axes),
+            '-2', sch.ofile('sample2', axes))
+
+        sch.transform('readstats', axes, lowmem,
+            read_stats,
+            sch.oobj('stats', axes),
+            sch.ifile('stats.file', axes),
+            float(cfg.fragment_length_num_stddevs),
+            sch.ofile('flen.plots', axes),
+            sch.inst('bylibrary'))
 
 
     def align_sample(sch, cfg, axes):
