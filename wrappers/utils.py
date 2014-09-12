@@ -68,26 +68,13 @@ def wget_file(url, filename):
     subprocess.check_call(['wget', '--no-check-certificate', url, '-O', filename])
 
 
-def download_single_sra_dataset(sra_id, output_dir):
-    url = 'ftp://ftp-trace.ncbi.nlm.nih.gov/sra/sra-instant/reads/ByRun/sra/{0}/{1}/{2}/{2}.sra'.format(sra_id[:3], sra_id[:6], sra_id)
-    with CurrentDirectory(output_dir):
-        subprocess.check_call(['wget', '-r', '-nH', '--cut-dirs=9', url])
-
-
-def add_read_end(fastq_filename, read_end):
-    temp_fastq_filename = fastq_filename + '.tmp'
-    with open(fastq_filename, 'r') as f_in, open(temp_fastq_filename, 'w') as f_out:
-        for line_number, line in enumerate(f_in):
-            if line_number % 4 == 0:
-                line = line.rstrip() + '/' + read_end + '\n'
-            f_out.write(line)
-    os.remove(fastq_filename)
-    os.rename(temp_fastq_filename, fastq_filename)
-
-
-def extract_single_sra_dataset(sra_id, output_dir):
-    with CurrentDirectory(output_dir):
-        subprocess.check_call(['fastq-dump', '-F', '--split-files', sra_id+'.sra'])
-        for read_end in ('1', '2'):
-            add_read_end(sra_id+'_'+read_end+'.fastq', read_end)
+class SafeWriteFile(object):
+    def __init__(self, filename):
+        self.filename = filename
+        self.temp_filename = filename + '.tmp'
+    def __enter__(self):
+        return self.temp_filename
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            os.rename(self.temp_filename, self.filename)
 
