@@ -103,7 +103,7 @@ class DellyWrapper(object):
                         subprocess.check_call('git checkout v0.5.9', shell=True)
 
                         with open('Makefile.tmp', 'w') as f:
-                            subprocess.check_call('sed s/-O9/-O3/g Makefile', shell=True, stdout=f)
+                            subprocess.check_call('sed s/-O9/-g\ -O3/g Makefile', shell=True, stdout=f)
                         os.rename('Makefile.tmp', 'Makefile')
 
                         make_cmd = 'make -B'
