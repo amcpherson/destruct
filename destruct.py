@@ -59,7 +59,7 @@ else:
 
     locally = {'local':True}
     lowmem = {'mem':1}
-    medmem = {'mem':6}
+    medmem = {'mem':8}
     himem = {'mem':16}
 
     def multilib_predict_breakpoints(sch, cfg, bams, breakpoints, breakreads, plots_tar):
