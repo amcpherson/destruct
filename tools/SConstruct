@@ -92,6 +92,7 @@ env.Program(target='testsplit', source=common_sources+sources)
 sources = """
     aligntrue.cpp
     AlignmentStream.cpp
+    ReadStream.cpp
     Sequences.cpp
     SimpleAligner.cpp
 """.split()
@@ -110,11 +111,6 @@ sources = """
     filterreads.cpp
 """.split()
 env.Program(target='filterreads', source=common_sources+sources)
-
-sources = """
-    qualtrimfastq.cpp
-""".split()
-env.Program(target='qualtrimfastq', source=common_sources+sources)
 
 sources = """
     SimpleAligner.cpp

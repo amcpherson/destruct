@@ -187,7 +187,8 @@ int main(int argc, char* argv[])
 	int minFragmentLength;
 	int maxFragmentLength;
 	string referenceFasta;
-	string readSeqsFilename;
+	string reads1Filename;
+	string reads2Filename;
 	string alignmentsFilename;
 	string statsFilename;
 	double validReadThreshold;
@@ -207,7 +208,8 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<int> minFragmentLengthArg("","flmin","Minimum Fragment Length",true,0,"int",cmd);
 		TCLAP::ValueArg<int> maxFragmentLengthArg("","flmax","Maximum Fragment Length",true,0,"int",cmd);
 		TCLAP::ValueArg<string> referenceFastaArg("r","reference","Reference Sequences Fasta",true,"","string",cmd);
-		TCLAP::ValueArg<string> readSeqsFilenameArg("s","seqs","Read Sequences Fastq",true,"","string",cmd);
+		TCLAP::ValueArg<string> reads1FilenameArg("1","reads1","Read End 1 Fastq",true,"","string",cmd);
+		TCLAP::ValueArg<string> reads2FilenameArg("2","reads2","Read End 2 Fastq",true,"","string",cmd);
 		TCLAP::ValueArg<string> alignmentsFilenameArg("a","align","Sam Alignments",true,"","string",cmd);
 		TCLAP::ValueArg<string> statsFilenameArg("z","stats","Stats Filename",true,"","string",cmd);
 		TCLAP::ValueArg<double> validReadThresholdArg("","tvalid","Valid Read Threshold",true,0.01,"float",cmd);
@@ -225,7 +227,8 @@ int main(int argc, char* argv[])
 		minFragmentLength = minFragmentLengthArg.getValue();
 		maxFragmentLength = maxFragmentLengthArg.getValue();
 		referenceFasta = referenceFastaArg.getValue();
-		readSeqsFilename = readSeqsFilenameArg.getValue();
+		reads1Filename = reads1FilenameArg.getValue();
+		reads2Filename = reads2FilenameArg.getValue();
 		alignmentsFilename = alignmentsFilenameArg.getValue();
 		statsFilename = statsFilenameArg.getValue();
 		validReadThreshold = validReadThresholdArg.getValue();
@@ -249,7 +252,6 @@ int main(int argc, char* argv[])
 	CheckFile(splitFile, splitFilename);
 	
 	const int cSeedScoreThreshold = 8;
-	const int cMaxBreakpointHomology = 25;
 	const int cMinAnchor = 8;
 	const int cBreakEndAdjust = 5;
 	const int cInsertedPenalty = -1;
@@ -266,13 +268,17 @@ int main(int argc, char* argv[])
 	
 	cerr << "Reading fastq sequences" << endl;
 	
-	ifstream readSeqsFile(readSeqsFilename.c_str());
-	CheckFile(readSeqsFile, readSeqsFilename);
+	ifstream reads1File(reads1Filename.c_str());
+	CheckFile(reads1File, reads1Filename);
+	FastqReadStream reads1Stream(reads1File);
 	
-	FastqReadStream readSeqsStream(readSeqsFile);
+	ifstream reads2File(reads2Filename.c_str());
+	CheckFile(reads2File, reads2Filename);
+	FastqReadStream reads2Stream(reads2File);
 	
 	PreppedReads preppedReads;
-	preppedReads.Prep(readSeqsStream);
+	preppedReads.Prep(reads1Stream);
+	preppedReads.Prep(reads2Stream);
 	
 	cerr << "Realigning" << endl;
 	
@@ -564,9 +570,21 @@ int main(int argc, char* argv[])
 
 				const RawAlignment& alignment = alignments[alignmentIndex];
 				
+				DebugCheck(alignment.readEnd == readEnd);
+				
+				int mateEnd = OtherReadEnd(readEnd);
+
 				AlignInfo alignInfo = selfAlignments[alignmentIndex];
 				
-				int score = alignInfo.SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
+				int selfScore = alignInfo.SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
+
+				int mateScore = 0;
+
+				unordered_map<int,AlignInfo>::const_iterator mateAlignIter = mateRevAlignments.find(alignmentIndex);
+				if (mateAlignIter != mateRevAlignments.end())
+				{
+					mateScore = max((short)0, mateAlignIter->second.SeqScores()[alignedLength[mateEnd]]);
+				}
 
 				if (!validSpanningAlignment[alignmentIndex] && !validSplitAlignment[alignmentIndex])
 				{
@@ -580,9 +598,11 @@ int main(int argc, char* argv[])
 				record.alignID = alignmentIndex;
 				record.chromosome = alignment.reference;
 				record.strand = ((alignment.strand == PlusStrand) ? "+" : "-");
-				record.start = alignInfo.AlignmentStart(preppedReads.ReadLength(alignment.readEnd));
-				record.end = alignInfo.AlignmentEnd(preppedReads.ReadLength(alignment.readEnd));
-				record.score = score;
+				record.position = alignInfo.OuterPosition();
+				record.selfLength = preppedReads.ReadLength(readEnd);
+				record.selfScore = selfScore;
+				record.mateLength = preppedReads.ReadLength(mateEnd);
+				record.mateScore = mateScore;
 
 				spanningFile << record;
 			}

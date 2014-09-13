@@ -21,7 +21,8 @@ int main(int argc, char* argv[])
 	int gapScore;
 	int maxFragmentLength;
 	string referenceFasta;
-	string readSeqsFilename;
+	string reads1Filename;
+	string reads2Filename;
 	string spanningFilename;
 	string clustersFilename;
 	string breakpointsFilename;
@@ -35,7 +36,8 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<int> gapScoreArg("g","gap","Gap Score",true,0,"int",cmd);
 		TCLAP::ValueArg<int> maxFragmentLengthArg("","flmax","Maximum Fragment Length",true,0,"int",cmd);
 		TCLAP::ValueArg<string> referenceFastaArg("r","reference","Reference Sequences Fasta",true,"","string",cmd);
-		TCLAP::ValueArg<string> readSeqsFilenameArg("s","seqs","Read Sequences Fastq",true,"","string",cmd);
+		TCLAP::ValueArg<string> reads1FilenameArg("1","reads1","Read End 1 Fastq",true,"","string",cmd);
+		TCLAP::ValueArg<string> reads2FilenameArg("2","reads2","Read End 2 Fastq",true,"","string",cmd);
 		TCLAP::ValueArg<string> spanningFilenameArg("","span","Spanning Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> clustersFilenameArg("c","clusters","Clusters Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> breakpointsFilenameArg("b","breakpoints","Breakpoints Filename",true,"","string",cmd);
@@ -47,7 +49,8 @@ int main(int argc, char* argv[])
 		gapScore = gapScoreArg.getValue();
 		maxFragmentLength = maxFragmentLengthArg.getValue();
 		referenceFasta = referenceFastaArg.getValue();
-		readSeqsFilename = readSeqsFilenameArg.getValue();
+		reads1Filename = reads1FilenameArg.getValue();
+		reads2Filename = reads2FilenameArg.getValue();
 		spanningFilename = spanningFilenameArg.getValue();
 		clustersFilename = clustersFilenameArg.getValue();
 		breakpointsFilename = breakpointsFilenameArg.getValue();
@@ -68,13 +71,17 @@ int main(int argc, char* argv[])
 	
 	cerr << "Reading fastq sequences" << endl;
 	
-	ifstream readSeqsFile(readSeqsFilename.c_str());
-	CheckFile(readSeqsFile, readSeqsFilename);
+	ifstream reads1File(reads1Filename.c_str());
+	CheckFile(reads1File, reads1Filename);
+	FastqReadStream reads1Stream(reads1File);
 	
-	FastqReadStream readSeqsStream(readSeqsFile);
+	ifstream reads2File(reads2Filename.c_str());
+	CheckFile(reads2File, reads2Filename);
+	FastqReadStream reads2Stream(reads2File);
 	
 	PreppedReads preppedReads;
-	preppedReads.Prep(readSeqsStream);
+	preppedReads.Prep(reads1Stream);
+	preppedReads.Prep(reads2Stream);
 	
 	cerr << "Reading spanning alignments" << endl;
 
@@ -195,7 +202,7 @@ int main(int argc, char* argv[])
 			const SpanningAlignmentRecord& spanningRecord = alignIter->second;
 
 			// Calculate the length between the breakend and the start of the read
-			int templateLength = abs(spanningRecord.GetOuterPosition() - breakpointRecord.position[memberRecord.clusterEnd]) + 1;
+			int templateLength = abs(spanningRecord.position - breakpointRecord.position[memberRecord.clusterEnd]) + 1;
 
 			// Calculate position of alignment in breakpoint sequence
 			int adjustedPosition = maxFragmentLength - templateLength;

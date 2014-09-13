@@ -165,6 +165,11 @@ public:
 	{
 		return max_element(seqScores.begin(), seqScores.end() - 32) - seqScores.begin();
 	}
+
+	int OuterPosition() const
+	{
+		return refStart;
+	}
 	
 	int BreakPosition(int seqLength) const
 	{

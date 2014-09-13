@@ -40,9 +40,16 @@ if __name__ == '__main__':
     cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
     pyp = pypeliner.easypypeliner.EasyPypeliner([destruct], cfg)
 
-    pyp.sch.transform('readlibs', (), destruct.locally, destruct.read_libraries, pyp.sch.oobj('libinfo', ('bylibrary',)), cfg.libraries)
+    pyp.sch.transform('readlibs', (), destruct.locally,
+        destruct.read_libraries,
+        pyp.sch.oobj('libinfo', ('bylibrary',)),
+        cfg.libraries)
 
-    pyp.sch.transform('linklibs', ('bylibrary',), destruct.locally, destruct.link_libraries, None, pyp.sch.iobj('libinfo', ('bylibrary',)).prop('bam'), pyp.sch.ofile('bam', ('bylibrary',)))
+    pyp.sch.transform('linklibs', ('bylibrary',), destruct.locally,
+        destruct.link_libraries,
+        None,
+        pyp.sch.iobj('libinfo', ('bylibrary',)).prop('bam'),
+        pyp.sch.ofile('bam', ('bylibrary',)))
 
     destruct.multilib_predict_breakpoints(pyp.sch, cfg, pyp.sch.ifile('bam', ('bylibrary',)), pyp.sch.output(cfg.breakpoints), pyp.sch.output(cfg.breakreads), pyp.sch.output(cfg.plots_tar))
 
@@ -53,7 +60,7 @@ else:
     locally = {'local':True}
     lowmem = {'mem':1}
     medmem = {'mem':8}
-    himem = {'mem':32}
+    himem = {'mem':16}
 
     def multilib_predict_breakpoints(sch, cfg, bams, breakpoints, breakreads, plots_tar):
 
@@ -136,7 +143,8 @@ else:
             '-m', cfg.match_score,
             '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'),
             '--span', sch.ifile('spanning.alignments', ('bylibrary', 'byread')),
-            '--seqs', sch.ifile('reads', ('bylibrary', 'byread')),
+            '-1', sch.ifile('reads1', ('bylibrary', 'byread')),
+            '-2', sch.ifile('reads2', ('bylibrary', 'byread')),
             '--realignments', sch.ofile('realignments', ('bylibrary', 'byread')))
 
 
@@ -198,7 +206,7 @@ else:
 
         # Select prediction based on max likelihood
 
-        sch.transform('select_predictions', (), medmem,
+        sch.transform('select_predictions', (), himem,
             predict_breaks.select_predictions,
             None,
             sch.ifile('breakpoints_1'),
@@ -240,7 +248,7 @@ else:
         sch.transform('tabreads', (), medmem,
             tabulate_reads,
             None,
-            sch.ifile('clusters'),
+            sch.ifile('clusters_setcover'),
             sch.iobj('libinfo', ('bylibrary',)),
             sch.ifile('reads1', ('bylibrary',)),
             sch.ifile('reads2', ('bylibrary',)),
@@ -249,7 +257,7 @@ else:
         sch.commandline('sortreads', (), medmem,
             'sort', '-n', sch.ifile('breakreads.table.unsorted'), '>', breakreads)
 
-        sch.transform('tabulate', (), medmem,
+        sch.transform('tabulate', (), himem,
             tabulate_results,
             None,
             sch.ifile('breakpoints'),
@@ -271,15 +279,42 @@ else:
         outputs: 'spanning.alignments', 'split.alignments'
         '''
 
-        sch.transform('splitfastq1', axes, lowmem, split_fastq, None, sch.ifile('reads1', axes), int(cfg.reads_per_split), sch.ofile('reads1', axes + ('byread',)))
-        sch.transform('splitfastq2', axes, lowmem, split_fastq, None, sch.ifile('reads2', axes), int(cfg.reads_per_split), sch.ofile('reads2', axes + ('byread2',)))
+        sch.transform('splitfastq1', axes, lowmem,
+            split_fastq,
+            None,
+            sch.ifile('reads1', axes),
+            int(cfg.reads_per_split),
+            sch.ofile('reads1', axes + ('byread',)))
+
+        sch.transform('splitfastq2', axes, lowmem,
+            split_fastq,
+            None,
+            sch.ifile('reads2', axes),
+            int(cfg.reads_per_split),
+            sch.ofile('reads2', axes + ('byread2',)))
+
         sch.changeaxis('fastq2axis', axes, 'reads2', 'byread2', 'byread')
 
         align_reads(sch, cfg, axes + ('byread',))
 
-        sch.transform('mergespan', axes, lowmem, merge_files_by_line, None, sch.ifile('spanning.alignments', axes + ('byread',)), sch.ofile('spanning.alignments.unfiltered', axes))
-        sch.commandline('filterreads', axes, lowmem, cfg.filterreads_tool, '-n', '2', '-a', sch.ifile('spanning.alignments.unfiltered', axes), '-r', cfg.satellite_regions, '>', sch.ofile('spanning.alignments', axes))
-        sch.transform('mergesplt', axes, lowmem, merge_files_by_line, None, sch.ifile('split.alignments', axes + ('byread',)), sch.ofile('split.alignments', axes))
+        sch.transform('mergespan', axes, lowmem,
+            merge_files_by_line,
+            None,
+            sch.ifile('spanning.alignments', axes + ('byread',)),
+            sch.ofile('spanning.alignments.unfiltered', axes))
+
+        sch.commandline('filterreads', axes, lowmem,
+            cfg.filterreads_tool,
+            '-n', '2',
+            '-a', sch.ifile('spanning.alignments.unfiltered', axes),
+            '-r', cfg.satellite_regions,
+            '>', sch.ofile('spanning.alignments', axes))
+
+        sch.transform('mergesplt', axes, lowmem,
+            merge_files_by_line,
+            None,
+            sch.ifile('split.alignments', axes + ('byread',)),
+            sch.ofile('split.alignments', axes))
 
 
     def retrieve_from_bam(sch, cfg, bams, axes):
@@ -289,21 +324,80 @@ else:
         outputs: 'reads1', 'reads2', 'stats', 'sample1', 'sample2'
         '''
 
-        sch.commandline('bamdisc', axes, medmem, cfg.bamdiscordantfastq_tool, '-r', '-c', cfg.bam_max_soft_clipped, '-f', cfg.bam_max_fragment_length, '-b', bams, '-s', sch.ofile('stats.file', axes), '-1', sch.ofile('reads1', axes), '-2', sch.ofile('reads2', axes), '-t', sch.tmpfile('bamdisc.tempspace', axes))
-        sch.commandline('bamsample', axes, medmem, cfg.bamsamplefastq_tool, '-r', '-b', bams, '-n', cfg.num_read_samples, '-1', sch.ofile('sample1', axes), '-2', sch.ofile('sample2', axes))
-        sch.transform('readstats', axes, lowmem, read_stats, sch.oobj('stats', axes), sch.ifile('stats.file', axes), float(cfg.fragment_length_num_stddevs), sch.ofile('flen.plots', axes), sch.inst('bylibrary'))
+        sch.commandline('bamdisc', axes, medmem,
+            cfg.bamdiscordantfastq_tool,
+            '-r',
+            '-c', cfg.bam_max_soft_clipped,
+            '-f', cfg.bam_max_fragment_length,
+            '-b', bams,
+            '-s', sch.ofile('stats.file', axes),
+            '-1', sch.ofile('reads1', axes),
+            '-2', sch.ofile('reads2', axes),
+            '-t', sch.tmpfile('bamdisc.tempspace', axes))
+
+        sch.commandline('bamsample', axes, medmem,
+            cfg.bamsamplefastq_tool,
+            '-r',
+            '-b', bams,
+            '-n', cfg.num_read_samples,
+            '-1', sch.ofile('sample1', axes),
+            '-2', sch.ofile('sample2', axes))
+
+        sch.transform('readstats', axes, lowmem,
+            read_stats,
+            sch.oobj('stats', axes),
+            sch.ifile('stats.file', axes),
+            float(cfg.fragment_length_num_stddevs),
+            sch.ofile('flen.plots', axes),
+            sch.inst('bylibrary'))
 
 
     def align_sample(sch, cfg, axes):
 
         '''
         inputs: 'sample1', 'sample2'
-        outputs: 'samples.align.true', 'samples.align.null'
+        outputs: 'samples.align.true'
         '''
 
-        sch.commandline('bwtsample', axes, medmem, cfg.bowtie2_bin, '--no-mixed', '--no-discordant', '--very-sensitive', '-X', cfg.fragment_length_max, cfg.bowtie2_options, '-x', cfg.genome_fasta, '-1', sch.ifile('sample1', axes), '-2', sch.ifile('sample2', axes), '>', sch.ofile('sample.sam', axes))
-        sch.commandline('aligntrue', axes, medmem, cfg.aligntrue_tool, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '-r', cfg.genome_fasta, '-a', sch.ifile('sample.sam', axes), '>', sch.ofile('samples.align.true', axes))
-        sch.transform('scorestats', axes, medmem, score_stats.create_score_stats, None, sch.ifile('samples.align.true', axes), int(cfg.match_score), sch.ofile('score.stats', axes), sch.ofile('score.stats.plots', axes), sch.inst('bylibrary'))
+        sch.transform('prepseed_sample', axes, medmem, 
+            prepare_seed_fastq,
+            None,
+            sch.ifile('sample1', axes),
+            sch.ifile('sample2', axes),
+            36,
+            sch.ofile('sample.seed', axes))
+
+        sch.commandline('bwtrealign_sample', axes, medmem,
+            cfg.bowtie_bin,
+            cfg.genome_fasta,
+            sch.ifile('sample.seed', axes),
+            '--chunkmbs', '512',
+            '-k', '1000',
+            '-m', '1000',
+            '--strata',
+            '--best',
+            '-S',
+            '|',
+            cfg.aligntrue_tool,
+            '-a', '-',
+            '-1', sch.ifile('sample1', axes),
+            '-2', sch.ifile('sample2', axes),
+            '-r', cfg.genome_fasta,
+            '-g', cfg.gap_score,
+            '-x', cfg.mismatch_score,
+            '-m', cfg.match_score,
+            '--flmin', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_min'),
+            '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'),
+            '-s', sch.ofile('samples.align.true', axes))
+
+        sch.transform('scorestats', axes, medmem,
+            score_stats.create_score_stats,
+            None,
+            sch.ifile('samples.align.true', axes),
+            int(cfg.match_score),
+            sch.ofile('score.stats', axes),
+            sch.ofile('score.stats.plots', axes),
+            sch.inst('bylibrary'))
 
 
     def align_reads(sch, cfg, axes):
@@ -313,9 +407,43 @@ else:
         outputs: 'spanning.alignments', 'split.alignments'
         '''
 
-        sch.transform('prepseed', axes, medmem, prepare_seed_fastq, None, sch.ifile('reads1', axes), sch.ifile('reads2', axes), 36, sch.ofile('reads.seed', axes))
-        sch.commandline('prepreads', axes, medmem, 'cat', sch.ifile('reads1', axes), sch.ifile('reads2', axes), '>', sch.ofile('reads', axes))
-        sch.commandline('bwtrealign', axes, medmem, cfg.bowtie_bin, cfg.genome_fasta, sch.ifile('reads.seed', axes), '--chunkmbs', '512', '-k', '1000', '-m', '1000', '--strata', '--best', '-S', '|', cfg.realign2_tool, '-l', sch.iobj('libinfo', ('bylibrary',)).prop('id'), '-a', '-', '-s', sch.ifile('reads', axes), '-r', cfg.genome_fasta, '-g', cfg.gap_score, '-x', cfg.mismatch_score, '-m', cfg.match_score, '--flmin', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_min'), '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'), '--tchimer', cfg.chimeric_threshold, '--talign', cfg.alignment_threshold, '--pchimer', cfg.chimeric_prior, '--tvalid', cfg.readvalid_threshold, '-z', sch.ifile('score.stats', ('bylibrary',)), '--span', sch.ofile('spanning.alignments', axes), '--split', sch.ofile('split.alignments', axes))
+        sch.transform('prepseed', axes, medmem, 
+            prepare_seed_fastq,
+            None,
+            sch.ifile('reads1', axes),
+            sch.ifile('reads2', axes),
+            36,
+            sch.ofile('reads.seed', axes))
+
+        sch.commandline('bwtrealign', axes, medmem,
+            cfg.bowtie_bin,
+            cfg.genome_fasta,
+            sch.ifile('reads.seed', axes),
+            '--chunkmbs', '512',
+            '-k', '1000',
+            '-m', '1000',
+            '--strata',
+            '--best',
+            '-S',
+            '|',
+            cfg.realign2_tool,
+            '-l', sch.iobj('libinfo', ('bylibrary',)).prop('id'),
+            '-a', '-',
+            '-1', sch.ifile('reads1', axes),
+            '-2', sch.ifile('reads2', axes),
+            '-r', cfg.genome_fasta,
+            '-g', cfg.gap_score,
+            '-x', cfg.mismatch_score,
+            '-m', cfg.match_score,
+            '--flmin', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_min'),
+            '--flmax', sch.iobj('stats', ('bylibrary',)).prop('fragment_length_max'),
+            '--tchimer', cfg.chimeric_threshold,
+            '--talign', cfg.alignment_threshold,
+            '--pchimer', cfg.chimeric_prior,
+            '--tvalid', cfg.readvalid_threshold,
+            '-z', sch.ifile('score.stats', ('bylibrary',)),
+            '--span', sch.ofile('spanning.alignments', axes),
+            '--split', sch.ofile('split.alignments', axes))
 
 
     def prepare_seed_fastq(reads_1_fastq, reads_2_fastq, seed_length, seed_fastq):
@@ -679,6 +807,8 @@ else:
                  'template_length_2':max}
 
         breakpoint_stats = likelihoods.groupby('cluster_id').agg(agg_f)
+
+        breakpoint_stats['template_length_min'] = breakpoint_stats[['template_length_1', 'template_length_2']].min(axis=1)
 
         breakpoint_counts = likelihoods.groupby(['cluster_id', 'library_id'])\
                                        .size()\

@@ -13,7 +13,9 @@ cluster_fields = ['cluster_id', 'cluster_end',
 
 
 spanning_fields = ['library_id', 'read_id', 'read_end', 'align_id',
-                   'chromosome', 'strand', 'start', 'end', 'score']
+                   'chromosome', 'strand', 'position',
+                   'self_length', 'self_score',
+                   'mate_length', 'mate_score']
 
 
 split_fields = ['library_id', 'read_id', 'read_end',
@@ -25,7 +27,8 @@ split_fields = ['library_id', 'read_id', 'read_end',
 breakpoint_fields = ['cluster_id', 'prediction_id',
                      'chromosome_1', 'strand_1', 'position_1',
                      'chromosome_2', 'strand_2', 'position_2',
-                     'homology', 'count', 'inserted']
+                     'homology', 'count', 'inserted',
+                     'mate_score']
 
 
 realignment_fields = ['cluster_id', 'prediction_id', 'cluster_end',
@@ -49,10 +52,28 @@ likelihoods_fields = ['cluster_id', 'prediction_id',
                       'log_likelihood', 'log_cdf']
 
 
+def calculate_mate_score(clusters, spanning):
+
+    # Create a table of spanning alignments for these clusters
+    data = spanning.merge(clusters, on=['library_id', 'read_id', 'read_end', 'align_id'])
+
+    data = data.set_index(['cluster_id', 'library_id', 'read_id'])[['mate_score']]\
+               .groupby(level=[0, 1, 2]).max()\
+               .groupby(level=[0]).mean()\
+               .reset_index()
+
+    return data
+
+
 def predict_breaks_spanning(clusters, spanning):
 
-    # Create a table of spanning alignments for this cluster
+    # Create a table of spanning alignments for these clusters
     data = spanning.merge(clusters, on=['library_id', 'read_id', 'read_end', 'align_id'])
+
+    # Add start and end based on position and read length, assuming
+    # the full read length aligns
+    data['start'] = np.where(data['strand'] == '+', data['position'], data['position'] - data['self_length'] + 1)
+    data['end'] = np.where(data['strand'] == '+', data['position'] + data['self_length'] - 1, data['position'])
 
     # Predict based on spanning reads
     agg_f = {'chromosome':max, 'strand':max, 'start':min, 'end':max}
@@ -170,6 +191,9 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
 
     predictions = pd.concat([predictions_0, predictions_1], ignore_index=True)
     predictions.sort('cluster_id', inplace=True)
+
+    mate_scores = calculate_mate_score(clusters, spanning)
+    predictions = predictions.merge(mate_scores, on='cluster_id')
 
     predictions.loc[predictions['inserted'] == '', 'inserted'] = '.'
 

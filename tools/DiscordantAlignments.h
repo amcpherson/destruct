@@ -36,7 +36,7 @@ bool IsConcordant(const vector<SpanningAlignmentRecord>& alignments, int maxFrag
 			
 			if (alignmentIter1->strand == "+" && alignmentIter2->strand == "-")
 			{
-				int inferredLength = alignmentIter2->end - alignmentIter1->start + 1;
+				int inferredLength = alignmentIter2->position - alignmentIter1->position + 1;
 				
 				if (inferredLength >= 0 && inferredLength < maxFragmentLength)
 				{
@@ -46,7 +46,7 @@ bool IsConcordant(const vector<SpanningAlignmentRecord>& alignments, int maxFrag
 			
 			if (alignmentIter2->strand == "+" && alignmentIter1->strand == "-")
 			{
-				int inferredLength = alignmentIter1->end - alignmentIter2->start + 1;
+				int inferredLength = alignmentIter1->position - alignmentIter2->position + 1;
 				
 				if (inferredLength >= 0 && inferredLength < maxFragmentLength)
 				{
@@ -239,7 +239,7 @@ public:
 			pair<uint32_t,uint32_t> chrStrIdxPair;
 			pair<size_t,size_t> alignmentIdxPair;
 			if ((chrStrIdx1 < chrStrIdx2) || 
-				((chrStrIdx1 == chrStrIdx2) && alignment1.GetOuterPosition() < alignment2.GetOuterPosition()))
+				((chrStrIdx1 == chrStrIdx2) && alignment1.position < alignment2.position))
 			{
 				chrStrIdxPair = pair<uint32_t,uint32_t>(chrStrIdx1, chrStrIdx2);
 				alignmentIdxPair = pair<size_t,size_t>(idx1 + idxOffset, idx2 + idxOffset);
@@ -259,7 +259,7 @@ public:
 			mReadIDs.push_back(alignmentIter->readID);
 			mReadEnds.push_back(alignmentIter->readEnd);
 			mAlignIDs.push_back(alignmentIter->alignID);
-			mPositions.push_back(alignmentIter->GetOuterPosition());
+			mPositions.push_back(alignmentIter->position);
 		}
 
 		mFragmentCount++;

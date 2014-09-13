@@ -27,7 +27,7 @@ bool IsFiltered(const vector<SpanningAlignmentRecord>& alignments, const RegionD
 	int excluded[] = {0,0};
 	for (vector<SpanningAlignmentRecord>::const_iterator alignmentIter = alignments.begin(); alignmentIter != alignments.end(); alignmentIter++)
 	{
-		if (excludedRegions.Overlapped(alignmentIter->chromosome, alignmentIter->start, alignmentIter->end))
+		if (excludedRegions.Overlapped(alignmentIter->chromosome, alignmentIter->position, alignmentIter->position))
 		{
 			excluded[alignmentIter->readEnd] = 1;
 		}
