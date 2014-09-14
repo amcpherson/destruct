@@ -89,7 +89,7 @@ class DellyWrapper(object):
                         subprocess.check_call(boost_build_cmd, shell=True)
 
 
-        with Sentinal('install_delly') as sentinal:
+        with Sentinal('download_delly') as sentinal:
 
             if sentinal.unfinished:
 
@@ -106,17 +106,24 @@ class DellyWrapper(object):
                             subprocess.check_call('sed s/-O9/-g\ -O3/g Makefile', shell=True, stdout=f)
                         os.rename('Makefile.tmp', 'Makefile')
 
-                        make_cmd = 'make -B'
-                        make_cmd += ' BAMTOOLS_ROOT=' + self.bamtools_root
-                        make_cmd += ' SEQTK_ROOT=' + self.seqtk_root
-                        make_cmd += ' BOOST_ROOT=' + self.boost_root
-                        make_cmd += ' src/delly'
 
-                        subprocess.check_call(make_cmd, shell=True)
+        with Sentinal('install_delly') as sentinal:
 
-                with utils.CurrentDirectory(self.bin_directory):
+            if sentinal.unfinished:
 
-                    utils.symlink(os.path.join(self.packages_directory, 'delly', 'src', 'delly'))
+                with utils.CurrentDirectory(os.path.join(self.packages_directory, 'delly')):
+
+                    make_cmd = 'make -B'
+                    make_cmd += ' BAMTOOLS_ROOT=' + self.bamtools_root
+                    make_cmd += ' SEQTK_ROOT=' + self.seqtk_root
+                    make_cmd += ' BOOST_ROOT=' + self.boost_root
+                    make_cmd += ' src/delly'
+
+                    subprocess.check_call(make_cmd, shell=True)
+
+            with utils.CurrentDirectory(self.bin_directory):
+
+                utils.symlink(os.path.join(self.packages_directory, 'delly', 'src', 'delly'))
 
 
     def run_sv_type(self, sv_type, genome_fasta, bam_filenames, output_filename):
