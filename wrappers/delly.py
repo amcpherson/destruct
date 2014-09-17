@@ -5,6 +5,7 @@ import sys
 import subprocess
 import tarfile
 import argparse
+import vcf
 
 import utils
 
@@ -126,6 +127,23 @@ class DellyWrapper(object):
                 utils.symlink(os.path.join(self.packages_directory, 'delly', 'src', 'delly'))
 
 
+    def run(self, temp_directory, genome_fasta, bam_filenames, output_filename):
+
+        table_filenames = list()
+
+        for sv_type in ('DEL', 'DUP', 'INV', 'TRA'):
+
+            vcf_filename = os.path.join(temp_directory, 'delly_{0}.vcf'.format(sv_type))
+            table_filename = os.path.join(temp_directory, 'delly_{0}.tsv'.format(sv_type))
+
+            self.run_sv_type(sv_type, genome_fasta, bam_filenames, vcf_filename)
+            self.convert_output(vcf_filename, bam_filenames, table_filename)
+
+            table_filenames.append(table_filename)
+
+        self.merge_tables(table_filenames, output_filename)
+
+
     def run_sv_type(self, sv_type, genome_fasta, bam_filenames, output_filename):
 
         with utils.SafeWriteFile(output_filename) as temp_output_filename:
@@ -136,13 +154,79 @@ class DellyWrapper(object):
             delly_cmd += ['-x', self.delly_excl_chrom]
             delly_cmd += ['-o', temp_output_filename]
             delly_cmd += ['-g', genome_fasta]
-            delly_cmd += bam_filenames
+            delly_cmd += bam_filenames.values()
 
             subprocess.check_call(delly_cmd)
 
 
-    def convert_output(output_filename, ):
-        pass
+    def convert_output(vcf_filename, bam_filenames, table_filename):
+
+        vcf_reader = vcf.Reader(filename=vcf_filename)
+
+        breakpoint_table = list()
+        counts_table = list()
+
+        for row in vcf_reader:
+
+            prediction_id = row.ID
+
+            chrom_1 = row.CHROM
+            chrom_2 = row.INFO['CHR2']
+
+            strand_1, strand_2 = [('-', '+')[a == '3'] for a in row.INFO['CT'].split('to')]
+
+            coord_1 = row.POS
+            coord_2 = row.sv_end
+
+            if 'LowQual' in row.FILTER:
+                qual = 0
+            else:
+                qual = 1
+
+            breakpoint_table.append((prediction_id, chrom_1, chrom_2, strand_1, strand_2, coord_1, coord_2, qual))
+
+            for call in row.samples:
+
+                library = call.sample
+
+                num_spanning = call.data.DV
+                num_split = call.data.RV
+
+                counts_table.append((prediction_id, library, num_spanning, num_split))
+
+        breakpoint_table = pd.DataFrame(breakpoint_table, columns=['prediction_id',
+                                                                   'chromosome_1', 'chromosome_2',
+                                                                   'strand_1', 'strand_2',
+                                                                   'position_1', 'position_2',
+                                                                   'qual'])
+
+        counts_table = pd.DataFrame(counts_table, columns=['prediction_id', 'library', 'num_spanning', 'num_split'])
+
+        library_ids = dict([bam.rstrip('.bam'), lib_id for lib_id, bam, in bam_filenames.iteritems()])
+        counts_table['library'] = counts_table['library'].apply(lambda a: library_ids[a])
+
+        split_read_counts = counts_table.groupby('prediction_id')['num_split'].sum().reset_index()
+
+        total_read_counts = counts_table.set_index(['prediction_id', 'library']).sum(axis=1).unstack()
+        total_read_counts.columns = [a + '_count' for a in total_read_counts.columns]
+        total_read_counts = total_read_counts.reset_index()
+
+        breakpoint_table = breakpoint_table.merge(split_read_counts, on='prediction_id')
+        breakpoint_table = breakpoint_table.merge(total_read_counts, on='prediction_id')
+
+        breakpoint_table.to_csv(table_filename, sep='\t', index=False)
+
+
+    def merge_tables(input_filenames, output_filename):
+
+        output_table = list()
+
+        for input_filename in input_filenames.values():
+            output_table.append(pd.read_csv(input_filename, sep='\t'))
+
+        output_table = pd.concat(output_table, ignore_index=True)
+
+        output_table.to_csv(output_filename, sep='\t', index=False)
 
 
 if __name__ == '__main__':
