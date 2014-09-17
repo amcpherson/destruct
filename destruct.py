@@ -23,6 +23,11 @@ import utils.plots
 import utils.misc
 import predict_breaks
 
+
+destruct_directory = os.path.abspath(os.path.dirname(__file__))
+destruct_tools_directory = os.path.join(destruct_directory, 'tools')
+
+
 __version__ = '0.1.0'
 
 if __name__ == '__main__':
@@ -102,7 +107,7 @@ else:
             cfg.chromosomes.split(' '))
 
         sch.commandline('cluster', ('bychromarg',), medmem,
-            cfg.mclustermatepairs_tool,
+            os.path.join(destruct_tools_directory, 'mclustermatepairs'),
             '-a', sch.ifile('spanning.alignments'),
             '-s', sch.ifile('libstats.tsv'),
             '-c', sch.ofile('clusters', ('bychromarg',)),
@@ -134,7 +139,7 @@ else:
         # Realign reads to breakpoints
 
         sch.commandline('realigntobreaks', ('bylibrary', 'byread'), medmem,
-            cfg.realigntobreaks2_tool,
+            os.path.join(destruct_tools_directory, 'realigntobreaks2'),
             '-r', cfg.genome_fasta,
             '-b', sch.ifile('breakpoints_2'),
             '-c', sch.ifile('clusters'),
@@ -186,7 +191,7 @@ else:
             sch.ofile('cluster_weights'))
 
         sch.commandline('setcover', (), medmem,
-            cfg.setcover_tool,
+            os.path.join(destruct_tools_directory, 'setcover'),
             '-c', sch.ifile('clusters'),
             '-w', sch.ifile('cluster_weights'),
             '-a', sch.ofile('clusters_setcover'))
@@ -228,7 +233,7 @@ else:
             sch.ofile('clusters.ids', ('bycluster',)))
 
         sch.commandline('cycles', ('bycluster',), medmem,
-            cfg.cycles_tool,
+            os.path.join(destruct_tools_directory, 'cycles'),
             '-b', sch.ifile('breakpoints'),
             '--idsfile', sch.ifile('clusters.ids', ('bycluster',)),
             '-s', cfg.cycles_scoremax,
@@ -304,7 +309,7 @@ else:
             sch.ofile('spanning.alignments.unfiltered', axes))
 
         sch.commandline('filterreads', axes, lowmem,
-            cfg.filterreads_tool,
+            os.path.join(destruct_tools_directory, 'filterreads'),
             '-n', '2',
             '-a', sch.ifile('spanning.alignments.unfiltered', axes),
             '-r', cfg.satellite_regions,
@@ -325,7 +330,7 @@ else:
         '''
 
         sch.commandline('bamdisc', axes, medmem,
-            cfg.bamdiscordantfastq_tool,
+            os.path.join(destruct_tools_directory, 'bamdiscordantfastq'),
             '-r',
             '-c', cfg.bam_max_soft_clipped,
             '-f', cfg.bam_max_fragment_length,
@@ -336,7 +341,7 @@ else:
             '-t', sch.tmpfile('bamdisc.tempspace', axes))
 
         sch.commandline('bamsample', axes, medmem,
-            cfg.bamsamplefastq_tool,
+            os.path.join(destruct_tools_directory, 'bamsamplefastq'),
             '-r',
             '-b', bams,
             '-n', cfg.num_read_samples,
@@ -378,7 +383,7 @@ else:
             '--best',
             '-S',
             '|',
-            cfg.aligntrue_tool,
+            os.path.join(destruct_tools_directory, 'aligntrue'),
             '-a', '-',
             '-1', sch.ifile('sample1', axes),
             '-2', sch.ifile('sample2', axes),
@@ -426,7 +431,7 @@ else:
             '--best',
             '-S',
             '|',
-            cfg.realign2_tool,
+            os.path.join(destruct_tools_directory, 'realign2'),
             '-l', sch.iobj('libinfo', ('bylibrary',)).prop('id'),
             '-a', '-',
             '-1', sch.ifile('reads1', axes),

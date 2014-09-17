@@ -13,6 +13,10 @@ from collections import *
 
 import pypeliner
 
+destruct_directory = os.path.abspath(os.path.dirname(__file__))
+destruct_data_directory = os.path.join(destruct_directory, 'data')
+
+
 def wget_gunzip(url, filename):
     temp_filename = filename + '.tmp'
     pypeliner.commandline.execute('wget', url, '-c', '-O', temp_filename + '.gz')
@@ -52,10 +56,6 @@ if __name__ == '__main__':
             self._config = config
             self._section = section
         def __getattr__(self, name):
-            if name.endswith('_tool'):
-                return self._config.get(self._section, 'tools_directory') + '/' + name[:-5]
-            if name.endswith('_rscript'):
-                return self._config.get(self._section, 'rscripts_directory') + '/' + name[:-8] + '.R'
             return self._config.get(self._section, name)
 
     cfg = ConfigWrapper(config)
@@ -66,6 +66,9 @@ if __name__ == '__main__':
         pass
 
     auto_sentinal = AutoSentinal(cfg.dataset_directory + '/sentinal.')
+
+    chromosome_map_filename = os.path.join(destruct_data_directory,
+                                           '{0}_chr_map.tsv'.format(cfg.ucsc_genome_version))
 
 
     def wget_genome_fasta():
@@ -107,7 +110,7 @@ if __name__ == '__main__':
         else:
             rmsk_url = 'ftp://hgdownload.cse.ucsc.edu/goldenPath/{0}/database/rmsk.txt.gz'.format(cfg.ucsc_genome_version)
             wget_gunzip(rmsk_url, repeat_filename)
-        with open(cfg.chromosome_map, 'r') as chr_map_file:
+        with open(chromosome_map_filename, 'r') as chr_map_file:
             chr_map = dict((a.split() for a in chr_map_file))
         with open(repeat_filename, 'r') as repeat_file, open(cfg.repeat_regions, 'w') as repeat_regions_file, open(cfg.satellite_regions, 'w') as satellite_regions_file:
             for row in csv.reader(repeat_file, delimiter='\t'):
