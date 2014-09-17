@@ -202,7 +202,7 @@ class DellyWrapper(object):
 
         counts_table = pd.DataFrame(counts_table, columns=['prediction_id', 'library', 'num_spanning', 'num_split'])
 
-        library_ids = dict([bam.rstrip('.bam'), lib_id for lib_id, bam, in bam_filenames.iteritems()])
+        library_ids = dict([(bam.rstrip('.bam'), lib_id) for lib_id, bam in bam_filenames.iteritems()])
         counts_table['library'] = counts_table['library'].apply(lambda a: library_ids[a])
 
         split_read_counts = counts_table.groupby('prediction_id')['num_split'].sum().reset_index()
