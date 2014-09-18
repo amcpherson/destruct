@@ -23,7 +23,7 @@ class DestructWrapper(object):
         pass
 
 
-    def run(self, temp_directory, genome_fasta, bam_filenames, output_filename):
+    def run(self, temp_directory, bam_filenames, output_filename):
 
         bam_list_filename = os.path.join(temp_directory, 'bam_list.tsv')
 
