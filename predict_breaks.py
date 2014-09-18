@@ -24,14 +24,14 @@ split_fields = ['library_id', 'read_id', 'read_end',
                 'homology', 'inserted', 'score']
 
 
-breakpoint_fields = ['cluster_id', 'prediction_id',
+breakpoint_fields = ['cluster_id', 'breakpoint_id',
                      'chromosome_1', 'strand_1', 'position_1',
                      'chromosome_2', 'strand_2', 'position_2',
                      'homology', 'count', 'inserted',
                      'mate_score']
 
 
-realignment_fields = ['cluster_id', 'prediction_id', 'cluster_end',
+realignment_fields = ['cluster_id', 'breakpoint_id', 'cluster_end',
                       'library_id', 'read_id', 'read_end', 'align_id',
                       'aligned_length', 'template_length', 'score']
 
@@ -39,7 +39,7 @@ realignment_fields = ['cluster_id', 'prediction_id', 'cluster_end',
 score_stats_fields = ['aligned_length', 'expon_lda']
 
 
-likelihoods_fields = ['cluster_id', 'prediction_id',
+likelihoods_fields = ['cluster_id', 'breakpoint_id',
                       'library_id', 'read_id',
                       'read_end_1', 'read_end_2',
                       'aligned_length_1', 'aligned_length_2',
@@ -184,10 +184,10 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
                            converters={'chromosome':str})
 
     predictions_0 = predict_breaks_spanning(clusters, spanning)
-    predictions_0['prediction_id'] = 0
+    predictions_0['breakpoint_id'] = 0
 
     predictions_1 = predict_breaks_split(clusters, split)
-    predictions_1['prediction_id'] = 1
+    predictions_1['breakpoint_id'] = 1
 
     predictions = pd.concat([predictions_0, predictions_1], ignore_index=True)
     predictions.sort('cluster_id', inplace=True)
@@ -208,7 +208,7 @@ def calculate_cluster_weights(breakpoints_filename, weights_filename):
     
     breakpoints = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields)
     
-    breakpoints = breakpoints[breakpoints['prediction_id'] == 0]
+    breakpoints = breakpoints[breakpoints['breakpoint_id'] == 0]
 
     breakpoints['distance'] = np.absolute(breakpoints['position_1'] - breakpoints['position_2']) + 1.0
     breakpoints.loc[breakpoints['chromosome_1'] != breakpoints['chromosome_2'], 'distance'] = itx_distance
@@ -237,7 +237,7 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
 
     data = pd.read_csv(realignments_filename, sep='\t', names=realignment_fields)
 
-    assert data.duplicated(subset=['cluster_id', 'prediction_id', 'library_id', 'read_id', 'read_end']).sum() == 0
+    assert data.duplicated(subset=['cluster_id', 'breakpoint_id', 'library_id', 'read_id', 'read_end']).sum() == 0
 
     data = data.merge(score_stats, on='aligned_length')
 
@@ -249,7 +249,7 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     data['score_log_cdf'] = -data['expon_lda'] * data['score_diff']
 
     # Unstack on cluster end
-    index_fields = ['cluster_id', 'prediction_id', 'library_id', 'read_id']
+    index_fields = ['cluster_id', 'breakpoint_id', 'library_id', 'read_id']
     unstack_field = ['cluster_end']
     data_fields = ['read_end', 'aligned_length', 'template_length',
                    'score', 'score_log_likelihood', 'score_log_cdf']
@@ -258,8 +258,8 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     data.reset_index(inplace=True)
 
     # Merge insert length from breakpoint predictions
-    data = data.merge(breakpoints[['cluster_id', 'prediction_id', 'inslen']],
-                      on=['cluster_id', 'prediction_id'])
+    data = data.merge(breakpoints[['cluster_id', 'breakpoint_id', 'inslen']],
+                      on=['cluster_id', 'breakpoint_id'])
 
     data['template_length'] = data['template_length_1'] + data['template_length_2'] + data['inslen']
 
@@ -314,19 +314,19 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                        likelihoods_filename, selected_likelihoods_filename):
 
     likelihoods = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
-                              usecols=['cluster_id', 'prediction_id', 'log_likelihood'])
+                              usecols=['cluster_id', 'breakpoint_id', 'log_likelihood'])
 
-    selected = likelihoods.set_index(['cluster_id', 'prediction_id'])\
+    selected = likelihoods.set_index(['cluster_id', 'breakpoint_id'])\
                           .groupby(level=[0, 1])[['log_likelihood']].sum()\
                           .groupby(level=[0]).idxmax()
-    selected = pd.DataFrame(list(selected['log_likelihood'].values), columns=['cluster_id', 'prediction_id'])
+    selected = pd.DataFrame(list(selected['log_likelihood'].values), columns=['cluster_id', 'breakpoint_id'])
 
     read_merge_write(likelihoods_filename, likelihoods_fields, selected,
-                     ['cluster_id', 'prediction_id'],
+                     ['cluster_id', 'breakpoint_id'],
                      selected_likelihoods_filename)
 
     read_merge_write(breakpoints_filename, breakpoint_fields, selected,
-                     ['cluster_id', 'prediction_id'],
+                     ['cluster_id', 'breakpoint_id'],
                      selected_breakpoints_filename)
 
 

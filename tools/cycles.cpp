@@ -173,7 +173,7 @@ int main(int argc, char* argv[])
 		// This is currently a cludge.  The cycle detection should not care about
 		// the breakpoint predictions, only the approximate breakpoint for each
 		// cluster.
-		if (breakpointRecord.predictionID != 0)
+		if (breakpointRecord.breakpointID != 0)
 		{
 			continue;
 		}

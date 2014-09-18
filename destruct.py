@@ -795,7 +795,7 @@ else:
         breakpoints = pd.read_csv(breakpoints_filename, sep='\t',
                                   names=predict_breaks.breakpoint_fields,
                                   converters=converters)
-        breakpoints = breakpoints.drop(['prediction_id'], axis=1)
+        breakpoints = breakpoints.drop(['breakpoint_id'], axis=1)
         breakpoints = breakpoints.rename(columns={'count':'num_split'})
         breakpoints.loc[breakpoints['inserted'] == '.', 'inserted'] = ''
 
@@ -804,7 +804,7 @@ else:
         likelihoods = pd.read_csv(likelihoods_filename, sep='\t',
                                   names=predict_breaks.likelihoods_fields,
                                   converters=converters)
-        likelihoods = likelihoods.drop(['prediction_id'], axis=1)
+        likelihoods = likelihoods.drop(['breakpoint_id'], axis=1)
 
         agg_f = {'log_likelihood':np.average,
                  'log_cdf':np.average,
@@ -886,6 +886,8 @@ else:
             cycles_table = pd.DataFrame(cycles_table, columns=cycles_columns)
 
         breakpoints = breakpoints.merge(cycles_table, on='cluster_id', how='left')
+
+        breakpoints = breapoints.rename(columns={'cluster_id':'prediction_id'})
 
         breakpoints.to_csv(results_filename, sep='\t', na_rep='NA', header=True, index=False)
 
