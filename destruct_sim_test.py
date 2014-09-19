@@ -18,6 +18,15 @@ from sklearn.metrics import roc_curve, auc
 
 import pygenes
 import pypeliner
+import pypeliner.managed as mgd
+
+import wrappers
+import utils.download
+
+destruct_directory = os.path.abspath(os.path.dirname(__file__))
+
+default_config_filename = os.path.join(destruct_directory, 'defaultconfig.py')
+
 
 if __name__ == '__main__':
 
@@ -25,98 +34,146 @@ if __name__ == '__main__':
     import create_breakpoint_simulation
 
     argparser = argparse.ArgumentParser()
-    pypeliner.easypypeliner.add_arguments(argparser)
+    pypeliner.app.add_arguments(argparser)
     argparser.add_argument('simconfig', help='Simulation configuration filename')
+    argparser.add_argument('installdir', help='Tool installations directory')
     argparser.add_argument('outdir', help='Output directory')
-    argparser.add_argument('results', help='Test results plots (pdf)')
+    argparser.add_argument('-c', '--config', help='Configuration filename')
 
-    cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
-    pyp = pypeliner.easypypeliner.EasyPypeliner([destruct_sim_test, create_breakpoint_simulation], cfg)
+    args = vars(argparser.parse_args())
 
-    if not cfg.results.lower().endswith('.pdf'):
-        raise Exception('results file requires pdf extension')
+    config = {}
 
-    ctx = {'mem':4}
+    if args['config'] is not None:
+        execfile(args['config'], {}, config)
+
+    config.update(args)
+
+    pyp = pypeliner.app.Pypeline([destruct_sim_test, create_breakpoint_simulation], config)
 
     try:
-        os.makedirs(cfg.outdir)
+        os.makedirs(args['outdir'])
     except OSError:
         pass
 
+    ctx = {'mem':4}
+
     pyp.sch.transform('read_params', (), ctx, destruct_sim_test.read_simulation_params,
-        pyp.sch.oobj('simulation.params'), 
-        pyp.sch.input(cfg.simconfig))
+        mgd.TempOutputObj('simulation.params'),
+        mgd.InputFile(args['simconfig']))
 
-    pyp.sch.transform('create_sim', (), ctx, create_breakpoint_simulation.create, 
+    pyp.sch.transform('create_genome', (), ctx,
+        destruct_sim_test.create_genome,
         None,
-        cfg,
-        pyp.sch.iobj('simulation.params'),
-        pyp.sch.output(os.path.join(cfg.outdir, 'simulated.fasta')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'simulated.tsv')),
-        pyp.sch.ofile('concordant.1.fastq'),
-        pyp.sch.ofile('concordant.2.fastq'),
-        pyp.sch.ofile('discordant.1.fastq'),
-        pyp.sch.ofile('discordant.2.fastq'))
+        mgd.TempInputObj('simulation.params'),
+        mgd.OutputFile(os.path.join(args['outdir'], 'genome.fasta')))
 
-    pyp.sch.commandline('cat1', (), ctx, 'cat', pyp.sch.ifile('concordant.1.fastq'), pyp.sch.ifile('discordant.1.fastq'), '>', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.1.fastq')))
-    pyp.sch.commandline('cat2', (), ctx, 'cat', pyp.sch.ifile('concordant.2.fastq'), pyp.sch.ifile('discordant.2.fastq'), '>', pyp.sch.output(os.path.join(cfg.outdir, 'simulated.2.fastq')))
+    pyp.sch.transform('create_sim', (), ctx, create_breakpoint_simulation.create,
+        None,
+        mgd.TempInputObj('simulation.params'),
+        mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
+        mgd.OutputFile(os.path.join(args['outdir'], 'simulated.fasta')),
+        mgd.OutputFile(os.path.join(args['outdir'], 'simulated.tsv')),
+        mgd.TempOutputFile('concordant.1.fastq'),
+        mgd.TempOutputFile('concordant.2.fastq'),
+        mgd.TempOutputFile('discordant.1.fastq'),
+        mgd.TempOutputFile('discordant.2.fastq'))
 
-    bwaalign_script = os.path.join(cfg.destruct_directory, 'bwaalign.py')
+    pyp.sch.commandline('cat1', (), ctx, 'cat', mgd.TempInputFile('concordant.1.fastq'), mgd.TempInputFile('discordant.1.fastq'), '>', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.1.fastq')))
+    pyp.sch.commandline('cat2', (), ctx, 'cat', mgd.TempInputFile('concordant.2.fastq'), mgd.TempInputFile('discordant.2.fastq'), '>', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.2.fastq')))
+
+    bwaalign_script = os.path.join(destruct_directory, 'bwaalign.py')
 
     pyp.sch.commandline('bwa_align', (), ctx, 
         sys.executable,
         bwaalign_script,
-        pyp.sch.input(os.path.join(cfg.outdir, 'simulated.1.fastq')),
-        pyp.sch.input(os.path.join(cfg.outdir, 'simulated.2.fastq')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'simulated.bam')),
-        '--config', pyp.sch.input(cfg.config),
-        '--tmp', pyp.sch.tmpfile('bwa_tmp'))
+        mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
+        mgd.InputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
+        mgd.InputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
+        mgd.TempOutputFile('simulated.unsorted.bam'),
+        '--tmp', mgd.TempFile('bwa_tmp'))
 
-    pyp.sch.transform('write_bam_list', (), ctx, destruct_sim_test.write_bam_list,
+    pyp.sch.transform('samtools_sort_index', (), ctx,
+        destruct_sim_test.samtools_sort_index,
         None,
-        pyp.sch.output(os.path.join(cfg.outdir, 'bam_list.tsv')),
-        **{'simulated':pyp.sch.input(os.path.join(cfg.outdir, 'simulated.bam'))})
+        mgd.TempInputFile('simulated.unsorted.bam'),
+        mgd.OutputFile(os.path.join(args['outdir'], 'simulated.bam')))
 
-    destruct_script = os.path.join(cfg.destruct_directory, 'destruct.py')
+    pyp.sch.transform('set_tools', (), ctx,
+        destruct_sim_test.set_tools,
+        mgd.OutputChunks('bytool'))
 
-    pyp.sch.commandline('destruct', (), ctx, 
-        sys.executable,
-        destruct_script,
-        pyp.sch.input(os.path.join(cfg.outdir, 'bam_list.tsv')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'breakpoints.tsv')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'breakreads.tsv')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'plots.tar')),
-        '--config', pyp.sch.input(cfg.config),
-        '--tmp', pyp.sch.tmpfile('destruct_tmp'),
-        '--nocleanup', '--repopulate')
-
-    pyp.sch.transform('plot', (), ctx, destruct_sim_test.create_roc_plot,
+    pyp.sch.transform('run_tool', ('bytool',), ctx,
+        destruct_sim_test.run_tool,
         None,
-        pyp.sch.iobj('simulation.params'),
-        pyp.sch.input(os.path.join(cfg.outdir, 'simulated.tsv')),
-        pyp.sch.input(os.path.join(cfg.outdir, 'breakpoints.tsv')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'annotated.tsv')),
-        pyp.sch.output(os.path.join(cfg.outdir, 'identified.tsv')),
-        pyp.sch.output(os.path.abspath(cfg.results)))
+        mgd.InputInstance('bytool'),
+        mgd.Template(os.path.join(args['installdir'], '{bytool}'), 'bytool'),
+        mgd.TempFile('tool_tmp', 'bytool'),
+        mgd.InputFile(os.path.join(args['outdir'], 'simulated.bam')),
+        mgd.OutputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'))
+
+    pyp.sch.transform('plot', ('bytool',), ctx, destruct_sim_test.create_roc_plot,
+        None,
+        mgd.TempInputObj('simulation.params'),
+        mgd.InputFile(os.path.join(args['outdir'], 'simulated.tsv')),
+        mgd.InputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
+        mgd.OutputFile(os.path.join(args['outdir'], 'annotated_{bytool}.tsv'), 'bytool'),
+        mgd.OutputFile(os.path.join(args['outdir'], 'identified_{bytool}.tsv'), 'bytool'),
+        mgd.OutputFile(os.path.join(args['outdir'], 'plots_{bytool}.pdf'), 'bytool'))
 
     pyp.run()
 
+
 else:
 
-    def read_simulation_params(config_filename):
 
-        config = ConfigParser.ConfigParser()
-        config.read(config_filename)
-        sim_info = dict(config.items('main'))
+    def create_genome(sim_info, genome_fasta):
+
+        utils.download.download_genome_fasta(genome_fasta,
+                                             sim_info['chromosomes'],
+                                             sim_info['include_nonchromosomal'])
+
+        pypeliner.commandline.execute('bwa', 'index', genome_fasta)
+        pypeliner.commandline.execute('samtools', 'faidx', genome_fasta)
+
+        for extension in ('.fai', '.amb', '.ann', '.bwt', '.pac', '.sa'):
+            os.rename(genome_fasta+extension, genome_fasta[:-4]+extension)
+
+
+    def samtools_sort_index(input_filename, output_filename):
+
+        pypeliner.commandline.execute('samtools', 'sort', input_filename, output_filename)
+
+        os.rename(output_filename + '.bam', output_filename)
+
+        assert output_filename.endswith('.tmp')
+        index_filename = output_filename[:-4] + '.bai'
+
+        pypeliner.commandline.execute('samtools', 'index', output_filename, index_filename)
+
+
+    def set_tools():
+        return wrappers.catalog.keys()
+
+
+    def run_tool(tool, install_directory, temp_directory, bam_filename, results_filename):
+
+        try:
+            ToolWrapper = wrappers.catalog[tool]
+        except KeyError:
+            raise Exception('No wrapper for tool ' + tool)
+
+        wrapper = ToolWrapper(install_directory)
+
+        wrapper.run(temp_directory, {'simulated':bam_filename}, results_filename)
+
+
+    def read_simulation_params(sim_config_filename):
+
+        sim_info = {}
+        execfile(sim_config_filename, {}, sim_info)
 
         return sim_info
-
-
-    def write_bam_list(bam_list_filename, **kwargs):
-
-        with open(bam_list_filename, 'w') as bam_list_file:
-            for lib_id, bam_filename in kwargs.iteritems():
-                bam_list_file.write(lib_id + '\t' + bam_filename + '\n')
 
 
     class BreakpointDatabase(object):
@@ -167,7 +224,7 @@ else:
         breakpoints_db = BreakpointDatabase(breakpoints)
 
         results = pd.read_csv(predicted_filename, sep='\t',
-                              converters={'cluster_id':str, 'chromosome_1':str, 'chromosome_2':str})
+                              converters={'prediction_id':str, 'chromosome_1':str, 'chromosome_2':str})
 
         min_dist = 200
 
@@ -178,11 +235,11 @@ else:
 
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
-        features = ['simulated_count', 'num_split', 'log_likelihood', 'log_cdf']
+        features = ['simulated_count', 'num_split']
         invalid_value = -1e9
 
         identified = breakpoints[['break_id']]
-        identified = identified.merge(results[['cluster_id', 'true_pos_id'] + features], left_on='break_id', right_on='true_pos_id', how='outer')
+        identified = identified.merge(results[['prediction_id', 'true_pos_id'] + features], left_on='break_id', right_on='true_pos_id', how='outer')
         identified = identified.drop('true_pos_id', axis=1)
 
         identified.to_csv(identified_filename, sep='\t', index=False, na_rep='NA')
