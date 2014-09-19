@@ -14,7 +14,9 @@ from collections import *
 import pypeliner
 
 destruct_directory = os.path.abspath(os.path.dirname(__file__))
-destruct_data_directory = os.path.join(destruct_directory, 'data')
+
+data_directory = os.path.join(destruct_directory, 'data')
+default_config_filename = os.path.join(destruct_directory, 'defaultconfig.py')
 
 
 def wget_gunzip(url, filename):
@@ -41,78 +43,65 @@ class AutoSentinal(object):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('config', help='Configuration filename')
-    parser.add_argument('-d', '--demix', action='store_true', help='Download additional demix data')
-    args = parser.parse_args()
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('refdatadir', help='Reference dataset directory')
+    argparser.add_argument('-c', '--config', help='Configuration filename')
+    argparser.add_argument('-d', '--demix', action='store_true', help='Download additional demix data')
+    args = argparser.parse_args()
 
-    args.config = os.path.abspath(args.config)
+    args = vars(argparser.parse_args())
 
-    config = ConfigParser.ConfigParser()
-    config.read(args.config)
+    config = {'ref_data_directory':args['refdatadir'],
+              'package_data_directory':data_directory}
+    execfile(default_config_filename, config)
 
-    class ConfigWrapper(object):
-        def __init__(self, config, section='main'):
-            self._config = config
-            self._section = section
-        def __getattr__(self, name):
-            return self._config.get(self._section, name)
+    if args['config'] is not None:
+        execfile(args['config'], config)
 
-    cfg = ConfigWrapper(config)
+    config.update(args)
 
     try:
-        os.makedirs(cfg.dataset_directory)
+        os.makedirs(args['refdatadir'])
     except OSError:
         pass
 
-    auto_sentinal = AutoSentinal(cfg.dataset_directory + '/sentinal.')
+    auto_sentinal = AutoSentinal(args['refdatadir'] + '/sentinal.')
 
-    chromosome_map_filename = os.path.join(destruct_data_directory,
-                                           '{0}_chr_map.tsv'.format(cfg.ucsc_genome_version))
+    temp_directory = os.path.join(args['refdatadir'], 'tmp')
 
+    try:
+        os.makedirs(temp_directory)
+    except OSError:
+        pass
 
     def wget_genome_fasta():
-        assembly_prefix = cfg.dataset_directory + '/dna.assembly.'
-        assembly_fastas = dict()
-        for assembly in cfg.ensembl_assemblies.rstrip().split(','):
-            assembly_fastas[assembly] = assembly_prefix + assembly + '.fa'
-            if os.path.exists(assembly_fastas[assembly]):
-                continue
-            assembly_url = 'ftp://ftp.ensembl.org/pub/release-{0}/fasta/homo_sapiens/dna/Homo_sapiens.{1}.{2}.dna.{3}.fa.gz'.format(cfg.ensembl_version, cfg.ensembl_genome_version, cfg.ensembl_version, assembly)
-            wget_gunzip(assembly_url, assembly_fastas[assembly])
-            with open(cfg.genome_fasta, 'w') as genome_file:
-                for assembly, assembly_fasta in assembly_fastas.iteritems():
-                    with open(assembly_fasta, 'r') as assembly_file:
-                        for line in assembly_file:
-                            if line[0] == '>':
-                                line = line.split()[0] + '\n'
-                            genome_file.write(line)
+        with open(config['genome_fasta'], 'w') as genome_file:
+            for assembly in config['ensembl_assemblies']:
+                assembly_url = config['ensembl_assembly_url'].format(assembly)
+                assembly_fasta = os.path.join(temp_directory, 'dna.assembly.{0}.fa'.format(assembly))
+                if not os.path.exists(assembly_fasta):
+                    wget_gunzip(assembly_url, assembly_fasta)
+                with open(assembly_fasta, 'r') as assembly_file:
+                    for line in assembly_file:
+                        if line[0] == '>':
+                            line = line.split()[0] + '\n'
+                        genome_file.write(line)
     auto_sentinal.run(wget_genome_fasta)
 
     def wget_gtf():
-        gtf_url = 'ftp://ftp.ensembl.org/pub/release-{0}/gtf/homo_sapiens/Homo_sapiens.{1}.{2}.gtf.gz'.format(cfg.ensembl_version, cfg.ensembl_genome_version, cfg.ensembl_version)
-        wget_gunzip(gtf_url, cfg.gtf_filename)
+        wget_gunzip(config['ensembl_gtf_url'], config['gtf_filename'])
     auto_sentinal.run(wget_gtf)
 
     def wget_dgv():
-        if cfg.dgv_url != '':
-            dgv_url = cfg.dgv_url
-        else:
-            dgv_url = 'http://dgv.tcag.ca/dgv/docs/{0}_variants_{1}.txt'.format(cfg.dgv_genome_version, cfg.dgv_version)
-        wget(dgv_url, cfg.dgv_filename)
+        wget(config['dgv_url'], config['dgv_filename'])
     auto_sentinal.run(wget_dgv)
 
     def wget_repeats():
-        repeat_filename = cfg.dataset_directory + '/repeats.txt'
-        if cfg.ucsc_genome_version == 'hg18':
-            rmsk_url = 'ftp://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/*_rmsk.txt.gz'
-            wget_gunzip(rmsk_url, repeat_filename)
-        else:
-            rmsk_url = 'ftp://hgdownload.cse.ucsc.edu/goldenPath/{0}/database/rmsk.txt.gz'.format(cfg.ucsc_genome_version)
-            wget_gunzip(rmsk_url, repeat_filename)
-        with open(chromosome_map_filename, 'r') as chr_map_file:
+        repeat_filename = os.path.join(temp_directory, 'repeats.txt')
+        wget_gunzip(config['rmsk_url'], repeat_filename)
+        with open(config['chromosome_map'], 'r') as chr_map_file:
             chr_map = dict((a.split() for a in chr_map_file))
-        with open(repeat_filename, 'r') as repeat_file, open(cfg.repeat_regions, 'w') as repeat_regions_file, open(cfg.satellite_regions, 'w') as satellite_regions_file:
+        with open(repeat_filename, 'r') as repeat_file, open(config['repeat_regions'], 'w') as repeat_regions_file, open(config['satellite_regions'], 'w') as satellite_regions_file:
             for row in csv.reader(repeat_file, delimiter='\t'):
                 if row[5] not in chr_map:
                     continue
@@ -126,30 +115,29 @@ if __name__ == '__main__':
     auto_sentinal.run(wget_repeats)
 
     def bowtie_build():
-        pypeliner.commandline.execute(cfg.bowtie_build_bin, cfg.genome_fasta, cfg.genome_fasta)
+        pypeliner.commandline.execute('bowtie-build', config['genome_fasta'], config['genome_fasta'])
     auto_sentinal.run(bowtie_build)
 
     def samtools_faidx():
-        pypeliner.commandline.execute(cfg.samtools_bin, 'faidx', cfg.genome_fasta)
+        pypeliner.commandline.execute('samtools', 'faidx', config['genome_fasta'])
     auto_sentinal.run(samtools_faidx)
 
-
-    if args.demix:
+    if args['demix']:
 
         def wget_thousand_genomes():
-            tar_filename = os.path.join(cfg.dataset_directory, 'thousand_genomes_download.tar.gz')
-            wget(cfg.thousand_genomes_impute_url, tar_filename)
-            pypeliner.commandline.execute('tar', '-C', cfg.dataset_directory, '-xzvf', tar_filename)
+            tar_filename = os.path.join(temp_directory, 'thousand_genomes_download.tar.gz')
+            wget(config['thousand_genomes_impute_url'], tar_filename)
+            pypeliner.commandline.execute('tar', '-C', args['refdatadir'], '-xzvf', tar_filename)
             os.remove(tar_filename)
         auto_sentinal.run(wget_thousand_genomes)
 
         def create_snp_positions():
-            with open(cfg.snp_positions, 'w') as snp_positions_file:
-                for chromosome in cfg.chromosomes.split():
+            with open(config['snp_positions'], 'w') as snp_positions_file:
+                for chromosome in config['chromosomes'].split():
                     phased_chromosome = chromosome
                     if chromosome == 'X':
-                        phased_chromosome = cfg.phased_chromosome_x
-                    legend_filename = cfg.legend_template.format(phased_chromosome)
+                        phased_chromosome = config['phased_chromosome_x']
+                    legend_filename = config['legend_template'].format(phased_chromosome)
                     with gzip.open(legend_filename, 'r') as legend_file:
                         for line in legend_file:
                             if line.startswith('id'):
