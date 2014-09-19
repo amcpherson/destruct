@@ -25,6 +25,8 @@ class DestructWrapper(object):
 
     def run(self, temp_directory, bam_filenames, output_filename):
 
+        utils.makedirs(temp_directory)
+
         bam_list_filename = os.path.join(temp_directory, 'bam_list.tsv')
 
         with open(bam_list_filename, 'w') as bam_list_file:
@@ -42,10 +44,10 @@ class DestructWrapper(object):
         destruct_cmd += [bam_list_filename]
         destruct_cmd += [breakpoints_filename]
         destruct_cmd += [breakreads_filename]
-        destruct_cmd += [plots_tar_filanem]
+        destruct_cmd += [plots_tar_filename]
         destruct_cmd += ['--config', self.config_filename]
         destruct_cmd += ['--tmp', destruct_tmp_directory]
-        destruct_cmd += ['--nocleanup', '--repopulate', '--maxjobs', 4, '--verbose']
+        destruct_cmd += ['--nocleanup', '--repopulate', '--maxjobs', '4', '--verbose']
 
         subprocess.check_call(destruct_cmd)
 

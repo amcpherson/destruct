@@ -6,6 +6,7 @@ import subprocess
 import tarfile
 import argparse
 import vcf
+import pandas as pd
 
 import utils
 
@@ -160,6 +161,8 @@ class DellyWrapper(object):
 
     def run(self, temp_directory, bam_filenames, output_filename):
 
+        utils.makedirs(temp_directory)
+
         table_filenames = list()
 
         for sv_type in ('DEL', 'DUP', 'INV', 'TRA'):
@@ -168,6 +171,10 @@ class DellyWrapper(object):
             table_filename = os.path.join(temp_directory, 'delly_{0}.tsv'.format(sv_type))
 
             self.run_sv_type(sv_type, bam_filenames, vcf_filename)
+
+            if not os.path.exists(vcf_filename):
+                continue
+
             self.convert_output(vcf_filename, bam_filenames, table_filename)
 
             table_filenames.append(table_filename)
@@ -177,20 +184,18 @@ class DellyWrapper(object):
 
     def run_sv_type(self, sv_type, bam_filenames, output_filename):
 
-        with utils.SafeWriteFile(output_filename) as temp_output_filename:
+        delly_cmd = list()
+        delly_cmd += [self.delly_bin]
+        delly_cmd += ['-t', sv_type]
+        delly_cmd += ['-x', self.delly_excl_chrom]
+        delly_cmd += ['-o', output_filename]
+        delly_cmd += ['-g', self.genome_fasta]
+        delly_cmd += bam_filenames.values()
 
-            delly_cmd = list()
-            delly_cmd += [self.delly_bin]
-            delly_cmd += ['-t', sv_type]
-            delly_cmd += ['-x', self.delly_excl_chrom]
-            delly_cmd += ['-o', temp_output_filename]
-            delly_cmd += ['-g', self.genome_fasta]
-            delly_cmd += bam_filenames.values()
-
-            subprocess.check_call(delly_cmd)
+        subprocess.check_call(delly_cmd)
 
 
-    def convert_output(vcf_filename, bam_filenames, table_filename):
+    def convert_output(self, vcf_filename, bam_filenames, table_filename):
 
         vcf_reader = vcf.Reader(filename=vcf_filename)
 
@@ -233,7 +238,7 @@ class DellyWrapper(object):
 
         counts_table = pd.DataFrame(counts_table, columns=['prediction_id', 'library', 'num_spanning', 'num_split'])
 
-        library_ids = dict([(bam.rstrip('.bam'), lib_id) for lib_id, bam in bam_filenames.iteritems()])
+        library_ids = dict([(os.path.basename(bam).rstrip('.bam'), lib_id) for lib_id, bam in bam_filenames.iteritems()])
         counts_table['library'] = counts_table['library'].apply(lambda a: library_ids[a])
 
         split_read_counts = counts_table.groupby('prediction_id')['num_split'].sum().reset_index()
@@ -248,11 +253,11 @@ class DellyWrapper(object):
         breakpoint_table.to_csv(table_filename, sep='\t', index=False)
 
 
-    def merge_tables(input_filenames, output_filename):
+    def merge_tables(self, input_filenames, output_filename):
 
         output_table = list()
 
-        for input_filename in input_filenames.values():
+        for input_filename in input_filenames:
             output_table.append(pd.read_csv(input_filename, sep='\t'))
 
         output_table = pd.concat(output_table, ignore_index=True)
