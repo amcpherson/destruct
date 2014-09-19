@@ -7,35 +7,97 @@ import itertools
 import argparse
 import string
 import gzip
-from collections import *
 
 import pypeliner
+import pypeliner.managed as mgd
 
 if __name__ == '__main__':
 
     import bwaalign
 
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    pypeliner.easypypeliner.add_arguments(argparser)
-    argparser.add_argument('fastq1', help='Fastq End 1 Filename')
-    argparser.add_argument('fastq2', help='Fastq End 2 Filename')
-    argparser.add_argument('output_bam', help='Output Bam Filename')
+    pypeliner.app.add_arguments(argparser)
+    argparser.add_argument('genome', help='Reference genome fasta')
+    argparser.add_argument('fastq1', help='Fastq end 1 filename')
+    argparser.add_argument('fastq2', help='Fastq end 2 filename')
+    argparser.add_argument('output_bam', help='Output bam filename')
+    argparser.add_argument('--reads_per_job', type=int, default=1000000, help='Reads per alignment job')
+    argparser.add_argument('--config', help='Configuration filename')
 
-    cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
-    pyp = pypeliner.easypypeliner.EasyPypeliner([bwaalign], cfg)
+    args = vars(argparser.parse_args())
+
+    config = {}
+
+    if args['config'] is not None:
+        execfile(args['config'], {}, config)
+
+    config.update(args)
+
+    pyp = pypeliner.app.Pypeline([bwaalign], config)
 
     lowmem = {'mem':1}
     medmem = {'mem':8}
     himem = {'mem':32}
 
-    pyp.sch.transform('split1', (), lowmem, bwaalign.split_fastq, None, pyp.sch.input(cfg.fastq1), int(cfg.reads_per_job), pyp.sch.ofile('fastq1', ('byread',)))
-    pyp.sch.transform('split2', (), lowmem, bwaalign.split_fastq, None, pyp.sch.input(cfg.fastq2), int(cfg.reads_per_job), pyp.sch.ofile('fastq2', ('byread2',)))
+    if not os.path.exists(args['genome']+'.bwt'):
+        raise Exception('No index for ' + args['genome'])
+
+    pyp.sch.transform('split1', (), lowmem,
+        bwaalign.split_fastq,
+        None,
+        mgd.InputFile(args['fastq1']),
+        args['reads_per_job'],
+        mgd.TempOutputFile('fastq1', 'byread'))
+
+    pyp.sch.transform('split2', (), lowmem,
+        bwaalign.split_fastq,
+        None, 
+        mgd.InputFile(args['fastq2']), 
+        args['reads_per_job'], 
+        mgd.TempOutputFile('fastq2', 'byread2'))
+
     pyp.sch.changeaxis('axis', (), 'fastq2', 'byread2', 'byread')
-    pyp.sch.commandline('aln1', ('byread',), medmem, cfg.bwa_bin, 'aln', cfg.genome_fasta, pyp.sch.ifile('fastq1', ('byread',)), '>', pyp.sch.ofile('sai1', ('byread',)))
-    pyp.sch.commandline('aln2', ('byread',), medmem, cfg.bwa_bin, 'aln', cfg.genome_fasta, pyp.sch.ifile('fastq2', ('byread',)), '>', pyp.sch.ofile('sai2', ('byread',)))
-    pyp.sch.commandline('sampe', ('byread',), medmem, cfg.bwa_bin, 'sampe', cfg.genome_fasta, pyp.sch.ifile('sai1', ('byread',)), pyp.sch.ifile('sai2', ('byread',)), pyp.sch.ifile('fastq1', ('byread',)), pyp.sch.ifile('fastq2', ('byread',)), '>', pyp.sch.ofile('sam', ('byread',)))
-    pyp.sch.transform('cat', (), lowmem, bwaalign.cat_merge, None, pyp.sch.ifile('sam', ('byread',)), pyp.sch.ofile('sam'))
-    pyp.sch.commandline('bam', (), lowmem, 'grep', '-v', '^@', pyp.sch.ifile('sam'), '|', cfg.samtools_bin, 'view', '-bt', cfg.genome_fasta+'.fai', '-', '>', pyp.sch.output(cfg.output_bam))
+
+    pyp.sch.commandline('aln1', ('byread',), medmem,
+        'bwa', 'aln',
+        args['genome'],
+        mgd.TempInputFile('fastq1', 'byread'),
+        '>',
+        mgd.TempOutputFile('sai1', 'byread'))
+
+    pyp.sch.commandline('aln2', ('byread',), medmem,
+        'bwa', 'aln',
+        args['genome'],
+        mgd.TempInputFile('fastq2', 'byread'),
+        '>',
+        mgd.TempOutputFile('sai2', 'byread'))
+
+    pyp.sch.commandline('sampe', ('byread',), medmem,
+        'bwa', 'sampe',
+        args['genome'],
+        mgd.TempInputFile('sai1', 'byread'),
+        mgd.TempInputFile('sai2', 'byread'),
+        mgd.TempInputFile('fastq1', 'byread'),
+        mgd.TempInputFile('fastq2', 'byread'),
+        '>',
+        mgd.TempOutputFile('sam', 'byread'))
+
+    pyp.sch.transform('cat', (), lowmem,
+        bwaalign.cat_merge,
+        None,
+        mgd.TempInputFile('sam', 'byread'),
+        mgd.TempOutputFile('sam'))
+
+    pyp.sch.commandline('bam', (), lowmem,
+        'grep', '-v', '^@',
+        mgd.TempInputFile('sam'),
+        '|',
+        'samtools', 'view', '-bt',
+        args['genome']+'.fai',
+        '-',
+        '>',
+        mgd.OutputFile(args['output_bam']))
+
     pyp.run()
 
 else:
@@ -66,8 +128,8 @@ else:
                 if out_file is not None:
                     out_file.close()
 
-    def sort_bam(samtools_bin, input_bam, output_bam):
-        pypeliner.commandline.execute(samtools_bin, 'sort', '-o', input_bam, output_bam+'.sortprefix', '>', output_bam)
+    def sort_bam(input_bam, output_bam):
+        pypeliner.commandline.execute('samtools', 'sort', '-o', input_bam, output_bam+'.sortprefix', '>', output_bam)
 
     def split_dict(d):
         ditems = d.items()
