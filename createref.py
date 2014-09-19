@@ -53,10 +53,10 @@ if __name__ == '__main__':
 
     config = {'ref_data_directory':args['refdatadir'],
               'package_data_directory':data_directory}
-    execfile(default_config_filename, config)
+    execfile(default_config_filename, {}, config)
 
     if args['config'] is not None:
-        execfile(args['config'], config)
+        execfile(args['config'], {}, config)
 
     config.update(args)
 
