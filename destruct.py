@@ -373,7 +373,7 @@ else:
             sch.ofile('sample.seed', axes))
 
         sch.commandline('bwtrealign_sample', axes, medmem,
-            cfg.bowtie_bin,
+            'bowtie',
             cfg.genome_fasta,
             sch.ifile('sample.seed', axes),
             '--chunkmbs', '512',
@@ -421,7 +421,7 @@ else:
             sch.ofile('reads.seed', axes))
 
         sch.commandline('bwtrealign', axes, medmem,
-            cfg.bowtie_bin,
+            'bowtie',
             cfg.genome_fasta,
             sch.ifile('reads.seed', axes),
             '--chunkmbs', '512',
