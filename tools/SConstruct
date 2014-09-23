@@ -161,6 +161,11 @@ sources = """
 env.Program(target='bamstats', source=common_sources+bamtools_sources+sources)
 
 sources = """
+    bamreheader.cpp
+""".split()
+env.Program(target='bamreheader', source=common_sources+bamtools_sources+sources)
+
+sources = """
     bammixture.cpp
 """.split()
 env.Program(target='bammixture', source=common_sources+bamtools_sources+sources)
