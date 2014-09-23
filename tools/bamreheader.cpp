@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
 	try
 	{
 		TCLAP::CmdLine cmd("Bam Reheader Tool");
-		TCLAP::ValueArg<string> fastaIndexFilenameArg("h","header","Header filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> fastaIndexFilenameArg("f","faidx","Fasta index filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> bamInputFilenameArg("i","inbam","Input bam filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> bamOutputFilenameArg("o","outbam","Output bam filename",true,"","string",cmd);
 		cmd.parse(argc,argv);
