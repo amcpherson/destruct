@@ -83,38 +83,6 @@ typedef vector<RegionVec> RegionTable;
 typedef vector<RegionVec>::iterator RegionTableIter;
 typedef vector<RegionVec>::const_iterator RegionTableConstIter;
 
-struct Location
-{
-	string refName;
-	int strand;
-	int start;
-	int end;
-};
-
-typedef vector<Location> LocationVec;
-typedef vector<Location>::iterator LocationVecIter;
-typedef vector<Location>::const_iterator LocationVecConstIter;
-
-typedef vector<LocationVec> LocationTable;
-typedef vector<LocationVec>::iterator LocationTableIter;
-typedef vector<LocationVec>::const_iterator LocationTableConstIter;
-
-typedef unordered_map<int,LocationVec> LocationVecMap;
-typedef unordered_map<int,LocationVec>::iterator LocationVecMapIter;
-typedef unordered_map<int,LocationVec>::const_iterator LocationVecMapConstIter;
-
-struct Counter
-{
-	Counter() : value(0) {}
-	
-	void operator++() { value++; }
-	void operator++(int) { value++; }
-	void operator+=(int a) { value += a; }
-	operator int() { return value; }
-	
-	int value;
-};
-
 typedef vector<string> StringVec;
 typedef vector<string>::iterator StringVecIter;
 typedef vector<string>::const_iterator StringVecConstIter;
@@ -122,14 +90,6 @@ typedef vector<string>::const_iterator StringVecConstIter;
 typedef vector<StringVec> StringTable;
 typedef vector<StringVec>::iterator StringTableIter;
 typedef vector<StringVec>::const_iterator StringTableConstIter;
-
-typedef vector<string> SequenceVec;
-typedef vector<string>::iterator SequenceVecIter;
-typedef vector<string>::const_iterator SequenceVecConstIter;
-
-typedef vector<SequenceVec> SequenceTable;
-typedef vector<SequenceVec>::iterator SequenceTableIter;
-typedef vector<SequenceVec>::const_iterator SequenceTableConstIter;
 
 typedef vector<int> IntegerVec;
 typedef vector<int>::iterator IntegerVecIter;
@@ -234,61 +194,7 @@ inline size_t hash_value(const ReadID& readid)
 	return seed;
 }
 
-struct CompactAlignment
-{
-	ReadID readID;
-	RefStrand refStrand;
-	Region region;
-	float alignProb;
-	float chimericProb;
-	float validProb;
-};
-
-typedef vector<CompactAlignment> CompAlignVec;
-typedef vector<CompactAlignment>::iterator CompAlignVecIter;
-typedef vector<CompactAlignment>::const_iterator CompAlignVecConstIter;
-
-typedef vector<CompAlignVec> CompAlignTable;
-typedef vector<CompAlignVec>::iterator CompAlignTableIter;
-typedef vector<CompAlignVec>::const_iterator CompAlignTableConstIter;
-
-struct ClusterEndID
-{
-	union
-	{
-		struct
-		{
-			unsigned clusterID : 31;
-			unsigned clusterEnd : 1;
-		};
-		
-		int id;
-	};
-};
-
 int OtherClusterEnd(int clusterEnd);
-
-struct CompactLocation
-{
-	RefStrand refStrand;
-	Region region;
-};
-
-typedef vector<CompactLocation> CompactLocationVec;
-typedef vector<CompactLocation>::iterator CompactLocationVecIter;
-typedef vector<CompactLocation>::const_iterator CompactLocationVecConstIter;
-
-typedef vector<CompactLocationVec> CompactLocationTable;
-typedef vector<CompactLocationVec>::iterator CompactLocationTableIter;
-typedef vector<CompactLocationVec>::const_iterator CompactLocationTableConstIter;
-
-typedef unordered_map<int,CompactLocation> CompactLocationMap;
-typedef unordered_map<int,CompactLocation>::iterator CompactLocationMapIter;
-typedef unordered_map<int,CompactLocation>::const_iterator CompactLocationMapConstIter;
-
-typedef unordered_map<int,CompactLocationVec> CompactLocationVecMap;
-typedef unordered_map<int,CompactLocationVec>::iterator CompactLocationVecMapIter;
-typedef unordered_map<int,CompactLocationVec>::const_iterator CompactLocationVecMapConstIter;
 
 struct MatePair
 {
@@ -299,8 +205,6 @@ struct MatePair
 };
 
 typedef vector<MatePair> MatePairVec;
-
-bool FragmentLessThan(const CompactAlignment& a1, const CompactAlignment& a2);
 
 double normalpdf(double x, double mu, double sigma);
 
@@ -356,14 +260,7 @@ private:
 	long mGenomeLength;
 };
 
-int FindMaxElement(const IntegerTable& clusters);
-int FindMaxElement(const IntegerVecMap& clusters);
-
 void CheckFile(const ios& file, const string& filename);
-
-bool ParseTranscriptID(const string& transcriptID, string& gene, string& transcript);
-
-void Transpose(const IntegerVecMap& clusters, IntegerVecMap& elements);
 
 template<typename TType>
 TType SafeParseField(const string& field, const char* nameOfType, const char* codeFilename, int codeLine, const string& parseFilename = string(), int parseLine = 0)

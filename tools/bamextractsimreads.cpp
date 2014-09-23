@@ -221,6 +221,11 @@ struct BamSimReader : PileupVisitor
 		swap(sampledReadNames, mReadNames);
 	}
 
+	int ReadCount()
+	{
+		return (int)mReadNames.size();
+	}
+
 	void WriteFastq(const string& namePrefix, int readEnd, ostream& fastq)
 	{
 		for (int readID = 0; readID < mReadNames.size(); readID++)
@@ -317,18 +322,34 @@ int main(int argc, char* argv[])
 		const string& seqName = seqNames[nameIdx];
 		const string& simSeq = simSequences.Get(seqName);
 
-		int chrIdx;
-		long position;
-		randomPosition.Next(chrIdx, position);
-		
-		const string& chromosome = bamSimReader.mBamReader.GetReferenceData()[chrIdx].RefName;
+		bool success = false;
+		for (int attempt = 0; attempt < 1000; attempt++)
+		{
+			int chrIdx;
+			long position;
+			randomPosition.Next(chrIdx, position);
+			
+			const string& chromosome = bamSimReader.mBamReader.GetReferenceData()[chrIdx].RefName;
 
-		bamSimReader.Read(chromosome, position, simSeq);
+			bamSimReader.Read(chromosome, position, simSeq);
 
-		bamSimReader.SampleReads(generator, coverageFraction);
+			bamSimReader.SampleReads(generator, coverageFraction);
 
-		bamSimReader.WriteFastq(seqName, 0, fastq1File);
-		bamSimReader.WriteFastq(seqName, 1, fastq2File);
+			if (bamSimReader.ReadCount() > 0)
+			{
+				bamSimReader.WriteFastq(seqName, 0, fastq1File);
+				bamSimReader.WriteFastq(seqName, 1, fastq2File);
+
+				success = true;
+
+				break;
+			}
+		}
+
+		if (!success)
+		{
+			ReportFailure("Failed to find a position with reads after 1000 attempts");
+		}
 	}
 }
 

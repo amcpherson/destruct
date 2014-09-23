@@ -5,6 +5,8 @@ import sys
 import subprocess
 import tarfile
 import argparse
+import vcf
+import pandas as pd
 
 import utils
 
@@ -17,6 +19,7 @@ class DellyWrapper(object):
 
         self.packages_directory = os.path.join(self.install_directory, 'packages')
         self.bin_directory = os.path.join(self.install_directory, 'bin')
+        self.data_directory = os.path.join(self.install_directory, 'data')
 
         self.bamtools_root = os.path.join(self.packages_directory, 'bamtools')
         self.seqtk_root = os.path.join(self.packages_directory, 'seqtk')
@@ -29,10 +32,14 @@ class DellyWrapper(object):
         self.delly_bin = os.path.join(self.bin_directory, 'delly')
         self.delly_excl_chrom = os.path.join(self.packages_directory, 'delly', 'human.hg19.excl.tsv')
 
+        self.primary_assembly_url = 'ftp://ftp.ensembl.org/pub/release-76/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz'
+        self.chromosome_url = 'ftp://ftp.ensembl.org/pub/release-76/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.{0}.fa.gz'
+        self.genome_fasta = os.path.join(self.data_directory, 'genome.fa')
 
-    def install(self):
 
-        Sentinal = utils.Sentinal(os.path.join(self.install_directory, 'sentinal_'))
+    def install(self, **kwargs):
+
+        Sentinal = utils.SentinalFactory(os.path.join(self.install_directory, 'sentinal_'), kwargs)
 
         with Sentinal('install_bamtools') as sentinal:
 
@@ -126,34 +133,148 @@ class DellyWrapper(object):
                 utils.symlink(os.path.join(self.packages_directory, 'delly', 'src', 'delly'))
 
 
-    def run_sv_type(self, sv_type, genome_fasta, bam_filenames, output_filename):
+        with Sentinal('download_genome') as sentinal:
 
-        with utils.SafeWriteFile(output_filename) as temp_output_filename:
+            if sentinal.unfinished:
 
-            delly_cmd = list()
-            delly_cmd += [self.delly_bin]
-            delly_cmd += ['-t', sv_type]
-            delly_cmd += ['-x', self.delly_excl_chrom]
-            delly_cmd += ['-o', temp_output_filename]
-            delly_cmd += ['-g', genome_fasta]
-            delly_cmd += bam_filenames
+                with utils.CurrentDirectory(os.path.join(self.data_directory)):
 
-            subprocess.check_call(delly_cmd)
+                    if kwargs.get('chromosomes', None) is None:
+
+                        utils.wget_file_gunzip(self.primary_assembly_url, self.genome_fasta)
+
+                    else:
+
+                        with open(self.genome_fasta, 'w') as genome_file:
+
+                            for chromosome in kwargs['chromosomes']:
+
+                                chromosome_filename = './chromosome_{0}.fa'.format(chromosome)
+
+                                utils.wget_file_gunzip(self.chromosome_url.format(chromosome), chromosome_filename)
+
+                                with open(chromosome_filename, 'r') as chromosome_file:
+                                    shutil.copyfileobj(chromosome_file, genome_file)
+
+                                os.remove(chromosome_filename)
 
 
-    def convert_output(output_filename, ):
-        pass
+    def run(self, temp_directory, bam_filenames, output_filename):
+
+        utils.makedirs(temp_directory)
+
+        table_filenames = list()
+
+        for sv_type in ('DEL', 'DUP', 'INV', 'TRA'):
+
+            vcf_filename = os.path.join(temp_directory, 'delly_{0}.vcf'.format(sv_type))
+            table_filename = os.path.join(temp_directory, 'delly_{0}.tsv'.format(sv_type))
+
+            self.run_sv_type(sv_type, bam_filenames, vcf_filename)
+
+            if not os.path.exists(vcf_filename):
+                continue
+
+            self.convert_output(vcf_filename, bam_filenames, table_filename)
+
+            table_filenames.append(table_filename)
+
+        self.merge_tables(table_filenames, output_filename)
+
+
+    def run_sv_type(self, sv_type, bam_filenames, output_filename):
+
+        delly_cmd = list()
+        delly_cmd += [self.delly_bin]
+        delly_cmd += ['-t', sv_type]
+        delly_cmd += ['-x', self.delly_excl_chrom]
+        delly_cmd += ['-o', output_filename]
+        delly_cmd += ['-g', self.genome_fasta]
+        delly_cmd += bam_filenames.values()
+
+        subprocess.check_call(delly_cmd)
+
+
+    def convert_output(self, vcf_filename, bam_filenames, table_filename):
+
+        vcf_reader = vcf.Reader(filename=vcf_filename)
+
+        breakpoint_table = list()
+        counts_table = list()
+
+        for row in vcf_reader:
+
+            prediction_id = row.ID
+
+            chrom_1 = row.CHROM
+            chrom_2 = row.INFO['CHR2']
+
+            strand_1, strand_2 = [('-', '+')[a == '3'] for a in row.INFO['CT'].split('to')]
+
+            coord_1 = row.POS
+            coord_2 = row.sv_end
+
+            if 'LowQual' in row.FILTER:
+                qual = 0
+            else:
+                qual = 1
+
+            breakpoint_table.append((prediction_id, chrom_1, chrom_2, strand_1, strand_2, coord_1, coord_2, qual))
+
+            for call in row.samples:
+
+                library = call.sample
+
+                num_spanning = call.data.DV
+                num_split = call.data.RV
+
+                counts_table.append((prediction_id, library, num_spanning, num_split))
+
+        breakpoint_table = pd.DataFrame(breakpoint_table, columns=['prediction_id',
+                                                                   'chromosome_1', 'chromosome_2',
+                                                                   'strand_1', 'strand_2',
+                                                                   'position_1', 'position_2',
+                                                                   'qual'])
+
+        counts_table = pd.DataFrame(counts_table, columns=['prediction_id', 'library', 'num_spanning', 'num_split'])
+
+        library_ids = dict([(os.path.basename(bam).rstrip('.bam'), lib_id) for lib_id, bam in bam_filenames.iteritems()])
+        counts_table['library'] = counts_table['library'].apply(lambda a: library_ids[a])
+
+        split_read_counts = counts_table.groupby('prediction_id')['num_split'].sum().reset_index()
+
+        total_read_counts = counts_table.set_index(['prediction_id', 'library']).sum(axis=1).unstack()
+        total_read_counts.columns = [a + '_count' for a in total_read_counts.columns]
+        total_read_counts = total_read_counts.reset_index()
+
+        breakpoint_table = breakpoint_table.merge(split_read_counts, on='prediction_id')
+        breakpoint_table = breakpoint_table.merge(total_read_counts, on='prediction_id')
+
+        breakpoint_table.to_csv(table_filename, sep='\t', index=False)
+
+
+    def merge_tables(self, input_filenames, output_filename):
+
+        output_table = list()
+
+        for input_filename in input_filenames:
+            output_table.append(pd.read_csv(input_filename, sep='\t'))
+
+        output_table = pd.concat(output_table, ignore_index=True)
+
+        output_table.to_csv(output_filename, sep='\t', index=False)
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('install_directory', help='Delly installation directory')
+    parser.add_argument('--chromosomes', nargs='*', type=str, default=None, help='Reference chromosomes')
     args = parser.parse_args()
 
     delly = DellyWrapper(args.install_directory)
 
-    delly.install()
+    delly.install(chromosomes=args.chromosomes)
 
 
 

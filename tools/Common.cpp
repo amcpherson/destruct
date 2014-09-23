@@ -54,11 +54,6 @@ void ReverseComplement(string& sequence)
 	}
 }
 
-bool FragmentLessThan(const CompactAlignment& a1, const CompactAlignment& a2)
-{
-	return a1.readID.fragmentIndex < a2.readID.fragmentIndex;
-}
-
 double normalpdf(double x, double mu, double sigma)
 {
 	double coeff = 1.0 / ((double)sigma * sqrt(2 * M_PI));
@@ -67,26 +62,6 @@ double normalpdf(double x, double mu, double sigma)
 	double exponent = -0.5 * dist * dist;
 	
 	return coeff * exp(exponent);
-}
-
-int FindMaxElement(const IntegerTable& clusters)
-{
-	int maxElement = -1;
-	for (IntegerTableConstIter clusterIter = clusters.begin(); clusterIter != clusters.end(); clusterIter++)
-	{
-		for (IntegerVecConstIter elementIter = clusterIter->begin(); elementIter != clusterIter->end(); elementIter++)
-		{
-			if (*elementIter < 0)
-			{
-				cerr << "Error: negative elements not permitted" << endl;
-				exit(1);
-			}
-			
-			maxElement = max(maxElement, *elementIter);
-		}
-	}
-	
-	return maxElement;
 }
 
 int InterpretStrand(const string& strand)
@@ -110,53 +85,6 @@ void CheckFile(const ios& file, const string& filename)
 		cerr << "Error: Unable to open " << filename << endl;
 		exit(1);
 	}	
-}
-
-bool ParseTranscriptID(const string& transcriptID, string& gene, string& transcript)
-{
-	StringVec idFields;
-	split(idFields, transcriptID, is_any_of("|"));
-
-	if (idFields.size() < 2)
-	{
-		return false;
-	}
-
-	gene = idFields[0];
-	transcript = idFields[1];
-
-	return true;
-}
-
-int FindMaxElement(const IntegerVecMap& clusters)
-{
-	int maxElement = -1;
-	for (IntegerVecMapConstIter clusterIter = clusters.begin(); clusterIter != clusters.end(); clusterIter++)
-	{
-		for (IntegerVecConstIter elementIter = clusterIter->second.begin(); elementIter != clusterIter->second.end(); elementIter++)
-		{
-			if (*elementIter < 0)
-			{
-				cerr << "Error: negative elements not permitted" << endl;
-				exit(1);
-			}
-			
-			maxElement = max(maxElement, *elementIter);
-		}
-	}
-	
-	return maxElement;
-}
-
-void Transpose(const IntegerVecMap& clusters, IntegerVecMap& elements)
-{
-	for (IntegerVecMapConstIter clusterIter = clusters.begin(); clusterIter != clusters.end(); clusterIter++)
-	{
-		for (IntegerVecConstIter elementIter = clusterIter->second.begin(); elementIter != clusterIter->second.end(); elementIter++)
-		{
-			elements[*elementIter].push_back(clusterIter->first);
-		}
-	}
 }
 
 void Print(const IntegerVecMap& clusters)

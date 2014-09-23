@@ -152,7 +152,7 @@ AlignmentKey ClusterMemberRecord::GetAlignmentKey() const
 std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record)
 {
 	os << record.clusterID << "\t";
-	os << record.predictionID << "\t";
+	os << record.breakpointID << "\t";
 	for (int clusterEnd = 0; clusterEnd < 2; clusterEnd++)
 	{
 		os << record.chromosome[clusterEnd] << "\t";
@@ -169,7 +169,7 @@ std::ostream & operator<<(std::ostream &os, const BreakpointRecord& record)
 std::istream & operator>>(std::istream &is, BreakpointRecord& record)
 {
 	is >> record.clusterID;
-	is >> record.predictionID;
+	is >> record.breakpointID;
 	for (int clusterEnd = 0; clusterEnd < 2; clusterEnd++)
 	{
 		is >> record.chromosome[clusterEnd];
@@ -190,7 +190,7 @@ std::istream & operator>>(std::istream &is, BreakpointRecord& record)
 std::ostream & operator<<(std::ostream &os, const BreakAlignScoreRecord& record)
 {
 	os << record.clusterID << "\t";
-	os << record.predictionID << "\t";
+	os << record.breakpointID << "\t";
 	os << record.clusterEnd << "\t";
 	os << record.libID << "\t";
 	os << record.readID << "\t";
@@ -205,7 +205,7 @@ std::ostream & operator<<(std::ostream &os, const BreakAlignScoreRecord& record)
 std::istream & operator>>(std::istream &is, BreakAlignScoreRecord& record)
 {
 	is >> record.clusterID;
-	is >> record.predictionID;
+	is >> record.breakpointID;
 	is >> record.clusterEnd;
 	is >> record.libID;
 	is >> record.readID;

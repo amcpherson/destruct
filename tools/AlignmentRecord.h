@@ -93,7 +93,7 @@ std::istream & operator>>(std::istream &is, ClusterMemberRecord& record);
 struct BreakpointRecord
 {
 	int clusterID;
-	int predictionID;
+	int breakpointID;
 	string chromosome[2];
 	string strand[2];
 	int position[2];
@@ -110,7 +110,7 @@ std::istream & operator>>(std::istream &is, BreakpointRecord& record);
 struct BreakAlignScoreRecord
 {
 	int clusterID;
-	int predictionID;
+	int breakpointID;
 	int clusterEnd;
 	int libID;
 	int readID;
