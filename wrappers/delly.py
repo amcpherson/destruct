@@ -13,6 +13,8 @@ import utils
 
 class DellyWrapper(object):
 
+    features = ['tumour_count', 'num_split']
+
     def __init__(self, install_directory):
 
         self.install_directory = install_directory

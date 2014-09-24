@@ -15,6 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from sklearn.metrics import roc_curve, auc
+import seaborn
 
 import pygenes
 import pypeliner
@@ -115,15 +116,15 @@ if __name__ == '__main__':
         mgd.TempInputFile('tumour.unspiked.bam'),
         mgd.TempInputFile('simulated.unsorted.bam'))
 
-    pyp.sch.transform('set_tools', (), ctx,
-        destruct_bam_test.set_tools,
-        mgd.OutputChunks('bytool'))
+    pyp.sch.transform('create_tool_wrappers', (), ctx,
+        destruct_bam_test.create_tool_wrappers,
+        mgd.TempOutputObj('tool_wrapper', 'bytool'),
+        args['installdir'])
 
     pyp.sch.transform('run_tool', ('bytool',), ctx,
         destruct_bam_test.run_tool,
         None,
-        mgd.InputInstance('bytool'),
-        mgd.Template(os.path.join(args['installdir'], '{bytool}'), 'bytool'),
+        mgd.TempInputObj('tool_wrapper', 'bytool'),
         mgd.TempFile('tool_tmp', 'bytool'),
         mgd.InputFile(os.path.join(args['outdir'], 'normal.bam')),
         mgd.InputFile(os.path.join(args['outdir'], 'tumour.bam')),
@@ -132,6 +133,7 @@ if __name__ == '__main__':
     pyp.sch.transform('plot', ('bytool',), ctx, destruct_bam_test.create_roc_plot,
         None,
         mgd.TempInputObj('simulation.params'),
+        mgd.TempInputObj('tool_wrapper', 'bytool'),
         mgd.InputFile(os.path.join(args['outdir'], 'simulated.tsv')),
         mgd.InputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
         mgd.OutputFile(os.path.join(args['outdir'], 'annotated_{bytool}.tsv'), 'bytool'),
@@ -188,20 +190,20 @@ else:
         pypeliner.commandline.execute('samtools', 'index', output_filename, index_filename)
 
 
-    def set_tools():
-        return wrappers.catalog.keys()
+    def create_tool_wrappers(install_directory):
+
+        tool_wrappers = dict()
+
+        for tool_name, ToolWrapper in wrappers.catalog.iteritems():
+
+            tool_wrappers[tool_name] = ToolWrapper(os.path.join(install_directory, tool_name))
+
+        return tool_wrappers
 
 
-    def run_tool(tool, install_directory, temp_directory, normal_filename, tumour_filename, results_filename):
+    def run_tool(tool_wrapper, temp_directory, normal_filename, tumour_filename, results_filename):
 
-        try:
-            ToolWrapper = wrappers.catalog[tool]
-        except KeyError:
-            raise Exception('No wrapper for tool ' + tool)
-
-        wrapper = ToolWrapper(install_directory)
-
-        wrapper.run(temp_directory, {'normal':normal_filename, 'tumour':tumour_filename}, results_filename)
+        tool_wrapper.run(temp_directory, {'normal':normal_filename, 'tumour':tumour_filename}, results_filename)
 
 
     def read_simulation_params(sim_config_filename):
@@ -248,67 +250,94 @@ else:
             return sorted(matched_ids_bypos)[0][1]
 
 
-    def create_roc_plot(sim_info, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
+    def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
 
-        breakpoints = pd.read_csv(simulated_filename, sep='\t', header=None,
-                          converters={'break_id':str, 'chromosome_1':str, 'chromosome_2':str},
-                          names=['break_id',
-                                 'chromosome_1', 'strand_1', 'position_1',
-                                 'chromosome_2', 'strand_2', 'position_2',
-                                 'inserted', 'homology'])
+        with PdfPages(plot_filename) as pdf:
 
-        breakpoints_db = BreakpointDatabase(breakpoints)
+            breakpoints = pd.read_csv(simulated_filename, sep='\t', header=None,
+                              converters={'break_id':str, 'chromosome_1':str, 'chromosome_2':str},
+                              names=['break_id',
+                                     'chromosome_1', 'strand_1', 'position_1',
+                                     'chromosome_2', 'strand_2', 'position_2',
+                                     'inserted', 'homology'])
 
-        results = pd.read_csv(predicted_filename, sep='\t',
-                              converters={'prediction_id':str, 'chromosome_1':str, 'chromosome_2':str})
+            breakpoints_db = BreakpointDatabase(breakpoints)
 
-        results = results[results['normal_count'] == 0]
+            results = pd.read_csv(predicted_filename, sep='\t',
+                                  converters={'prediction_id':str, 'chromosome_1':str, 'chromosome_2':str})
 
-        min_dist = 200
+            results = results[results['normal_count'] == 0]
 
-        def identify_true_positive(row):
-            return breakpoints_db.query(row, min_dist)
+            min_dist = 200
 
-        results['true_pos_id'] = results.apply(identify_true_positive, axis=1)
+            def identify_true_positive(row):
+                return breakpoints_db.query(row, min_dist)
 
-        results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
+            results['true_pos_id'] = results.apply(identify_true_positive, axis=1)
 
-        features = ['tumour_count', 'num_split']
-        invalid_value = -1e9
+            results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
-        identified = breakpoints[['break_id']]
-        identified = identified.merge(results[['prediction_id', 'true_pos_id'] + features], left_on='break_id', right_on='true_pos_id', how='outer')
-        identified = identified.drop('true_pos_id', axis=1)
+            features = tool_wrapper.features
+            invalid_value = -1e9
 
-        identified.to_csv(identified_filename, sep='\t', index=False, na_rep='NA')
+            identified = breakpoints[['break_id']]
+            identified = identified.merge(results[['prediction_id', 'true_pos_id'] + features], left_on='break_id', right_on='true_pos_id', how='outer')
+            identified = identified.drop('true_pos_id', axis=1)
 
-        num_positive = int(sim_info['num_breakpoints'])
+            identified.to_csv(identified_filename, sep='\t', index=False, na_rep='NA')
 
-        y_test = results['true_pos_id'].notnull()
+            num_positive = int(sim_info['num_breakpoints'])
 
-        num_missed = num_positive - np.sum(y_test)
+            y_test = results['true_pos_id'].notnull()
 
-        y_test = np.concatenate([y_test, np.array([True]*num_missed)])
+            num_missed = num_positive - np.sum(y_test)
 
-        if y_test.sum() == len(y_test):
-            y_test = np.concatenate([y_test, np.array([False])])
+            y_test = np.concatenate([y_test, np.array([True]*num_missed)])
 
-        fig = plt.figure(figsize=(16,16))
+            if y_test.sum() == len(y_test):
+                y_test = np.concatenate([y_test, np.array([False])])
 
-        for feature in features:
-            values = results[feature].values
-            values = np.concatenate([values, np.array([invalid_value] * (len(y_test) - len(values)))])
-            fpr, tpr, thresholds = roc_curve(y_test, values)
-            roc_auc = auc(fpr, tpr)
-            plt.plot(fpr, tpr, label='{0} AUC = {1:.2f}'.format(feature, roc_auc))
+            fig = plt.figure(figsize=(16,16))
 
-        plt.plot([0, 1], [0, 1], 'k--')
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.0])
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title('Receiver operating characteristic example')
-        plt.legend(loc="lower right")
+            for feature in features:
+                values = results[feature].values
+                values = np.concatenate([values, np.array([invalid_value] * (len(y_test) - len(values)))])
+                fpr, tpr, thresholds = roc_curve(y_test, values)
+                roc_auc = auc(fpr, tpr)
+                plt.plot(fpr, tpr, label='{0} AUC = {1:.2f}'.format(feature, roc_auc))
 
-        fig.savefig(plot_filename, format='pdf')
+            plt.plot([0, 1], [0, 1], 'k--')
+            plt.xlim([0.0, 1.0])
+            plt.ylim([0.0, 1.0])
+            plt.xlabel('False Positive Rate')
+            plt.ylabel('True Positive Rate')
+            plt.title('Receiver operating characteristic example')
+            plt.legend(loc="lower right")
+
+            pdf.savefig(fig)
+
+            for feature in features:
+
+                fig = plt.figure(figsize=(16,16))
+
+                true_features = results.loc[results['true_pos_id'].notnull(), feature].values.astype(float)
+                false_features = results.loc[results['true_pos_id'].isnull(), feature].values.astype(float)
+
+                def add_optional_noise(feature_values):
+                    if len(np.unique(feature_values)) <= 1:
+                        feature_values += np.random.randn(*feature_values.shape) * 1e-16
+                    return feature_values
+
+                true_features = add_optional_noise(true_features)
+                false_features = add_optional_noise(false_features)
+
+                seaborn.violinplot([true_features, false_features],
+                                   names=['True', 'False'])
+
+                plt.title('True vs false for ' + feature)
+
+                pdf.savefig(fig)
+
+
+
 

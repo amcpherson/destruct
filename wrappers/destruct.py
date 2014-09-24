@@ -12,6 +12,8 @@ import utils
 
 class DestructWrapper(object):
 
+    features = ['tumour_count', 'num_split', 'template_length_min', 'log_likelihood', 'log_cdf']
+
     def __init__(self, install_directory):
 
         self.install_directory = install_directory
