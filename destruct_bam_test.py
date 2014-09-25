@@ -66,17 +66,11 @@ if __name__ == '__main__':
         mgd.TempOutputObj('simulation.params'),
         mgd.InputFile(args['simconfig']))
 
-    pyp.sch.transform('create_genome', (), ctx,
-        destruct_bam_test.create_genome,
-        None,
-        mgd.TempInputObj('simulation.params'),
-        mgd.OutputFile(os.path.join(args['outdir'], 'genome.fasta')))
-
     pyp.sch.transform('create_sim', (), ctx,
         create_breakpoint_simulation.create_breakpoints,
         None,
         mgd.TempInputObj('simulation.params'),
-        mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
+        mgd.InputFile(args['ref']),
         mgd.OutputFile(os.path.join(args['outdir'], 'simulated.fasta')),
         mgd.OutputFile(os.path.join(args['outdir'], 'simulated.tsv')))
 
@@ -102,7 +96,7 @@ if __name__ == '__main__':
     pyp.sch.commandline('bwa_align', (), ctx,
         sys.executable,
         bwaalign_script,
-        mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
+        mgd.InputFile(args['ref']),
         mgd.InputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
         mgd.InputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
         mgd.TempOutputFile('simulated.unsorted.bam'),
@@ -142,19 +136,6 @@ if __name__ == '__main__':
 
 
 else:
-
-
-    def create_genome(sim_info, genome_fasta):
-
-        utils.download.download_genome_fasta(genome_fasta,
-                                             sim_info['chromosomes'],
-                                             sim_info['include_nonchromosomal'])
-
-        pypeliner.commandline.execute('bwa', 'index', genome_fasta)
-        pypeliner.commandline.execute('samtools', 'faidx', genome_fasta)
-
-        for extension in ('.fai', '.amb', '.ann', '.bwt', '.pac', '.sa'):
-            os.rename(genome_fasta+extension, genome_fasta[:-4]+extension)
 
 
     def partition_bam(original_filename, output_a_filename, output_b_filename, fraction_a):
