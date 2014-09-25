@@ -13,6 +13,8 @@ import utils
 
 class DellyWrapper(object):
 
+    features = ['tumour_count', 'num_split']
+
     def __init__(self, install_directory):
 
         self.install_directory = install_directory
@@ -32,8 +34,10 @@ class DellyWrapper(object):
         self.delly_bin = os.path.join(self.bin_directory, 'delly')
         self.delly_excl_chrom = os.path.join(self.packages_directory, 'delly', 'human.hg19.excl.tsv')
 
-        self.primary_assembly_url = 'ftp://ftp.ensembl.org/pub/release-76/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz'
-        self.chromosome_url = 'ftp://ftp.ensembl.org/pub/release-76/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.chromosome.{0}.fa.gz'
+        ensembl_version = '70'
+        ensembl_genome_version = 'GRCh37'
+        self.primary_assembly_url = 'ftp://ftp.ensembl.org/pub/release-'+ensembl_version+'/fasta/homo_sapiens/dna/Homo_sapiens.'+ensembl_genome_version+'.'+ensembl_version+'.dna.primary_assembly.fa.gz'
+        self.chromosome_url = 'ftp://ftp.ensembl.org/pub/release-'+ensembl_version+'/fasta/homo_sapiens/dna/Homo_sapiens.'+ensembl_genome_version+'.'+ensembl_version+'.dna.chromosome.{0}.fa.gz'
         self.genome_fasta = os.path.join(self.data_directory, 'genome.fa')
 
 
@@ -106,8 +110,6 @@ class DellyWrapper(object):
                     subprocess.check_call('git clone https://github.com/tobiasrausch/delly.git', shell=True)
 
                     with utils.CurrentDirectory('delly'):
-
-                        subprocess.check_call('git checkout v0.5.9', shell=True)
 
                         with open('Makefile.tmp', 'w') as f:
                             subprocess.check_call('sed s/-O9/-g\ -O3/g Makefile', shell=True, stdout=f)
