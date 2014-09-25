@@ -136,7 +136,7 @@ void ReadFAI(const string& faiFilename, vector<string>& referenceNames, vector<l
 	ifstream faiFile(faiFilename.c_str());
 	if (!faiFile)
 	{
-		cerr << "Error: unable to fai file" << endl;
+		cerr << "Error: unable to open fai file" << endl;
 		exit(1);
 	}
 	
