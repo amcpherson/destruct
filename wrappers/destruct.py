@@ -12,7 +12,7 @@ import utils
 
 class DestructWrapper(object):
 
-    features = ['tumour_count', 'num_split', 'template_length_min', 'log_likelihood', 'log_cdf']
+    features = ['tumour_count', 'num_split', 'template_length_min', 'log_likelihood', 'log_cdf', 'mate_score']
 
     def __init__(self, install_directory):
 
