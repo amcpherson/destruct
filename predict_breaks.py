@@ -330,4 +330,46 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                      selected_breakpoints_filename)
 
 
+def remove_duplicates(spanning_filename, filtered_spanning_filename):
+
+    alignments = pd.read_csv(spanning_filename, sep='\t', names=spanning_fields,
+                             converters={'chromosome':str})
+
+    # Create an identifier for groups of alignments with the same position
+    data = alignments.copy().sort(['chromosome', 'strand', 'position'])
+    data['position_group'] = ((data['position'].diff().fillna(0) != 0) * 1).cumsum()
+
+    # Remove singleton alignment groups
+    data.set_index('position_group', inplace=True)
+    data['position_group_size'] = data.groupby(level=0).size()
+    data.reset_index(inplace=True)
+    data = data[data['position_group_size'] > 1]
+    data = data.drop(['position_group_size'], axis=1)
+
+    # Create a table with all pairs of groups table for each read 
+    data = pd.merge(data.loc[data['read_end'] == 0, ['read_id', 'position_group']],
+                   data.loc[data['read_end'] == 1, ['read_id', 'position_group']],
+                   on=['read_id'], how='inner',
+                   suffixes=('_1', '_2'))
+
+    # Create an identifier for groups of paired alignments with the same position groups
+    data = data.sort(['position_group_1', 'position_group_2'])
+    data['diff_1'] = (data['position_group_1'].diff().fillna(0) != 0) * 1
+    data['diff_2'] = (data['position_group_2'].diff().fillna(0) != 0) * 1
+    data['pair_group'] = (((data['diff_1'] + data['diff_2']) != 0) * 1).cumsum()
+    data = data.drop(['position_group_1', 'position_group_2', 'diff_1', 'diff_2'], axis=1)
+
+    # Mark as duplicates all but the first read in each group
+    data = data.sort('pair_group')
+    data['duplicate'] = 1 - ((data['pair_group'].diff().fillna(1) != 0) * 1)
+
+    # Merge duplicate call into alignments
+    alignments = alignments.merge(data[['read_id', 'duplicate']], on='read_id', how='left')
+    alignments['duplicate'] = alignments['duplicate'].fillna(0)
+
+    # Filter duplicates
+    alignments = alignments[alignments['duplicate'] == 0]
+    alignments = alignments.drop(['duplicate'], axis=1)
+
+    alignments.to_csv(filtered_spanning_filename, sep='\t', index=False, header=False)
 
