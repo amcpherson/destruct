@@ -311,7 +311,8 @@ def select_clusters(clusters_filename,
 
 
 def select_predictions(breakpoints_filename, selected_breakpoints_filename,
-                       likelihoods_filename, selected_likelihoods_filename):
+                       likelihoods_filename, selected_likelihoods_filename,
+                       mate_score_threshold, template_length_min_threshold):
 
     likelihoods = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
                               usecols=['cluster_id', 'breakpoint_id', 'log_likelihood'])
@@ -320,6 +321,23 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                           .groupby(level=[0, 1])[['log_likelihood']].sum()\
                           .groupby(level=[0]).idxmax()
     selected = pd.DataFrame(list(selected['log_likelihood'].values), columns=['cluster_id', 'breakpoint_id'])
+
+    template_length_min = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
+                                      usecols=['cluster_id', 'breakpoint_id',
+                                               'template_length_1', 'template_length_2'])
+    template_length_min['template_length_min'] = template_length_min[['template_length_1', 'template_length_2']].min(axis=1)
+    template_length_min = template_length_min.drop(['template_length_1', 'template_length_2'], axis=1)
+
+    selected = selected.merge(template_length_min)
+    selected = selected[selected['template_length_min'] >= template_length_min_threshold]
+    selected = selected.drop(['template_length_min'], axis=1)
+
+    mate_score = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
+                             usecols=['cluster_id', 'prediction_id', 'mate_score'])
+
+    selected = selected.merge(mate_score)
+    selected = selected[selected['mate_score'] <= mate_score_threshold]
+    selected = selected.drop(['mate_score'], axis=1)
 
     read_merge_write(likelihoods_filename, likelihoods_fields, selected,
                      ['cluster_id', 'breakpoint_id'],

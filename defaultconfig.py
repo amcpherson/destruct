@@ -105,6 +105,12 @@ cluster_valid_threshold                     = 0.5
 # Minimum discordant read count for filtering clusters
 cluster_readcount_threshold                 = 2
 
+# Minimum template length aligned to either side of the breakpoint
+template_length_min_threshold               = 120
+
+# Minimum mate score for possibly concordant alignments
+mate_score_threshold                        = 60
+
 # Realignment parameters
 match_score                                 = 2
 mismatch_score                              = -3

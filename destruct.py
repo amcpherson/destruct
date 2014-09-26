@@ -133,7 +133,7 @@ else:
             '-s', mgd.TempInputFile('libstats.tsv'),
             '-c', mgd.TempOutputFile('clusters', 'bychromarg'),
             mgd.TempInputObj('chrom.args', 'bychromarg'),
-            '--clustmin', '1',
+            '--clustmin', config['cluster_readcount_threshold'],
             '--fragmax', config['fragment_length_max'])
 
         
@@ -238,8 +238,10 @@ else:
             mgd.TempInputFile('breakpoints_1'),
             mgd.TempOutputFile('breakpoints'),
             mgd.TempInputFile('likelihoods_1'),
-            mgd.TempOutputFile('likelihoods'))
-
+            mgd.TempOutputFile('likelihoods'),
+            config['mate_score_threshold'],
+            config['template_length_min_threshold'])
+        
 
         # Predict rearrangement cycles
 
