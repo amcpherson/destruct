@@ -10,7 +10,7 @@ def read_sequences(fasta):
         if line[0] == '>':
             if id is not None:
                 yield (id, ''.join(sequences))
-            id = line[1:]
+            id = line[1:].split()[0]
             sequences = []
         else:
             sequences.append(line)
