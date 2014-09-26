@@ -6,6 +6,9 @@ import os
 import subprocess
 import sys
 
+import utils.io
+import utils.misc
+
 
 class SequenceRegion(object):
     def __init__(self, chromosome, strand, start, end):
@@ -188,7 +191,7 @@ class TumourChromosome(object):
         for region in self.regions:
             region_sequence = genome[region.chromosome][region.start-1:region.end]
             if region.strand == '-':
-                region_sequence = reverse_complement(region_sequence)
+                region_sequence = utils.misc.reverse_complement(region_sequence)
             sequence += region_sequence
         return sequence
     @property
@@ -210,26 +213,6 @@ class TumourChromosome(object):
                 str2 = '+'
             yield id, region1.chromosome, str1, pos1, region2.chromosome, str2, pos2
 
-def read_sequences(fasta):
-    id = None
-    sequences = []
-    for line in fasta:
-        line = line.rstrip()
-        if len(line) == 0:
-            continue
-        if line[0] == '>':
-            if id is not None:
-                yield (id, ''.join(sequences))
-            id = line[1:]
-            sequences = []
-        else:
-            sequences.append(line)
-    if id is not None:
-        yield (id, ''.join(sequences))
-
-def reverse_complement(sequence):
-    return sequence[::-1].translate(string.maketrans('ACTGactg','TGACtgac'))
-
 def random_chimera(fasta, chromosome, num_chimera, fragment_length):
     id = 0
     chimera_length = 0
@@ -240,7 +223,7 @@ def random_chimera(fasta, chromosome, num_chimera, fragment_length):
             end = start + fragment_length
             sequence = chromosome[start:end]
             if random.choice([True, False]):
-                sequence = reverse_complement(sequence)
+                sequence = utils.misc.reverse_complement(sequence)
             chimera += sequence
         if chimera.count('N') > 0:
             continue
@@ -282,7 +265,7 @@ def simulate(cfg, sim_info, read_count, sequences_fasta, reads1, reads2, random_
 
 def create(cfg, sim_info, chromosomes_info, breakpoints_info, reads_fastq_1, reads_fastq_2, temps_prefix):
     random.seed(int(sim_info['rearrangements_seed']))
-    genome = dict(read_sequences(open(cfg.genome_fasta, 'r')))
+    genome = dict(utils.io.read_sequences(open(cfg.genome_fasta, 'r')))
     simulation_chromosome = sim_info['simulation_chromosome']
     # Create simulated chromosomes by applying random operations
     tumour_proportions = [float(a) for a in sim_info['chromosome_proportions'].split()]

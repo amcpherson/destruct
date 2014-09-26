@@ -22,6 +22,7 @@ import pypeliner.managed as mgd
 import score_stats
 import utils.plots
 import utils.misc
+import utils.io
 import predict_breaks
 
 
@@ -682,24 +683,6 @@ else:
                                 reads_table_file.write('\t'.join([str(cluster_id), str(lib_id), str(fragment_id), read_end, seq, qual, comment]) + '\n')
 
 
-    def read_sequences(fasta):
-        id = None
-        sequences = []
-        for line in fasta:
-            line = line.rstrip()
-            if len(line) == 0:
-                continue
-            if line[0] == '>':
-                if id is not None:
-                    yield (id, ''.join(sequences))
-                id = line[1:]
-                sequences = []
-            else:
-                sequences.append(line)
-        if id is not None:
-            yield (id, ''.join(sequences))
-
-
     class DGVDatabase(object):
         def __init__(self, dgv_filename):
             self.variations = list()
@@ -872,7 +855,7 @@ else:
 
         # Annotate sequence
         reference_sequences = dict()
-        for id, seq in read_sequences(open(genome_fasta, 'r')):
+        for id, seq in utils.io.read_sequences(open(genome_fasta, 'r')):
             reference_sequences[id] = seq
 
         breakpoints['sequence'] = breakpoints.apply(lambda row: create_sequence(row, reference_sequences), axis=1)

@@ -13,6 +13,8 @@ import itertools
 
 import pypeliner
 
+import utils.io
+
 if __name__ == '__main__':
 	
 	import mappability_bwa
@@ -32,26 +34,9 @@ if __name__ == '__main__':
 	pyp.sch.transform('merge_bedgraph', (), ctx, mappability_bwa.merge_files_by_line, None, pyp.sch.ifile('bedgraph', ('bykmer',)), pyp.sch.output(cfg.mappability_filename))
 	pyp.run()
 	
-def read_sequences(fasta):
-	id = None
-	sequences = []
-	for line in fasta:
-		line = line.rstrip()
-		if len(line) == 0:
-			continue
-		if line[0] == '>':
-			if id is not None:
-				yield (id, ''.join(sequences))
-			id = line[1:]
-			sequences = []
-		else:
-			sequences.append(line)
-	if id is not None:
-		yield (id, ''.join(sequences))
-
 def create_kmers(genome_fasta, k, kmers_filename):
 	with open(kmers_filename, 'w') as kmers_file:
-		genome_sequences = dict(read_sequences(open(genome_fasta, 'r')))
+		genome_sequences = dict(utils.io.read_sequences(open(genome_fasta, 'r')))
 		for chromosome, sequence in genome_sequences.iteritems():
 			chromosome = chromosome.split()[0]
 			for start in xrange(len(sequence)):
