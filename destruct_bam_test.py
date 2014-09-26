@@ -305,8 +305,10 @@ else:
                 false_features = results.loc[results['true_pos_id'].isnull(), feature].values.astype(float)
 
                 def add_optional_noise(feature_values):
+                    if len(feature_values) == 1:
+                        feature_values = np.concatenate([feature_values, feature_values])
                     if len(np.unique(feature_values)) <= 1:
-                        feature_values += np.random.randn(*feature_values.shape) * 1e-16
+                        feature_values += np.random.randn(*feature_values.shape) * 1e-4
                     return feature_values
 
                 true_features = add_optional_noise(true_features)
