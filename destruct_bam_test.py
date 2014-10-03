@@ -271,6 +271,8 @@ else:
 
             y_test = results['true_pos_id'].notnull()
 
+            tp_identified = np.sum(y_test)
+
             num_missed = num_positive - np.sum(y_test)
 
             y_test = np.concatenate([y_test, np.array([True]*num_missed)])
@@ -281,18 +283,23 @@ else:
             fig = plt.figure(figsize=(16,16))
 
             for feature in features:
+                
                 values = results[feature].values
                 values = np.concatenate([values, np.array([invalid_value] * (len(y_test) - len(values)))])
-                fpr, tpr, thresholds = roc_curve(y_test, values)
-                roc_auc = auc(fpr, tpr)
-                plt.plot(fpr, tpr, label='{0} AUC = {1:.2f}'.format(feature, roc_auc))
+                
+                tp_counts = list()
+                fp_counts = list()
+                
+                for threshold in np.sort(np.unique(values)):
+                    
+                    tp_counts.append(np.sum(y_test[values > threshold]))
+                    fp_counts.append(np.sum(1 - y_test[values > threshold]))
+                
+                plt.plot(fp_counts, tp_counts, label=feature.replace('_', ' '))
 
-            plt.plot([0, 1], [0, 1], 'k--')
-            plt.xlim([0.0, 1.0])
-            plt.ylim([0.0, 1.0])
-            plt.xlabel('False Positive Rate')
-            plt.ylabel('True Positive Rate')
-            plt.title('Receiver operating characteristic example')
+            plt.title('Features for {0} identified true positives'.format(tp_identified))
+            plt.xlabel('False Positive Count')
+            plt.ylabel('True Positive Count')
             plt.legend(loc="lower right")
 
             pdf.savefig(fig)
