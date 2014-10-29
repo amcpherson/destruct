@@ -41,8 +41,7 @@ struct SpanningAlignmentRecord
 	string chromosome;
 	string strand;
 	int position;
-	int selfLength;
-	int selfScore;
+	int alignedLength;
 	int mateLength;
 	int mateScore;
 

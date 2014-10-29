@@ -576,7 +576,7 @@ int main(int argc, char* argv[])
 
 				AlignInfo alignInfo = selfAlignments[alignmentIndex];
 				
-				int selfScore = alignInfo.SeqScores()[preppedReads.ReadLength(alignment.readEnd)];
+				int selfSeqLength = alignInfo.BestPartialSeqLength();
 
 				int mateScore = 0;
 
@@ -599,8 +599,7 @@ int main(int argc, char* argv[])
 				record.chromosome = alignment.reference;
 				record.strand = ((alignment.strand == PlusStrand) ? "+" : "-");
 				record.position = alignInfo.OuterPosition();
-				record.selfLength = preppedReads.ReadLength(readEnd);
-				record.selfScore = selfScore;
+				record.alignedLength = selfSeqLength;
 				record.mateLength = preppedReads.ReadLength(mateEnd);
 				record.mateScore = mateScore;
 

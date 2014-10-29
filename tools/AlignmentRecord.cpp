@@ -27,8 +27,7 @@ std::ostream & operator<<(std::ostream &os, const SpanningAlignmentRecord& recor
 	os << record.chromosome << "\t";
 	os << record.strand << "\t";
 	os << record.position << "\t";
-	os << record.selfLength << "\t";
-	os << record.selfScore << "\t";
+	os << record.alignedLength << "\t";
 	os << record.mateLength << "\t";
 	os << record.mateScore << std::endl;
 	return os;
@@ -43,8 +42,7 @@ std::istream & operator>>(std::istream &is, SpanningAlignmentRecord& record)
 	is >> record.chromosome;
 	is >> record.strand;
 	is >> record.position;
-	is >> record.selfLength;
-	is >> record.selfScore;
+	is >> record.alignedLength;
 	is >> record.mateLength;
 	is >> record.mateScore;
 	return is;

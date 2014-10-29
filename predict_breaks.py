@@ -13,8 +13,7 @@ cluster_fields = ['cluster_id', 'cluster_end',
 
 
 spanning_fields = ['library_id', 'read_id', 'read_end', 'align_id',
-                   'chromosome', 'strand', 'position',
-                   'self_length', 'self_score',
+                   'chromosome', 'strand', 'position', 'aligned_length',
                    'mate_length', 'mate_score']
 
 
@@ -70,10 +69,9 @@ def predict_breaks_spanning(clusters, spanning):
     # Create a table of spanning alignments for these clusters
     data = spanning.merge(clusters, on=['library_id', 'read_id', 'read_end', 'align_id'])
 
-    # Add start and end based on position and read length, assuming
-    # the full read length aligns
-    data['start'] = np.where(data['strand'] == '+', data['position'], data['position'] - data['self_length'] + 1)
-    data['end'] = np.where(data['strand'] == '+', data['position'] + data['self_length'] - 1, data['position'])
+    # Add start and end based on position and aligned length
+    data['start'] = np.where(data['strand'] == '+', data['position'], data['position'] - data['aligned_length'] + 1)
+    data['end'] = np.where(data['strand'] == '+', data['position'] + data['aligned_length'] - 1, data['position'])
 
     # Predict based on spanning reads
     agg_f = {'chromosome':max, 'strand':max, 'start':min, 'end':max}
@@ -321,10 +319,19 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
     likelihoods = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
                               usecols=['cluster_id', 'breakpoint_id', 'log_likelihood'])
 
-    selected = likelihoods.set_index(['cluster_id', 'breakpoint_id'])\
-                          .groupby(level=[0, 1])[['log_likelihood']].sum()\
-                          .groupby(level=[0]).idxmax()
-    selected = pd.DataFrame(list(selected['log_likelihood'].values), columns=['cluster_id', 'breakpoint_id'])
+    # Calculate total likelihood
+    likelihoods = likelihoods.groupby(['cluster_id', 'breakpoint_id'])['log_likelihood']\
+                             .sum()\
+                             .reset_index()
+
+    # Select highest likelihood breakpoint predictions
+    # Prefer a higher breakpoint id, thus preferring solutions with split reads
+    likelihoods = likelihoods.sort(['cluster_id', 'log_likelihood', 'breakpoint_id'],
+                                   ascending=[True, False, False])
+    selected = likelihoods.groupby('cluster_id')\
+                          .first()\
+                          .reset_index()\
+                          .drop(['log_likelihood'], axis=1)
 
     template_length_min = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
                                       usecols=['cluster_id', 'breakpoint_id',
