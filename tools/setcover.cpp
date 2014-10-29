@@ -73,8 +73,7 @@ int main(int argc, char* argv[])
 
 					if (!inserted)
 					{
-						cerr << "Error: read " << readRecord.readID << ", lib " << readRecord.libID << " has multiple entries for cluster " << ids.back() << endl;
-						exit(1);
+						cerr << "Warning: read " << readRecord.readID << ", lib " << readRecord.libID << " has multiple entries for cluster " << ids.back() << endl;
 					}
 				}
 			}

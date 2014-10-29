@@ -239,8 +239,6 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
 
     data = pd.read_csv(realignments_filename, sep='\t', names=realignment_fields)
 
-    assert data.duplicated(subset=['cluster_id', 'breakpoint_id', 'library_id', 'read_id', 'read_end']).sum() == 0
-
     data = data.merge(score_stats, on='aligned_length')
 
     # Alignment score likelihood and CDF
@@ -255,8 +253,8 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     data_fields = ['read_end', 'aligned_length', 'template_length',
                    'score', 'score_log_likelihood', 'score_log_cdf']
     data = pd.merge(data.loc[data['cluster_end'] == 0, index_fields + data_fields].drop_duplicates(),
-		    data.loc[data['cluster_end'] == 1, index_fields + data_fields].drop_duplicates(),
-		    on=index_fields,
+                    data.loc[data['cluster_end'] == 1, index_fields + data_fields].drop_duplicates(),
+                    on=index_fields,
                     suffixes=('_1', '_2'))
 
     # Merge insert length from breakpoint predictions
@@ -278,7 +276,11 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
                       data['score_log_cdf_2'] + \
                       data['length_log_cdf']
 
-    data = data.reset_index()
+    index_fields = ['cluster_id', 'breakpoint_id', 'library_id', 'read_id']
+    data = data.sort(index_fields + ['log_likelihood'])\
+               .groupby(index_fields)\
+               .last()\
+               .reset_index()
 
     data = data[likelihoods_fields]
 

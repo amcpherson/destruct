@@ -205,12 +205,6 @@ int main(int argc, char* argv[])
 				for (int elementIndex = 0; elementIndex < cluster.size(); elementIndex++)
 				{
 					int alignPairIndex = alignPairIndices[cluster[elementIndex]];
-
-					// For fragments with multiple alignments supporting the same cluster, select first alignment
-					if (!clusterFragmentIndices.insert(readInfos[alignPairIndex].first.readID).second)
-					{
-						continue;
-					}
 					
 					OutputClusterMember(clustersFile, clusterID, 0, readInfos[alignPairIndex].first);
 					OutputClusterMember(clustersFile, clusterID, 1, readInfos[alignPairIndex].second);
