@@ -88,11 +88,12 @@ def predict_breaks_spanning(clusters, spanning):
     data['count'] = 0
     data['homology'] = 0
     data['inserted'] = ''
+    data['breakpoint_id'] = 0
 
     return data
 
 
-def predict_breaks_split(clusters, split):
+def predict_breaks_split(clusters, split, max_predictions_per_cluster=10):
 
     # Unstack clusters file by read end, in preparation for
     # merge with split alignments
@@ -137,18 +138,6 @@ def predict_breaks_split(clusters, split):
     data['inslen'] = data['inserted'].apply(len)
 
     data.set_index(['cluster_id', 'position_1', 'position_2', 'homology', 'inslen'], inplace=True)
-    data = data.sort_index()
-
-    agg_f = {'score':sum, 'read_id':len,
-             'chromosome_1':max, 'chromosome_2':max,
-             'strand_1':max, 'strand_2':max}
-    split_data = data.groupby(level=[0, 1, 2, 3, 4])\
-                     .agg(agg_f)\
-                     .rename(columns={'read_id':'count'})
-
-    selected = split_data['score'].groupby(level=[0]).idxmax().values
-
-    split_data = split_data.loc[selected]
 
     def calculate_consensus(dat):
         inserted = np.array([np.array(list(a)) for a in dat.values])
@@ -158,11 +147,22 @@ def predict_breaks_split(clusters, split):
         consensus = ''.join(consensus)
         return consensus
 
-    split_data['inserted'] = data.loc[selected, 'inserted']\
-                                 .groupby(level=[0, 1, 2, 3, 4])\
-                                 .apply(calculate_consensus)
+    agg_f = {'score':sum, 'read_id':len,
+             'chromosome_1':max, 'chromosome_2':max,
+             'strand_1':max, 'strand_2':max,
+             'inserted':calculate_consensus}
+    split_data = data.groupby(level=[0, 1, 2, 3, 4])\
+                     .agg(agg_f)\
+                     .rename(columns={'read_id':'count'})\
+                     .reset_index()
 
-    split_data.reset_index(inplace=True)
+    split_data = split_data.sort(['cluster_id', 'score'])
+
+    split_data['breakpoint_id'] = split_data.groupby('cluster_id').cumcount(ascending=False)
+
+    split_data = split_data[split_data['breakpoint_id'] < max_predictions_per_cluster]
+
+    split_data['breakpoint_id'] += 1
 
     return split_data
 
@@ -184,10 +184,8 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
                            converters={'chromosome':str})
 
     predictions_0 = predict_breaks_spanning(clusters, spanning)
-    predictions_0['breakpoint_id'] = 0
 
     predictions_1 = predict_breaks_split(clusters, split)
-    predictions_1['breakpoint_id'] = 1
 
     predictions = pd.concat([predictions_0, predictions_1], ignore_index=True)
     predictions.sort('cluster_id', inplace=True)
