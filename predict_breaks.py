@@ -97,8 +97,12 @@ def predict_breaks_split(clusters, split, max_predictions_per_cluster=10):
 
     # Unstack clusters file by read end, in preparation for
     # merge with split alignments
-    paired = clusters.set_index(['cluster_id', 'library_id', 'read_id', 'read_end'])[['cluster_end', 'align_id']].unstack()
-    paired.columns = ['cluster_end_1', 'cluster_end_2', 'align_id_1', 'align_id_2']
+    index_fields = ['cluster_id', 'library_id', 'read_id']
+    data_fields = ['cluster_end', 'align_id']
+    paired = pd.merge(clusters.loc[clusters['read_end'] == 0, index_fields + data_fields].drop_duplicates(),
+                      clusters.loc[clusters['read_end'] == 1, index_fields + data_fields].drop_duplicates(),
+                      on=index_fields,
+                      suffixes=('_1', '_2'))
 
     # Keep track of which reads have ends flipped relative to clusters
     paired['flip'] = paired['cluster_end_1'] != 0
@@ -248,12 +252,12 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
 
     # Unstack on cluster end
     index_fields = ['cluster_id', 'breakpoint_id', 'library_id', 'read_id']
-    unstack_field = ['cluster_end']
     data_fields = ['read_end', 'aligned_length', 'template_length',
                    'score', 'score_log_likelihood', 'score_log_cdf']
-    data = data.set_index(index_fields + unstack_field)[data_fields].unstack()
-    data.columns = ['_'.join((a, str(b+1))) for a, b in data.columns.values]
-    data.reset_index(inplace=True)
+    data = pd.merge(data.loc[data['cluster_end'] == 0, index_fields + data_fields].drop_duplicates(),
+		    data.loc[data['cluster_end'] == 1, index_fields + data_fields].drop_duplicates(),
+		    on=index_fields,
+                    suffixes=('_1', '_2'))
 
     # Merge insert length from breakpoint predictions
     data = data.merge(breakpoints[['cluster_id', 'breakpoint_id', 'inslen']],
