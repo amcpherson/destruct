@@ -338,7 +338,7 @@ else:
             '-r', config['satellite_regions'],
             '>', mgd.TempOutputFile('spanning.alignments_1', 'bylibrary'))
 
-        sch.transform('filterdups', ('bylibrary',), lowmem,
+        sch.transform('filterdups', ('bylibrary',), medmem,
             predict_breaks.remove_duplicates,
             None,
             mgd.TempInputFile('spanning.alignments_1', 'bylibrary'),
