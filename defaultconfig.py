@@ -106,7 +106,7 @@ cluster_valid_threshold                     = 0.5
 cluster_readcount_threshold                 = 2
 
 # Minimum template length aligned to either side of the breakpoint
-template_length_min_threshold               = 120
+template_length_min_threshold               = 40
 
 # Minimum mate score for possibly concordant alignments
 mate_score_threshold                        = 60
