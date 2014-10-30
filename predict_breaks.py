@@ -365,40 +365,39 @@ def remove_duplicates(spanning_filename, filtered_spanning_filename):
                              converters={'chromosome':str})
 
     # Create an identifier for groups of alignments with the same position
-    data = alignments.copy().sort(['chromosome', 'strand', 'position'])
-    data['position_group'] = ((data['position'].diff().fillna(0) != 0) * 1).cumsum()
-
-    # Remove singleton alignment groups
-    data.set_index('position_group', inplace=True)
-    data['position_group_size'] = data.groupby(level=0).size()
-    data.reset_index(inplace=True)
-    data = data[data['position_group_size'] > 1]
-    data = data.drop(['position_group_size'], axis=1)
+    group_idx = alignments[['chromosome', 'strand', 'position']].drop_duplicates()
+    group_idx['position_group'] = xrange(len(group_idx.index))
+    data = alignments.merge(group_idx)
 
     # Create a table with all pairs of groups table for each read 
-    data = pd.merge(data.loc[data['read_end'] == 0, ['read_id', 'position_group']],
-                   data.loc[data['read_end'] == 1, ['read_id', 'position_group']],
-                   on=['read_id'], how='inner',
-                   suffixes=('_1', '_2'))
+    data = pd.merge(data.loc[data['read_end'] == 0, ['read_id', 'position_group']].drop_duplicates(),
+                    data.loc[data['read_end'] == 1, ['read_id', 'position_group']].drop_duplicates(),
+                    on=['read_id'], how='inner',
+                    suffixes=('_1', '_2'))
+
+    # Create an ordering for position groups
+    ordering = data['position_group_1'] < data['position_group_2']
+    data['position_group_a'] = np.where(ordering,
+                                        data['position_group_1'],
+                                        data['position_group_2'])
+    data['position_group_b'] = np.where(ordering,
+                                        data['position_group_2'],
+                                        data['position_group_1'])
+    data = data.drop(['position_group_1', 'position_group_2'], axis=1)
 
     # Create an identifier for groups of paired alignments with the same position groups
-    data = data.sort(['position_group_1', 'position_group_2'])
-    data['diff_1'] = (data['position_group_1'].diff().fillna(0) != 0) * 1
-    data['diff_2'] = (data['position_group_2'].diff().fillna(0) != 0) * 1
-    data['pair_group'] = (((data['diff_1'] + data['diff_2']) != 0) * 1).cumsum()
-    data = data.drop(['position_group_1', 'position_group_2', 'diff_1', 'diff_2'], axis=1)
+    group_idx = data[['position_group_a', 'position_group_b']].drop_duplicates()
+    group_idx['pair_group'] = xrange(len(group_idx.index))
+    data = data.merge(group_idx)
+    data = data.drop(['position_group_a', 'position_group_b'], axis=1)
 
-    # Mark as duplicates all but the first read in each group
-    data = data.sort('pair_group')
-    data['duplicate'] = 1 - ((data['pair_group'].diff().fillna(1) != 0) * 1)
+    # Select the first read in each pair group as the representative of each set of duplicates
+    data = data.groupby('pair_group')\
+               .first()\
+               .reset_index()
 
-    # Merge duplicate call into alignments
-    alignments = alignments.merge(data[['read_id', 'duplicate']], on='read_id', how='left')
-    alignments['duplicate'] = alignments['duplicate'].fillna(0)
-
-    # Filter duplicates
-    alignments = alignments[alignments['duplicate'] == 0]
-    alignments = alignments.drop(['duplicate'], axis=1)
+    # Filter alignments based on representatives of each set of duplicates
+    alignments = alignments.merge(data[['read_id']].drop_duplicates())
 
     alignments.to_csv(filtered_spanning_filename, sep='\t', index=False, header=False)
 
