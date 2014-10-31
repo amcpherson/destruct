@@ -184,6 +184,11 @@ int main(int argc, char* argv[])
 		
 		for (IntegerTableConstIter delaunyClusterIter = delaunyClusters.begin(); delaunyClusterIter != delaunyClusters.end(); delaunyClusterIter++)
 		{
+			if (delaunyClusterIter->size() < minClusterSize)
+			{
+				continue;
+			}
+			
 			MatePairVec delaunyMatePairs;
 			IntegerVec alignPairIndices;
 			for (IntegerVecConstIter elementIter = delaunyClusterIter->begin(); elementIter != delaunyClusterIter->end(); elementIter++)
@@ -201,7 +206,24 @@ int main(int argc, char* argv[])
 			{
 				const IntegerVec& cluster = gibbsClusters[clusterIndex];
 
-				unordered_set<int> clusterFragmentIndices;
+				if (cluster.size() < minClusterSize)
+				{
+					continue;
+				}
+
+				unordered_set<int> clusterReadIDs;
+				for (int elementIndex = 0; elementIndex < cluster.size(); elementIndex++)
+				{
+					int alignPairIndex = alignPairIndices[cluster[elementIndex]];
+
+					clusterReadIDs.insert(readInfos[alignPairIndex].first.readID);
+				}
+
+				if (clusterReadIDs.size() < minClusterSize)
+				{
+					continue;
+				}
+
 				for (int elementIndex = 0; elementIndex < cluster.size(); elementIndex++)
 				{
 					int alignPairIndex = alignPairIndices[cluster[elementIndex]];
