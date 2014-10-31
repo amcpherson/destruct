@@ -191,16 +191,13 @@ else:
             merge_files_by_line,
             None,
             mgd.TempInputFile('likelihoods_2', 'bylibrary', 'byread'),
-            mgd.TempOutputFile('likelihoods_unsorted', 'bylibrary'))
+            mgd.TempOutputFile('likelihoods_2', 'bylibrary'))
 
         sch.transform('merge_likelihoods2', (), lowmem,
             merge_files_by_line,
             None,
-            mgd.TempInputFile('likelihoods_unsorted', 'bylibrary'),
-            mgd.TempOutputFile('likelihoods_unsorted'))
-
-        sch.commandline('sort_likelihoods', (), medmem,
-            'sort', '-n', mgd.TempInputFile('likelihoods_unsorted'), '>', mgd.TempOutputFile('likelihoods_2'))
+            mgd.TempInputFile('likelihoods_2', 'bylibrary'),
+            mgd.TempOutputFile('likelihoods_2'))
 
 
         # Set cover for multi mapping reads
