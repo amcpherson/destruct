@@ -40,16 +40,37 @@ if __name__ == '__main__':
     import destruct
 
     argparser = argparse.ArgumentParser()
+
     pypeliner.app.add_arguments(argparser)
+
     argparser.add_argument('--version', action='version', version=__version__)
+
     argparser.add_argument('refdatadir', help='Reference dataset directory')
-    argparser.add_argument('libraries', help='Libraries list filename')
+
     argparser.add_argument('breakpoints', help='Breakpoints table filename')
+
     argparser.add_argument('breakreads', help='Breakpoint reads table filename')
+
     argparser.add_argument('plots_tar', help='Diagnostic plots tar filename')
-    argparser.add_argument('-c', '--config', help='Configuration Filename')
+
+    argparser.add_argument('--libs_table', help='Libraries list table filename')
+
+    argparser.add_argument('--bam_files', nargs='+', help='Bam filenames')
+
+    argparser.add_argument('--lib_ids', nargs='+', help='Ids for respective bam filenames')
+
+    argparser.add_argument('--config', help='Configuration Filename')
 
     args = vars(argparser.parse_args())
+
+    if not ((args['libs_table'] is not None) or (args['bam_files'] is not None and args['lib_ids'] is not None)):
+        raise Exception('either --libs_table or both --bam_files and --lib_ids are required')
+
+    if (args['libs_table'] is not None) == (args['bam_files'] is not None or args['lib_ids'] is not None):
+        raise Exception('--libs_table is mutually exclusive with --bam_files and --lib_ids')
+
+    if args['bam_files'] is not None and (len(args['bam_files']) != len(args['lib_ids'])):
+        raise Exception('--lib_ids must correspond one to one with --bam_files')
 
     config = {'ref_data_directory':args['refdatadir'],
               'package_data_directory':data_directory}
@@ -62,10 +83,17 @@ if __name__ == '__main__':
 
     pyp = pypeliner.app.Pypeline([destruct], config)
 
-    pyp.sch.transform('readlibs', (), destruct.locally,
-        destruct.read_libraries,
-        mgd.TempOutputObj('libinfo', 'bylibrary'),
-        args['libraries'])
+    if args['libs_table'] is not None:
+        pyp.sch.transform('readlibs', (), destruct.locally,
+            destruct.read_libraries,
+            mgd.TempOutputObj('libinfo', 'bylibrary'),
+            args['libs_table'])
+    else:
+        pyp.sch.transform('initlibs', (), destruct.locally,
+            destruct.init_libraries,
+            mgd.TempOutputObj('libinfo', 'bylibrary'),
+            args['lib_ids'],
+            args['bam_files'])
 
     pyp.sch.transform('linklibs', ('bylibrary',), destruct.locally,
         destruct.link_libraries,
@@ -647,6 +675,8 @@ else:
 
 
     LibInfo = collections.namedtuple('LibInfo', ['id', 'name', 'bam'])
+
+
     def read_libraries(libraries_filename):
         libraries = dict()
         with open(libraries_filename, 'r') as libraries_file:
@@ -654,6 +684,13 @@ else:
                 lib_name = row[0]
                 lib_bam = row[1]
                 libraries[lib_name] = LibInfo(lib_idx, lib_name, lib_bam)
+        return libraries
+
+
+    def init_libraries(lib_names, bam_filenames):
+        libraries = dict()
+        for lib_idx, (lib_name, lib_bam) in enumerate(sorted(zip(lib_names, bam_filenames))):
+            libraries[lib_name] = LibInfo(lib_idx, lib_name, lib_bam)
         return libraries
 
 
