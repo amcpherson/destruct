@@ -54,11 +54,7 @@ class DestructWrapper(object):
 
         utils.makedirs(temp_directory)
 
-        bam_list_filename = os.path.join(temp_directory, 'bam_list.tsv')
-
-        with open(bam_list_filename, 'w') as bam_list_file:
-            for lib_id, bam_filename in bam_filenames.iteritems():
-                bam_list_file.write(lib_id + '\t' + bam_filename + '\n')
+        lib_ids, bam_files = zip(*list(bam_filenames.items()))
 
         breakpoints_filename = output_filename
         breakreads_filename = os.path.join(temp_directory, 'breakreads.tsv')
@@ -69,10 +65,16 @@ class DestructWrapper(object):
         destruct_cmd += [sys.executable]
         destruct_cmd += [self.destruct_script]
         destruct_cmd += [self.ref_data_directory]
-        destruct_cmd += [bam_list_filename]
         destruct_cmd += [breakpoints_filename]
         destruct_cmd += [breakreads_filename]
         destruct_cmd += [plots_tar_filename]
+
+        destruct_cmd += ['--lib_ids']
+	destruct_cmd += lib_ids
+
+	destruct_cmd += ['--bam_files']
+	destruct_cmd += bam_files
+
         destruct_cmd += ['--config', self.user_config_filename]
         destruct_cmd += ['--tmp', destruct_tmp_directory]
         destruct_cmd += ['--nocleanup', '--repopulate', '--maxjobs', '4', '--loglevel', 'DEBUG']
