@@ -45,13 +45,13 @@ if __name__ == '__main__':
 
     argparser.add_argument('--version', action='version', version=__version__)
 
-    argparser.add_argument('refdatadir', help='Reference dataset directory')
+    argparser.add_argument('ref_data_dir', help='Reference dataset directory')
 
-    argparser.add_argument('breakpoints', help='Breakpoints table filename')
+    argparser.add_argument('breakpoint_table', help='Output table of breakpoint information in TSV format')
 
-    argparser.add_argument('breakreads', help='Breakpoint reads table filename')
+    argparser.add_argument('breakpoint_read_table', help='Output table of breakpoint read information in TSV format')
 
-    argparser.add_argument('plots_tar', help='Diagnostic plots tar filename')
+    argparser.add_argument('plots_tar', help='Output diagnostic plots tar filename')
 
     argparser.add_argument('--libs_table', help='Libraries list table filename')
 
@@ -72,7 +72,7 @@ if __name__ == '__main__':
     if args['bam_files'] is not None and (len(args['bam_files']) != len(args['lib_ids'])):
         raise Exception('--lib_ids must correspond one to one with --bam_files')
 
-    config = {'ref_data_directory':args['refdatadir'],
+    config = {'ref_data_directory':args['ref_data_dir'],
               'package_data_directory':data_directory}
     execfile(default_config_filename, {}, config)
 
@@ -82,427 +82,403 @@ if __name__ == '__main__':
     config.update(args)
 
     pyp = pypeliner.app.Pypeline([destruct], config)
+    sch = pyp.sch
 
-    if args['libs_table'] is not None:
-        pyp.sch.transform('readlibs', (), destruct.locally,
-            destruct.read_libraries,
-            mgd.TempOutputObj('libinfo', 'bylibrary'),
-            args['libs_table'])
-    else:
-        pyp.sch.transform('initlibs', (), destruct.locally,
-            destruct.init_libraries,
-            mgd.TempOutputObj('libinfo', 'bylibrary'),
-            args['lib_ids'],
-            args['bam_files'])
 
-    pyp.sch.transform('linklibs', ('bylibrary',), destruct.locally,
-        destruct.link_libraries,
-        None,
-        mgd.TempInputObj('libinfo', 'bylibrary').prop('bam'),
-        mgd.TempOutputFile('bam', 'bylibrary'))
-
-    destruct.multilib_predict_breakpoints(pyp.sch, config,
-        mgd.TempInputFile('bam', 'bylibrary'),
-        mgd.OutputFile(args['breakpoints']),
-        mgd.OutputFile(args['breakreads']),
-        mgd.OutputFile(args['plots_tar']))
-
-    pyp.run()
-
-else:
+    # Pypeliner contexts
 
     locally = {'local':True}
     lowmem = {'mem':1}
     medmem = {'mem':8}
     himem = {'mem':16}
 
-    def multilib_predict_breakpoints(sch, config, bams, breakpoints, breakreads, plots_tar):
-
-        '''
-        inputs: 'bam', ('bylibrary',)
-        outputs: 'breakpoints.table'
-        '''
-
-        retrieve_from_bam(sch, config, bams)
-
-        align_sample(sch, config)
-        split_align_merge(sch, config)
-
-        sch.transform('write_stats_table', (), lowmem,
-            write_stats_table,
-            None,
-            mgd.TempInputObj('libinfo', 'bylibrary'),
-            mgd.TempInputObj('stats', 'bylibrary'),
-            mgd.TempOutputFile('libstats.tsv'))
-
-        sch.transform('merge_spanning', (), lowmem,
-            merge_files_by_line,
-            None,
-            mgd.TempInputFile('spanning.alignments', 'bylibrary'),
-            mgd.TempOutputFile('spanning.alignments'))
-
-        sch.transform('merge_split', (), lowmem,
-            merge_files_by_line,
-            None,
-            mgd.TempInputFile('split.alignments', 'bylibrary'),
-            mgd.TempOutputFile('split.alignments'))
-
-
-        # Cluster spanning reads
-
-        sch.transform('chromosome_args', (), locally,
-            generate_chromosome_args,
-            mgd.TempOutputObj('chrom.args', 'bychromarg'),
-            config['chromosomes'])
-
-        sch.commandline('cluster', ('bychromarg',), medmem,
-            os.path.join(tools_directory, 'mclustermatepairs'),
-            '-a', mgd.TempInputFile('spanning.alignments'),
-            '-s', mgd.TempInputFile('libstats.tsv'),
-            '-c', mgd.TempOutputFile('clusters', 'bychromarg'),
-            mgd.TempInputObj('chrom.args', 'bychromarg'),
-            '--clustmin', config['cluster_readcount_threshold'],
-            '--fragmax', config['fragment_length_max'])
-
-        
-        # Predict breakpoints from split reads
-
-        sch.transform('predict_breaks', ('bychromarg',), medmem,
-            predict_breaks.predict_breaks,
-            None,
-            mgd.TempInputFile('clusters', 'bychromarg'),
-            mgd.TempInputFile('spanning.alignments'),
-            mgd.TempInputFile('split.alignments'),
-            mgd.TempOutputFile('breakpoints_2', 'bychromarg'))
-
-        sch.transform('merge_clusters', (), lowmem,
-            merge_clusters,
-            None,
-            mgd.TempInputFile('clusters', 'bychromarg'),
-            mgd.TempInputFile('breakpoints_2', 'bychromarg'),
-            mgd.TempOutputFile('clusters'),
-            mgd.TempOutputFile('breakpoints_2'),
-            mgd.TempOutputFile('merge_clusters.debug'))
-
-
-        # Realign reads to breakpoints
-
-        sch.commandline('realigntobreaks', ('bylibrary', 'byread'), medmem,
-            os.path.join(tools_directory, 'realigntobreaks2'),
-            '-r', config['genome_fasta'],
-            '-b', mgd.TempInputFile('breakpoints_2'),
-            '-c', mgd.TempInputFile('clusters'),
-            '-g', config['gap_score'],
-            '-x', config['mismatch_score'],
-            '-m', config['match_score'],
-            '--flmax', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_max'),
-            '--span', mgd.TempInputFile('spanning.alignments', 'bylibrary', 'byread'),
-            '-1', mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
-            '-2', mgd.TempInputFile('reads2', 'bylibrary', 'byread'),
-            '--realignments', mgd.TempOutputFile('realignments', 'bylibrary', 'byread'))
-
-
-        # Calculate likelihoods based on realignments
-
-        sch.transform('calculate_realignment_likelihoods', ('bylibrary', 'byread'), medmem,
-            predict_breaks.calculate_realignment_likelihoods,
-            None,
-            mgd.TempInputFile('breakpoints_2'),
-            mgd.TempInputFile('realignments', 'bylibrary', 'byread'),
-            mgd.TempInputFile('score.stats', 'bylibrary'),
-            mgd.TempOutputFile('likelihoods_2', 'bylibrary', 'byread'),
-            config['match_score'],
-            mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_mean'),
-            mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_stddev'))
-
-        sch.transform('merge_likelihoods1', ('bylibrary',), lowmem,
-            merge_files_by_line,
-            None,
-            mgd.TempInputFile('likelihoods_2', 'bylibrary', 'byread'),
-            mgd.TempOutputFile('likelihoods_2', 'bylibrary'))
-
-        sch.transform('merge_likelihoods2', (), lowmem,
-            merge_files_by_line,
-            None,
-            mgd.TempInputFile('likelihoods_2', 'bylibrary'),
-            mgd.TempOutputFile('likelihoods_2'))
-
-
-        # Set cover for multi mapping reads
-
-        sch.transform('calc_weights', (), medmem,
-            predict_breaks.calculate_cluster_weights,
-            None,
-            mgd.TempInputFile('breakpoints_2'),
-            mgd.TempOutputFile('cluster_weights'))
-
-        sch.commandline('setcover', (), medmem,
-            os.path.join(tools_directory, 'setcover'),
-            '-c', mgd.TempInputFile('clusters'),
-            '-w', mgd.TempInputFile('cluster_weights'),
-            '-a', mgd.TempOutputFile('clusters_setcover'))
-
-
-        # Select cluster based on setcover
-
-        sch.transform('select_clusters', (), medmem,
-            predict_breaks.select_clusters,
-            None,
-            mgd.TempInputFile('clusters_setcover'),
-            mgd.TempInputFile('breakpoints_2'),
-            mgd.TempOutputFile('breakpoints_1'),
-            mgd.TempInputFile('likelihoods_2'),
-            mgd.TempOutputFile('likelihoods_1'))
-
-
-        # Select prediction based on max likelihood
-
-        sch.transform('select_predictions', (), himem,
-            predict_breaks.select_predictions,
-            None,
-            mgd.TempInputFile('breakpoints_1'),
-            mgd.TempOutputFile('breakpoints'),
-            mgd.TempInputFile('likelihoods_1'),
-            mgd.TempOutputFile('likelihoods'),
-            config['mate_score_threshold'],
-            config['template_length_min_threshold'])
-        
-
-        # Predict rearrangement cycles
-
-        sch.commandline('getclusterids', (), lowmem,
-            'cut', '-f1', mgd.TempInputFile('clusters'), '|', 'uniq', '>', mgd.TempOutputFile('clusters.ids'))
-
-        sch.transform('splitclusterids', (), lowmem,
-            split_file_byline,
-            None,
-            mgd.TempInputFile('clusters.ids'),
-            config['clusters_per_split'],
-            mgd.TempOutputFile('clusters.ids', 'bycluster'))
-
-        sch.commandline('cycles', ('bycluster',), medmem,
-            os.path.join(tools_directory, 'cycles'),
-            '-b', mgd.TempInputFile('breakpoints'),
-            '--idsfile', mgd.TempInputFile('clusters.ids', 'bycluster'),
-            '-s', config['cycles_scoremax'],
-            '-v', config['cycles_visitmax'],
-            '-y', config['cycles_lambda'],
-            '>', mgd.TempOutputFile('cycles', 'bycluster'))
-
-        sch.transform('mergecycles', (), lowmem,
-            merge_files_by_line,
-            None,
-            mgd.TempInputFile('cycles', 'bycluster'),
-            mgd.TempOutputFile('cycles'))
-
-
-        # Tabulate results
-
-        sch.transform('tabreads', (), medmem,
-            tabulate_reads,
-            None,
-            mgd.TempInputFile('clusters_setcover'),
-            mgd.TempInputObj('libinfo', 'bylibrary'),
-            mgd.TempInputFile('reads1', 'bylibrary'),
-            mgd.TempInputFile('reads2', 'bylibrary'),
-            mgd.TempOutputFile('breakreads.table.unsorted'))
-
-        sch.commandline('sortreads', (), medmem,
-            'sort', '-n', mgd.TempInputFile('breakreads.table.unsorted'), '>', breakreads)
-
-        sch.transform('tabulate', (), himem,
-            tabulate_results,
-            None,
-            mgd.TempInputFile('breakpoints'),
-            mgd.TempInputFile('likelihoods'),
-            mgd.TempInputFile('cycles'),
-            mgd.TempInputObj('libinfo', 'bylibrary'),
-            config['genome_fasta'],
-            config['gtf_filename'],
-            config['dgv_filename'],
-            breakpoints)
-
-        sch.transform('merge_plots', (), lowmem, merge_tars, None, plots_tar, mgd.TempInputFile('score.stats.plots', 'bylibrary'), mgd.TempInputFile('flen.plots', 'bylibrary'))
-
-
-    def split_align_merge(sch, config):
-
-        '''
-        inputs: 'reads1', 'reads2'
-        outputs: 'spanning.alignments', 'split.alignments'
-        '''
-
-        sch.transform('splitfastq1', ('bylibrary',), lowmem,
-            split_fastq,
-            None,
-            mgd.TempInputFile('reads1', 'bylibrary'),
-            int(config['reads_per_split']),
-            mgd.TempOutputFile('reads1', 'bylibrary', 'byread'))
-
-        sch.transform('splitfastq2', ('bylibrary',), lowmem,
-            split_fastq,
-            None,
-            mgd.TempInputFile('reads2', 'bylibrary'),
-            int(config['reads_per_split']),
-            mgd.TempOutputFile('reads2', 'bylibrary', 'byread2'))
-
-        sch.changeaxis('fastq2axis', ('bylibrary',), 'reads2', 'byread2', 'byread')
-
-        align_reads(sch, config)
-
-        sch.transform('mergespan', ('bylibrary',), lowmem,
-            merge_files_by_line,
-            None,
-            mgd.TempInputFile('spanning.alignments', 'bylibrary', 'byread'),
-            mgd.TempOutputFile('spanning.alignments_2', 'bylibrary'))
-
-        sch.commandline('filterreads', ('bylibrary',), lowmem,
-            os.path.join(tools_directory, 'filterreads'),
-            '-n', '2',
-            '-a', mgd.TempInputFile('spanning.alignments_2', 'bylibrary'),
-            '-r', config['satellite_regions'],
-            '>', mgd.TempOutputFile('spanning.alignments_1', 'bylibrary'))
-
-        sch.transform('filterdups', ('bylibrary',), medmem,
-            predict_breaks.remove_duplicates,
-            None,
-            mgd.TempInputFile('spanning.alignments_1', 'bylibrary'),
-            mgd.TempOutputFile('spanning.alignments', 'bylibrary'))
-
-        sch.transform('mergesplt', ('bylibrary',), lowmem,
-            merge_files_by_line,
-            None,
-            mgd.TempInputFile('split.alignments', 'bylibrary', 'byread'),
-            mgd.TempOutputFile('split.alignments', 'bylibrary'))
-
-
-    def retrieve_from_bam(sch, config, bams):
-
-        '''
-        inputs: 'bam'
-        outputs: 'reads1', 'reads2', 'stats', 'sample1', 'sample2'
-        '''
-
-        sch.commandline('bamdisc', ('bylibrary',), medmem,
-            os.path.join(tools_directory, 'bamdiscordantfastq'),
-            '-r',
-            '-c', config['bam_max_soft_clipped'],
-            '-f', config['bam_max_fragment_length'],
-            '-b', bams,
-            '-s', mgd.TempOutputFile('stats.file', 'bylibrary'),
-            '-1', mgd.TempOutputFile('reads1', 'bylibrary'),
-            '-2', mgd.TempOutputFile('reads2', 'bylibrary'),
-            '-t', mgd.TempFile('bamdisc.tempspace', 'bylibrary'))
-
-        sch.commandline('bamsample', ('bylibrary',), medmem,
-            os.path.join(tools_directory, 'bamsamplefastq'),
-            '-r',
-            '-b', bams,
-            '-n', config['num_read_samples'],
-            '-1', mgd.TempOutputFile('sample1', 'bylibrary'),
-            '-2', mgd.TempOutputFile('sample2', 'bylibrary'))
-
-        sch.transform('readstats', ('bylibrary',), lowmem,
-            read_stats,
-            mgd.TempOutputObj('stats', 'bylibrary'),
-            mgd.TempInputFile('stats.file', 'bylibrary'),
-            config['fragment_length_num_stddevs'],
-            mgd.TempOutputFile('flen.plots', 'bylibrary'),
-            mgd.InputInstance('bylibrary'))
-
-
-    def align_sample(sch, config):
-
-        '''
-        inputs: 'sample1', 'sample2'
-        outputs: 'samples.align.true'
-        '''
-
-        sch.transform('prepseed_sample', ('bylibrary',), medmem, 
-            prepare_seed_fastq,
-            None,
-            mgd.TempInputFile('sample1', 'bylibrary'),
-            mgd.TempInputFile('sample2', 'bylibrary'),
-            36,
-            mgd.TempOutputFile('sample.seed', 'bylibrary'))
-
-        sch.commandline('bwtrealign_sample', ('bylibrary',), medmem,
-            'bowtie',
-            config['genome_fasta'],
-            mgd.TempInputFile('sample.seed', 'bylibrary'),
-            '--chunkmbs', '512',
-            '-k', '1000',
-            '-m', '1000',
-            '--strata',
-            '--best',
-            '-S',
-            '|',
-            os.path.join(tools_directory, 'aligntrue'),
-            '-a', '-',
-            '-1', mgd.TempInputFile('sample1', 'bylibrary'),
-            '-2', mgd.TempInputFile('sample2', 'bylibrary'),
-            '-r', config['genome_fasta'],
-            '-g', config['gap_score'],
-            '-x', config['mismatch_score'],
-            '-m', config['match_score'],
-            '--flmin', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_min'),
-            '--flmax', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_max'),
-            '-s', mgd.TempOutputFile('samples.align.true', 'bylibrary'))
-
-        sch.transform('scorestats', ('bylibrary',), medmem,
-            score_stats.create_score_stats,
-            None,
-            mgd.TempInputFile('samples.align.true', 'bylibrary'),
-            config['match_score'],
-            mgd.TempOutputFile('score.stats', 'bylibrary'),
-            mgd.TempOutputFile('score.stats.plots', 'bylibrary'),
-            mgd.InputInstance('bylibrary'))
-
-
-    def align_reads(sch, config):
-
-        '''
-        inputs: 'reads1', 'reads2'
-        outputs: 'spanning.alignments', 'split.alignments'
-        '''
-
-        sch.transform('prepseed', ('bylibrary', 'byread'), medmem, 
-            prepare_seed_fastq,
-            None,
-            mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
-            mgd.TempInputFile('reads2', 'bylibrary', 'byread'),
-            36,
-            mgd.TempOutputFile('reads.seed', 'bylibrary', 'byread'))
-
-        sch.commandline('bwtrealign', ('bylibrary', 'byread'), medmem,
-            'bowtie',
-            config['genome_fasta'],
-            mgd.TempInputFile('reads.seed', 'bylibrary', 'byread'),
-            '--chunkmbs', '512',
-            '-k', '1000',
-            '-m', '1000',
-            '--strata',
-            '--best',
-            '-S',
-            '|',
-            os.path.join(tools_directory, 'realign2'),
-            '-l', mgd.TempInputObj('libinfo', 'bylibrary').prop('id'),
-            '-a', '-',
-            '-1', mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
-            '-2', mgd.TempInputFile('reads2', 'bylibrary', 'byread'),
-            '-r', config['genome_fasta'],
-            '-g', config['gap_score'],
-            '-x', config['mismatch_score'],
-            '-m', config['match_score'],
-            '--flmin', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_min'),
-            '--flmax', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_max'),
-            '--tchimer', config['chimeric_threshold'],
-            '--talign', config['alignment_threshold'],
-            '--pchimer', config['chimeric_prior'],
-            '--tvalid', config['readvalid_threshold'],
-            '-z', mgd.TempInputFile('score.stats', 'bylibrary'),
-            '--span', mgd.TempOutputFile('spanning.alignments', 'bylibrary', 'byread'),
-            '--split', mgd.TempOutputFile('split.alignments', 'bylibrary', 'byread'))
+
+    # Read in the bam file information
+
+    if args['libs_table'] is not None:
+        sch.transform('readlibs', (), locally,
+            destruct.read_libraries,
+            mgd.TempOutputObj('libinfo', 'bylibrary'),
+            args['libs_table'])
+    else:
+        sch.transform('initlibs', (), locally,
+            destruct.init_libraries,
+            mgd.TempOutputObj('libinfo', 'bylibrary'),
+            args['lib_ids'],
+            args['bam_files'])
+
+
+    # Symlink the bam files locally
+
+    sch.transform('linklibs', ('bylibrary',), locally,
+        destruct.link_libraries,
+        None,
+        mgd.TempInputObj('libinfo', 'bylibrary').prop('bam'),
+        mgd.TempOutputFile('bam', 'bylibrary'))
+
+
+    # Retrieve discordant reads and stats from bam files
+
+    sch.commandline('bamdisc', ('bylibrary',), medmem,
+        os.path.join(tools_directory, 'bamdiscordantfastq'),
+        '-r',
+        '-c', config['bam_max_soft_clipped'],
+        '-f', config['bam_max_fragment_length'],
+        '-b', mgd.TempInputFile('bam', 'bylibrary'),
+        '-s', mgd.TempOutputFile('stats.file', 'bylibrary'),
+        '-1', mgd.TempOutputFile('reads1', 'bylibrary'),
+        '-2', mgd.TempOutputFile('reads2', 'bylibrary'),
+        '-t', mgd.TempFile('bamdisc.tempspace', 'bylibrary'))
+
+    sch.commandline('bamsample', ('bylibrary',), medmem,
+        os.path.join(tools_directory, 'bamsamplefastq'),
+        '-r',
+        '-b', mgd.TempInputFile('bam', 'bylibrary'),
+        '-n', config['num_read_samples'],
+        '-1', mgd.TempOutputFile('sample1', 'bylibrary'),
+        '-2', mgd.TempOutputFile('sample2', 'bylibrary'))
+
+    sch.transform('readstats', ('bylibrary',), lowmem,
+        destruct.read_stats,
+        mgd.TempOutputObj('stats', 'bylibrary'),
+        mgd.TempInputFile('stats.file', 'bylibrary'),
+        config['fragment_length_num_stddevs'],
+        mgd.TempOutputFile('flen.plots', 'bylibrary'),
+        mgd.InputInstance('bylibrary'))
+
+
+    # Align a sample of reads and calculate alignment statistics
+
+    sch.transform('prepseed_sample', ('bylibrary',), medmem, 
+        destruct.prepare_seed_fastq,
+        None,
+        mgd.TempInputFile('sample1', 'bylibrary'),
+        mgd.TempInputFile('sample2', 'bylibrary'),
+        36,
+        mgd.TempOutputFile('sample.seed', 'bylibrary'))
+
+    sch.commandline('bwtrealign_sample', ('bylibrary',), medmem,
+        'bowtie',
+        config['genome_fasta'],
+        mgd.TempInputFile('sample.seed', 'bylibrary'),
+        '--chunkmbs', '512',
+        '-k', '1000',
+        '-m', '1000',
+        '--strata',
+        '--best',
+        '-S',
+        '|',
+        os.path.join(tools_directory, 'aligntrue'),
+        '-a', '-',
+        '-1', mgd.TempInputFile('sample1', 'bylibrary'),
+        '-2', mgd.TempInputFile('sample2', 'bylibrary'),
+        '-r', config['genome_fasta'],
+        '-g', config['gap_score'],
+        '-x', config['mismatch_score'],
+        '-m', config['match_score'],
+        '--flmin', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_min'),
+        '--flmax', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_max'),
+        '-s', mgd.TempOutputFile('samples.align.true', 'bylibrary'))
+
+    sch.transform('scorestats', ('bylibrary',), medmem,
+        score_stats.create_score_stats,
+        None,
+        mgd.TempInputFile('samples.align.true', 'bylibrary'),
+        config['match_score'],
+        mgd.TempOutputFile('score.stats', 'bylibrary'),
+        mgd.TempOutputFile('score.stats.plots', 'bylibrary'),
+        mgd.InputInstance('bylibrary'))
+
+
+    # Split discordant fastqs and align
+
+    sch.transform('splitfastq1', ('bylibrary',), lowmem,
+        destruct.split_fastq,
+        None,
+        mgd.TempInputFile('reads1', 'bylibrary'),
+        int(config['reads_per_split']),
+        mgd.TempOutputFile('reads1', 'bylibrary', 'byread'))
+
+    sch.transform('splitfastq2', ('bylibrary',), lowmem,
+        destruct.split_fastq,
+        None,
+        mgd.TempInputFile('reads2', 'bylibrary'),
+        int(config['reads_per_split']),
+        mgd.TempOutputFile('reads2', 'bylibrary', 'byread2'))
+
+    sch.changeaxis('fastq2axis', ('bylibrary',), 'reads2', 'byread2', 'byread')
+
+    sch.transform('prepseed', ('bylibrary', 'byread'), medmem, 
+        destruct.prepare_seed_fastq,
+        None,
+        mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
+        mgd.TempInputFile('reads2', 'bylibrary', 'byread'),
+        36,
+        mgd.TempOutputFile('reads.seed', 'bylibrary', 'byread'))
+
+    sch.commandline('bwtrealign', ('bylibrary', 'byread'), medmem,
+        'bowtie',
+        config['genome_fasta'],
+        mgd.TempInputFile('reads.seed', 'bylibrary', 'byread'),
+        '--chunkmbs', '512',
+        '-k', '1000',
+        '-m', '1000',
+        '--strata',
+        '--best',
+        '-S',
+        '|',
+        os.path.join(tools_directory, 'realign2'),
+        '-l', mgd.TempInputObj('libinfo', 'bylibrary').prop('id'),
+        '-a', '-',
+        '-1', mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
+        '-2', mgd.TempInputFile('reads2', 'bylibrary', 'byread'),
+        '-r', config['genome_fasta'],
+        '-g', config['gap_score'],
+        '-x', config['mismatch_score'],
+        '-m', config['match_score'],
+        '--flmin', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_min'),
+        '--flmax', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_max'),
+        '--tchimer', config['chimeric_threshold'],
+        '--talign', config['alignment_threshold'],
+        '--pchimer', config['chimeric_prior'],
+        '--tvalid', config['readvalid_threshold'],
+        '-z', mgd.TempInputFile('score.stats', 'bylibrary'),
+        '--span', mgd.TempOutputFile('spanning.alignments', 'bylibrary', 'byread'),
+        '--split', mgd.TempOutputFile('split.alignments', 'bylibrary', 'byread'))
+
+    sch.transform('mergespan', ('bylibrary',), lowmem,
+        destruct.merge_files_by_line,
+        None,
+        mgd.TempInputFile('spanning.alignments', 'bylibrary', 'byread'),
+        mgd.TempOutputFile('spanning.alignments_2', 'bylibrary'))
+
+    sch.commandline('filterreads', ('bylibrary',), lowmem,
+        os.path.join(tools_directory, 'filterreads'),
+        '-n', '2',
+        '-a', mgd.TempInputFile('spanning.alignments_2', 'bylibrary'),
+        '-r', config['satellite_regions'],
+        '>', mgd.TempOutputFile('spanning.alignments_1', 'bylibrary'))
+
+    sch.transform('filterdups', ('bylibrary',), medmem,
+        predict_breaks.remove_duplicates,
+        None,
+        mgd.TempInputFile('spanning.alignments_1', 'bylibrary'),
+        mgd.TempOutputFile('spanning.alignments', 'bylibrary'))
+
+    sch.transform('mergesplt', ('bylibrary',), lowmem,
+        destruct.merge_files_by_line,
+        None,
+        mgd.TempInputFile('split.alignments', 'bylibrary', 'byread'),
+        mgd.TempOutputFile('split.alignments', 'bylibrary'))
+
+    sch.transform('merge_spanning', (), lowmem,
+        destruct.merge_files_by_line,
+        None,
+        mgd.TempInputFile('spanning.alignments', 'bylibrary'),
+        mgd.TempOutputFile('spanning.alignments'))
+
+    sch.transform('merge_split', (), lowmem,
+        destruct.merge_files_by_line,
+        None,
+        mgd.TempInputFile('split.alignments', 'bylibrary'),
+        mgd.TempOutputFile('split.alignments'))
+
+
+    # Cluster spanning reads
+
+    sch.transform('chromosome_args', (), locally,
+        destruct.generate_chromosome_args,
+        mgd.TempOutputObj('chrom.args', 'bychromarg'),
+        config['chromosomes'])
+
+    sch.transform('write_stats_table', (), lowmem,
+        destruct.write_stats_table,
+        None,
+        mgd.TempInputObj('libinfo', 'bylibrary'),
+        mgd.TempInputObj('stats', 'bylibrary'),
+        mgd.TempOutputFile('libstats.tsv'))
+
+    sch.commandline('cluster', ('bychromarg',), medmem,
+        os.path.join(tools_directory, 'mclustermatepairs'),
+        '-a', mgd.TempInputFile('spanning.alignments'),
+        '-s', mgd.TempInputFile('libstats.tsv'),
+        '-c', mgd.TempOutputFile('clusters', 'bychromarg'),
+        mgd.TempInputObj('chrom.args', 'bychromarg'),
+        '--clustmin', config['cluster_readcount_threshold'],
+        '--fragmax', config['fragment_length_max'])
+
+    
+    # Predict breakpoints from split reads
+
+    sch.transform('predict_breaks', ('bychromarg',), medmem,
+        predict_breaks.predict_breaks,
+        None,
+        mgd.TempInputFile('clusters', 'bychromarg'),
+        mgd.TempInputFile('spanning.alignments'),
+        mgd.TempInputFile('split.alignments'),
+        mgd.TempOutputFile('breakpoints_2', 'bychromarg'))
+
+    sch.transform('merge_clusters', (), lowmem,
+        destruct.merge_clusters,
+        None,
+        mgd.TempInputFile('clusters', 'bychromarg'),
+        mgd.TempInputFile('breakpoints_2', 'bychromarg'),
+        mgd.TempOutputFile('clusters'),
+        mgd.TempOutputFile('breakpoints_2'),
+        mgd.TempOutputFile('merge_clusters.debug'))
+
+
+    # Realign reads to breakpoints
+
+    sch.commandline('realigntobreaks', ('bylibrary', 'byread'), medmem,
+        os.path.join(tools_directory, 'realigntobreaks2'),
+        '-r', config['genome_fasta'],
+        '-b', mgd.TempInputFile('breakpoints_2'),
+        '-c', mgd.TempInputFile('clusters'),
+        '-g', config['gap_score'],
+        '-x', config['mismatch_score'],
+        '-m', config['match_score'],
+        '--flmax', mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_max'),
+        '--span', mgd.TempInputFile('spanning.alignments', 'bylibrary', 'byread'),
+        '-1', mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
+        '-2', mgd.TempInputFile('reads2', 'bylibrary', 'byread'),
+        '--realignments', mgd.TempOutputFile('realignments', 'bylibrary', 'byread'))
+
+
+    # Calculate likelihoods based on realignments
+
+    sch.transform('calculate_realignment_likelihoods', ('bylibrary', 'byread'), medmem,
+        predict_breaks.calculate_realignment_likelihoods,
+        None,
+        mgd.TempInputFile('breakpoints_2'),
+        mgd.TempInputFile('realignments', 'bylibrary', 'byread'),
+        mgd.TempInputFile('score.stats', 'bylibrary'),
+        mgd.TempOutputFile('likelihoods_2', 'bylibrary', 'byread'),
+        config['match_score'],
+        mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_mean'),
+        mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_stddev'))
+
+    sch.transform('merge_likelihoods1', ('bylibrary',), lowmem,
+        destruct.merge_files_by_line,
+        None,
+        mgd.TempInputFile('likelihoods_2', 'bylibrary', 'byread'),
+        mgd.TempOutputFile('likelihoods_2', 'bylibrary'))
+
+    sch.transform('merge_likelihoods2', (), lowmem,
+        destruct.merge_files_by_line,
+        None,
+        mgd.TempInputFile('likelihoods_2', 'bylibrary'),
+        mgd.TempOutputFile('likelihoods_2'))
+
+
+    # Set cover for multi mapping reads
+
+    sch.transform('calc_weights', (), medmem,
+        predict_breaks.calculate_cluster_weights,
+        None,
+        mgd.TempInputFile('breakpoints_2'),
+        mgd.TempOutputFile('cluster_weights'))
+
+    sch.commandline('setcover', (), medmem,
+        os.path.join(tools_directory, 'setcover'),
+        '-c', mgd.TempInputFile('clusters'),
+        '-w', mgd.TempInputFile('cluster_weights'),
+        '-a', mgd.TempOutputFile('clusters_setcover'))
+
+
+    # Select cluster based on setcover
+
+    sch.transform('select_clusters', (), medmem,
+        predict_breaks.select_clusters,
+        None,
+        mgd.TempInputFile('clusters_setcover'),
+        mgd.TempInputFile('breakpoints_2'),
+        mgd.TempOutputFile('breakpoints_1'),
+        mgd.TempInputFile('likelihoods_2'),
+        mgd.TempOutputFile('likelihoods_1'))
+
+
+    # Select prediction based on max likelihood
+
+    sch.transform('select_predictions', (), himem,
+        predict_breaks.select_predictions,
+        None,
+        mgd.TempInputFile('breakpoints_1'),
+        mgd.TempOutputFile('breakpoints'),
+        mgd.TempInputFile('likelihoods_1'),
+        mgd.TempOutputFile('likelihoods'),
+        config['mate_score_threshold'],
+        config['template_length_min_threshold'])
+    
+
+    # Predict rearrangement cycles
+
+    sch.commandline('getclusterids', (), lowmem,
+        'cut', '-f1', mgd.TempInputFile('clusters'), '|', 'uniq', '>', mgd.TempOutputFile('clusters.ids'))
+
+    sch.transform('splitclusterids', (), lowmem,
+        destruct.split_file_byline,
+        None,
+        mgd.TempInputFile('clusters.ids'),
+        config['clusters_per_split'],
+        mgd.TempOutputFile('clusters.ids', 'bycluster'))
+
+    sch.commandline('cycles', ('bycluster',), medmem,
+        os.path.join(tools_directory, 'cycles'),
+        '-b', mgd.TempInputFile('breakpoints'),
+        '--idsfile', mgd.TempInputFile('clusters.ids', 'bycluster'),
+        '-s', config['cycles_scoremax'],
+        '-v', config['cycles_visitmax'],
+        '-y', config['cycles_lambda'],
+        '>', mgd.TempOutputFile('cycles', 'bycluster'))
+
+    sch.transform('mergecycles', (), lowmem,
+        destruct.merge_files_by_line,
+        None,
+        mgd.TempInputFile('cycles', 'bycluster'),
+        mgd.TempOutputFile('cycles'))
+
+
+    # Tabulate results
+
+    sch.transform('tabreads', (), medmem,
+        destruct.tabulate_reads,
+        None,
+        mgd.TempInputFile('clusters_setcover'),
+        mgd.TempInputObj('libinfo', 'bylibrary'),
+        mgd.TempInputFile('reads1', 'bylibrary'),
+        mgd.TempInputFile('reads2', 'bylibrary'),
+        mgd.TempOutputFile('breakreads.table.unsorted'))
+
+    sch.commandline('sortreads', (), medmem,
+        'sort', '-n', mgd.TempInputFile('breakreads.table.unsorted'), '>', mgd.OutputFile(args['breakpoint_read_table']))
+
+    sch.transform('tabulate', (), himem,
+        destruct.tabulate_results,
+        None,
+        mgd.TempInputFile('breakpoints'),
+        mgd.TempInputFile('likelihoods'),
+        mgd.TempInputFile('cycles'),
+        mgd.TempInputObj('libinfo', 'bylibrary'),
+        config['genome_fasta'],
+        config['gtf_filename'],
+        config['dgv_filename'],
+        mgd.OutputFile(args['breakpoint_table']))
+
+    sch.transform('merge_plots', (), lowmem,
+        destruct.merge_tars,
+        None,
+        mgd.OutputFile(args['plots_tar']),
+        mgd.TempInputFile('score.stats.plots', 'bylibrary'),
+        mgd.TempInputFile('flen.plots', 'bylibrary'))
+
+
+    # Run the pipeline
+
+    pyp.run()
+
+
+else:
 
 
     def prepare_seed_fastq(reads_1_fastq, reads_2_fastq, seed_length, seed_fastq):
@@ -935,4 +911,5 @@ else:
         breakpoints = breakpoints.rename(columns={'cluster_id':'prediction_id'})
 
         breakpoints.to_csv(results_filename, sep='\t', na_rep='NA', header=True, index=False)
+
 
