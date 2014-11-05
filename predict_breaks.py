@@ -177,11 +177,13 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
             pass
         return
 
+    merge_columns = ['library_id', 'read_id', 'read_end', 'align_id']
+
+    clusters_alignments = clusters[merge_columns].drop_duplicates()
+
     split_iter = pd.read_csv(split_filename, sep='\t', names=split_fields, na_values=['.'],
                              converters={'chromosome_1':str, 'chromosome_2':str},
-                             iterator=True, chunksize=10000)
-
-    merge_columns = ['library_id', 'read_id', 'read_end', 'align_id']
+                             iterator=True, chunksize=1000000)
 
     split_merge_columns = {'1':['library_id', 'read_id', 'read_end', 'align_id_1'],
                            '2':['library_id', 'read_id', 'read_end', 'align_id_2']}
@@ -189,7 +191,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
     def filter_split(df):
         filtered = list()
         for side, left_merge_columns in split_merge_columns.iteritems():
-            df_2 = pd.merge(df, clusters[merge_columns], 
+            df_2 = pd.merge(df, clusters_alignments, 
                             left_on=left_merge_columns,
                             right_on=merge_columns,
                             how='inner')
@@ -203,10 +205,10 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
 
     spanning_iter  = pd.read_csv(spanning_filename, sep='\t', names=spanning_fields,
                                  converters={'chromosome':str},
-                                 iterator=True, chunksize=10000)
+                                 iterator=True, chunksize=1000000)
 
     def filter_spanning(df):
-        return pd.merge(chunk, clusters[merge_columns], how='inner')
+        return pd.merge(chunk, clusters_alignments, how='inner')
 
     spanning = pd.concat([filter_spanning(chunk) for chunk in spanning_iter])
 
