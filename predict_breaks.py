@@ -56,9 +56,8 @@ def calculate_mate_score(clusters, spanning):
     # Create a table of spanning alignments for these clusters
     data = spanning.merge(clusters, on=['library_id', 'read_id', 'read_end', 'align_id'])
 
-    data = data.set_index(['cluster_id', 'library_id', 'read_id'])[['mate_score']]\
-               .groupby(level=[0, 1, 2]).max()\
-               .groupby(level=[0]).mean()\
+    data = data.groupby(['cluster_id', 'library_id', 'read_id'])[['mate_score']].max()\
+               .groupby(level=0).mean()\
                .reset_index()
 
     return data
@@ -178,12 +177,38 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
             pass
         return
 
-    split = pd.read_csv(split_filename, sep='\t', names=split_fields, na_values=['.'],
-                        converters={'chromosome_1':str, 'chromosome_2':str})
+    split_iter = pd.read_csv(split_filename, sep='\t', names=split_fields, na_values=['.'],
+                             converters={'chromosome_1':str, 'chromosome_2':str},
+                             iterator=True, chunksize=10000)
+
+    merge_columns = ['library_id', 'read_id', 'read_end', 'align_id']
+
+    split_merge_columns = {'1':['library_id', 'read_id', 'read_end', 'align_id_1'],
+                           '2':['library_id', 'read_id', 'read_end', 'align_id_2']}
+
+    def filter_split(df):
+        filtered = list()
+        for side, left_merge_columns in split_merge_columns.iteritems():
+            df_2 = pd.merge(df, clusters[merge_columns], 
+                            left_on=left_merge_columns,
+                            right_on=merge_columns,
+                            how='inner')
+            df_2 = df_2.drop(['align_id'], axis=1)
+            filtered.append(df_2)
+        return pd.concat(filtered).drop_duplicates()
+
+    split = pd.concat([filter_split(chunk) for chunk in split_iter])
+
     split['inserted'] = split['inserted'].fillna('')
 
-    spanning = pd.read_csv(spanning_filename, sep='\t', names=spanning_fields,
-                           converters={'chromosome':str})
+    spanning_iter  = pd.read_csv(spanning_filename, sep='\t', names=spanning_fields,
+                                 converters={'chromosome':str},
+                                 iterator=True, chunksize=10000)
+
+    def filter_spanning(df):
+        return pd.merge(chunk, clusters[merge_columns], how='inner')
+
+    spanning = pd.concat([filter_spanning(chunk) for chunk in spanning_iter])
 
     predictions_0 = predict_breaks_spanning(clusters, spanning)
 

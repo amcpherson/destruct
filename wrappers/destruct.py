@@ -6,6 +6,7 @@ import subprocess
 import tarfile
 import argparse
 import vcf
+import pandas as pd
 
 import utils
 
@@ -56,8 +57,8 @@ class DestructWrapper(object):
 
         lib_ids, bam_files = zip(*list(bam_filenames.items()))
 
-        breakpoints_filename = output_filename
-        breakreads_filename = os.path.join(temp_directory, 'breakreads.tsv')
+        breakpoint_table_filename = os.path.join(temp_directory, 'breakpoint.tsv')
+        breakpoint_library_table_filename = os.path.join(temp_directory, 'breakpoint_library.tsv')
         plots_tar_filename = os.path.join(temp_directory, 'plots.tar')
         destruct_tmp_directory = os.path.join(temp_directory, 'tmp')
 
@@ -65,21 +66,36 @@ class DestructWrapper(object):
         destruct_cmd += [sys.executable]
         destruct_cmd += [self.destruct_script]
         destruct_cmd += [self.ref_data_directory]
-        destruct_cmd += [breakpoints_filename]
-        destruct_cmd += [breakreads_filename]
+        destruct_cmd += [breakpoint_table_filename]
+        destruct_cmd += [breakpoint_library_table_filename]
         destruct_cmd += [plots_tar_filename]
 
         destruct_cmd += ['--lib_ids']
-	destruct_cmd += lib_ids
+        destruct_cmd += lib_ids
 
-	destruct_cmd += ['--bam_files']
-	destruct_cmd += bam_files
+        destruct_cmd += ['--bam_files']
+        destruct_cmd += bam_files
 
         destruct_cmd += ['--config', self.user_config_filename]
         destruct_cmd += ['--tmp', destruct_tmp_directory]
         destruct_cmd += ['--nocleanup', '--repopulate', '--maxjobs', '4', '--loglevel', 'DEBUG']
 
         subprocess.check_call(destruct_cmd)
+
+        breakpoint_table = pd.read_csv(breakpoint_table_filename, sep='\t')
+        breakpoint_library_table = pd.read_csv(breakpoint_library_table_filename, sep='\t')
+
+        breakpoint_counts = breakpoint_library_table.set_index(['prediction_id', 'library'])[['num_reads']]\
+                                                    .unstack()\
+                                                    .fillna(0)\
+                                                    .astype(int)
+        breakpoint_counts.columns = [a[1] + '_count' for a in breakpoint_counts.columns]
+
+        breakpoint_table = breakpoint_table.merge(breakpoint_counts,
+                                                  left_on='prediction_id',
+                                                  right_index=True)
+
+        breakpoint_table.to_csv(output_filename, sep='\t', index=False)
 
 
 if __name__ == '__main__':

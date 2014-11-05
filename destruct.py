@@ -45,21 +45,32 @@ if __name__ == '__main__':
 
     argparser.add_argument('--version', action='version', version=__version__)
 
-    argparser.add_argument('ref_data_dir', help='Reference dataset directory')
+    argparser.add_argument('ref_data_dir',
+                           help='Reference dataset directory')
 
-    argparser.add_argument('breakpoint_table', help='Output table of breakpoint information in TSV format')
+    argparser.add_argument('breakpoint_table',
+                           help='Output table of breakpoint information in TSV format')
 
-    argparser.add_argument('breakpoint_read_table', help='Output table of breakpoint read information in TSV format')
+    argparser.add_argument('breakpoint_library_table',
+                           help='Output table of library specific breakpoint information in TSV format')
 
-    argparser.add_argument('plots_tar', help='Output diagnostic plots tar filename')
+    argparser.add_argument('plots_tar',
+                           help='Output diagnostic plots tar filename')
 
-    argparser.add_argument('--libs_table', help='Libraries list table filename')
+    argparser.add_argument('--breakpoint_read_table', required=False,
+                           help='Output table of breakpoint read information in TSV format')
 
-    argparser.add_argument('--bam_files', nargs='+', help='Bam filenames')
+    argparser.add_argument('--libs_table', required=False,
+                           help='Input libraries list table filename')
 
-    argparser.add_argument('--lib_ids', nargs='+', help='Ids for respective bam filenames')
+    argparser.add_argument('--bam_files', nargs='+', required=False,
+                           help='Input bam filenames')
 
-    argparser.add_argument('--config', help='Configuration Filename')
+    argparser.add_argument('--lib_ids', nargs='+', required=False,
+                           help='Input ids for respective bam filenames')
+
+    argparser.add_argument('--config', required=False,
+                           help='Configuration Filename')
 
     args = vars(argparser.parse_args())
 
@@ -439,19 +450,26 @@ if __name__ == '__main__':
         mgd.TempOutputFile('cycles'))
 
 
+    # Optionally tabulate supporting reads
+
+    if args['breakpoint_read_table'] is not None:
+
+        sch.transform('tabreads', (), medmem,
+            destruct.tabulate_reads,
+            None,
+            mgd.TempInputFile('clusters_setcover'),
+            mgd.TempInputObj('libinfo', 'bylibrary'),
+            mgd.TempInputFile('reads1', 'bylibrary'),
+            mgd.TempInputFile('reads2', 'bylibrary'),
+            mgd.TempOutputFile('breakreads.table.unsorted'))
+
+        sch.commandline('sortreads', (), medmem,
+            'sort', '-n',
+            mgd.TempInputFile('breakreads.table.unsorted'),
+            '>', mgd.OutputFile(args['breakpoint_read_table']))
+
+
     # Tabulate results
-
-    sch.transform('tabreads', (), medmem,
-        destruct.tabulate_reads,
-        None,
-        mgd.TempInputFile('clusters_setcover'),
-        mgd.TempInputObj('libinfo', 'bylibrary'),
-        mgd.TempInputFile('reads1', 'bylibrary'),
-        mgd.TempInputFile('reads2', 'bylibrary'),
-        mgd.TempOutputFile('breakreads.table.unsorted'))
-
-    sch.commandline('sortreads', (), medmem,
-        'sort', '-n', mgd.TempInputFile('breakreads.table.unsorted'), '>', mgd.OutputFile(args['breakpoint_read_table']))
 
     sch.transform('tabulate', (), himem,
         destruct.tabulate_results,
@@ -463,7 +481,8 @@ if __name__ == '__main__':
         config['genome_fasta'],
         config['gtf_filename'],
         config['dgv_filename'],
-        mgd.OutputFile(args['breakpoint_table']))
+        mgd.OutputFile(args['breakpoint_table']),
+        mgd.OutputFile(args['breakpoint_library_table']))
 
     sch.transform('merge_plots', (), lowmem,
         destruct.merge_tars,
@@ -809,9 +828,10 @@ else:
     def tabulate_results(breakpoints_filename, likelihoods_filename,
                          cycles_filename, lib_infos,
                          genome_fasta, gtf_filename, dgv_filename,
-                         results_filename):
+                         breakpoint_table, breakpoint_library_table):
 
-        lib_names = dict([(info.id, info.name) for info in lib_infos.values()])
+        lib_names = pd.DataFrame.from_records(lib_infos.values(), columns=LibInfo._fields, exclude=['bam'])
+        lib_names = lib_names.rename(columns={'id':'library_id', 'name':'library'})
 
         breakpoints = pd.read_csv(breakpoints_filename, sep='\t',
                                   names=predict_breaks.breakpoint_fields,
@@ -827,26 +847,33 @@ else:
                                   converters=converters)
         likelihoods = likelihoods.drop(['breakpoint_id'], axis=1)
 
+        breakpoint_library = likelihoods.groupby(['cluster_id', 'library_id'])\
+                                        .size()\
+                                        .reset_index()
+        breakpoint_library.columns = ['cluster_id', 'library_id', 'num_reads']
+
+        breakpoint_library = breakpoint_library.merge(lib_names)\
+                                               .drop(['library_id'], axis=1)
+
         agg_f = {'log_likelihood':np.average,
                  'log_cdf':np.average,
                  'template_length_1':max,
                  'template_length_2':max}
 
-        breakpoint_stats = likelihoods.groupby('cluster_id').agg(agg_f)
+        breakpoint_stats = likelihoods.groupby('cluster_id')\
+                                            .agg(agg_f)\
+                                            .reset_index()
 
         breakpoint_stats['template_length_min'] = breakpoint_stats[['template_length_1', 'template_length_2']].min(axis=1)
 
-        breakpoint_counts = likelihoods.groupby(['cluster_id', 'library_id'])\
+        breakpoint_counts = likelihoods.groupby('cluster_id')\
                                        .size()\
-                                       .unstack()\
-                                       .fillna(0)\
-                                       .astype(int)\
-                                       .rename(columns=lib_names)
-        breakpoint_counts.columns = [a+'_count' for a in breakpoint_counts.columns]
+                                       .reset_index()
+        breakpoint_counts.columns = ['cluster_id', 'num_reads']
 
-        breakpoints = breakpoints.merge(breakpoint_stats, left_on='cluster_id', right_index=True, how='left')
+        breakpoints = breakpoints.merge(breakpoint_stats, on='cluster_id', how='left')
 
-        breakpoints = breakpoints.merge(breakpoint_counts, left_on='cluster_id', right_index=True, how='left')
+        breakpoints = breakpoints.merge(breakpoint_counts, on='cluster_id', how='left')
 
         # Calculate breakpoint type
         def breakpoint_type(row):
@@ -910,6 +937,11 @@ else:
 
         breakpoints = breakpoints.rename(columns={'cluster_id':'prediction_id'})
 
-        breakpoints.to_csv(results_filename, sep='\t', na_rep='NA', header=True, index=False)
+        breakpoints.to_csv(breakpoint_table, sep='\t', na_rep='NA', header=True, index=False)
+
+        breakpoint_library = breakpoint_library.rename(columns={'cluster_id':'prediction_id'})
+
+        breakpoint_library.to_csv(breakpoint_library_table, sep='\t', na_rep='NA', header=True, index=False)
+
 
 
