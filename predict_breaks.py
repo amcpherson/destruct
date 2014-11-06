@@ -191,7 +191,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
     def filter_split(df):
         filtered = list()
         for side, left_merge_columns in split_merge_columns.iteritems():
-            df_2 = pd.merge(df, clusters_alignments, 
+            df_2 = pd.merge(df, clusters_alignments,
                             left_on=left_merge_columns,
                             right_on=merge_columns,
                             how='inner')
@@ -229,10 +229,10 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
 
 
 def calculate_cluster_weights(breakpoints_filename, weights_filename):
-    
+
     epsilon = 0.0001
     itx_distance = 1000000000
-    
+
     breakpoints = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
                               converters={'chromosome_1':str, 'chromosome_2':str})
 
@@ -329,7 +329,7 @@ def select_clusters(clusters_filename,
                     likelihoods_filename, selected_likelihoods_filename):
 
     clusters = pd.read_csv(clusters_filename, sep='\t', names=cluster_fields,
-                           usecols=['cluster_id', 'library_id', 'read_id', 'align_id'])
+                           usecols=['cluster_id', 'library_id', 'read_id'])
     clusters = clusters.drop_duplicates()
 
     breakpoints_iter = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
@@ -344,14 +344,14 @@ def select_clusters(clusters_filename,
             assert list(chunk.columns.values) == breakpoint_fields
             chunk.to_csv(selected_breakpoints_file, sep='\t', header=False, index=False)
 
-    likelihoods_iter = pd.read_csv(spanning_filename, sep='\t', names=likelihoods_fields,
+    likelihoods_iter = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
                                    iterator=True, chunksize=1000000)
 
     with open(selected_likelihoods_filename, 'w') as selected_likelihoods_file:
-        for chunk in breakpoints_iter:
+        for chunk in likelihoods_iter:
             chunk = chunk.merge(clusters, how='inner')
             assert list(chunk.columns.values) == likelihoods_fields
-            chunk_to_csv(selected_likelihoods_file, sep='\t', header=False, index=False)
+            chunk.to_csv(selected_likelihoods_file, sep='\t', header=False, index=False)
 
 
 def select_predictions(breakpoints_filename, selected_breakpoints_filename,
@@ -411,7 +411,7 @@ def remove_duplicates(spanning_filename, filtered_spanning_filename):
     group_idx['position_group'] = xrange(len(group_idx.index))
     data = alignments.merge(group_idx)
 
-    # Create a table with all pairs of groups table for each read 
+    # Create a table with all pairs of groups table for each read
     data = pd.merge(data.loc[data['read_end'] == 0, ['read_id', 'position_group']].drop_duplicates(),
                     data.loc[data['read_end'] == 1, ['read_id', 'position_group']].drop_duplicates(),
                     on=['read_id'], how='inner',
