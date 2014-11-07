@@ -257,7 +257,7 @@ if __name__ == '__main__':
         '--span', mgd.TempOutputFile('spanning.alignments', 'bylibrary', 'byread'),
         '--split', mgd.TempOutputFile('split.alignments', 'bylibrary', 'byread'))
 
-    sch.transform('mergespan', ('bylibrary',), lowmem,
+    sch.transform('merge_spanning_1', ('bylibrary',), lowmem,
         destruct.merge_files_by_line,
         None,
         mgd.TempInputFile('spanning.alignments', 'bylibrary', 'byread'),
@@ -276,19 +276,19 @@ if __name__ == '__main__':
         mgd.TempInputFile('spanning.alignments_1', 'bylibrary'),
         mgd.TempOutputFile('spanning.alignments', 'bylibrary'))
 
-    sch.transform('mergesplt', ('bylibrary',), lowmem,
+    sch.transform('merge_split_1', ('bylibrary',), lowmem,
         destruct.merge_files_by_line,
         None,
         mgd.TempInputFile('split.alignments', 'bylibrary', 'byread'),
         mgd.TempOutputFile('split.alignments', 'bylibrary'))
 
-    sch.transform('merge_spanning', (), lowmem,
+    sch.transform('merge_spanning_2', (), lowmem,
         destruct.merge_files_by_line,
         None,
         mgd.TempInputFile('spanning.alignments', 'bylibrary'),
         mgd.TempOutputFile('spanning.alignments'))
 
-    sch.transform('merge_split', (), lowmem,
+    sch.transform('merge_split_2', (), lowmem,
         destruct.merge_files_by_line,
         None,
         mgd.TempInputFile('split.alignments', 'bylibrary'),
@@ -369,13 +369,13 @@ if __name__ == '__main__':
         mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_mean'),
         mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_stddev'))
 
-    sch.transform('merge_likelihoods1', ('bylibrary',), lowmem,
+    sch.transform('merge_likelihoods_1', ('bylibrary',), lowmem,
         destruct.merge_files_by_line,
         None,
         mgd.TempInputFile('likelihoods_2', 'bylibrary', 'byread'),
         mgd.TempOutputFile('likelihoods_2', 'bylibrary'))
 
-    sch.transform('merge_likelihoods2', (), lowmem,
+    sch.transform('merge_likelihoods_2', (), lowmem,
         destruct.merge_files_by_line,
         None,
         mgd.TempInputFile('likelihoods_2', 'bylibrary'),
@@ -422,34 +422,6 @@ if __name__ == '__main__':
         config['template_length_min_threshold'])
     
 
-    # Predict rearrangement cycles
-
-    sch.commandline('getclusterids', (), lowmem,
-        'cut', '-f1', mgd.TempInputFile('clusters'), '|', 'uniq', '>', mgd.TempOutputFile('clusters.ids'))
-
-    sch.transform('splitclusterids', (), lowmem,
-        destruct.split_file_byline,
-        None,
-        mgd.TempInputFile('clusters.ids'),
-        config['clusters_per_split'],
-        mgd.TempOutputFile('clusters.ids', 'bycluster'))
-
-    sch.commandline('cycles', ('bycluster',), medmem,
-        os.path.join(tools_directory, 'cycles'),
-        '-b', mgd.TempInputFile('breakpoints'),
-        '--idsfile', mgd.TempInputFile('clusters.ids', 'bycluster'),
-        '-s', config['cycles_scoremax'],
-        '-v', config['cycles_visitmax'],
-        '-y', config['cycles_lambda'],
-        '>', mgd.TempOutputFile('cycles', 'bycluster'))
-
-    sch.transform('mergecycles', (), lowmem,
-        destruct.merge_files_by_line,
-        None,
-        mgd.TempInputFile('cycles', 'bycluster'),
-        mgd.TempOutputFile('cycles'))
-
-
     # Optionally tabulate supporting reads
 
     if args['breakpoint_read_table'] is not None:
@@ -476,7 +448,6 @@ if __name__ == '__main__':
         None,
         mgd.TempInputFile('breakpoints'),
         mgd.TempInputFile('likelihoods'),
-        mgd.TempInputFile('cycles'),
         mgd.TempInputObj('libinfo', 'bylibrary'),
         config['genome_fasta'],
         config['gtf_filename'],
@@ -825,8 +796,7 @@ else:
         return ', '.join(variants)
 
 
-    def tabulate_results(breakpoints_filename, likelihoods_filename,
-                         cycles_filename, lib_infos,
+    def tabulate_results(breakpoints_filename, likelihoods_filename, lib_infos,
                          genome_fasta, gtf_filename, dgv_filename,
                          breakpoint_table, breakpoint_library_table):
 
@@ -915,25 +885,6 @@ else:
         dgv = DGVDatabase(dgv_filename)
 
         breakpoints['dgv_ids'] = breakpoints.apply(lambda row: query_dgv(row, dgv), axis=1)
-
-        # Annotate rearrangement cycles
-        cycles_table = list()
-        with open(cycles_filename, 'r') as cycles_file:
-            for row in csv.reader(cycles_file, delimiter='\t'):
-                score = row[0]
-                ids = row[1::4]
-                cluster_id = ids[0]
-                num_cycle_breaks = len(ids)
-                cycles_table.append((cluster_id, score, num_cycle_breaks, ', '.join(ids)))
-
-        cycles_columns = ['cluster_id', 'cycle_score', 'cycle_num_breaks', 'cycle_ids']
-
-        if len(cycles_table) == 0:
-            cycles_table = pd.DataFrame(columns=cycles_columns)
-        else:
-            cycles_table = pd.DataFrame(cycles_table, columns=cycles_columns)
-
-        breakpoints = breakpoints.merge(cycles_table, on='cluster_id', how='left')
 
         breakpoints = breakpoints.rename(columns={'cluster_id':'prediction_id'})
 
