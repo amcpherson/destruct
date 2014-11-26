@@ -95,17 +95,6 @@ class GASVWrapper(object):
         subprocess.check_call(bamtogasv_cmd, shell=True)
 
         gasv_pr_filename = gasv_files_prefix + '.gasv.in'
-        # gasv_info_filename = gasv_files_prefix + '.info'
-
-        # gasv_info = pd.read_csv(gasv_info_filename, sep='\t').iloc[0]
-
-        # batches.append((gasv_pr_filename, 'PR', gasv_info['Lmin'].astype(str), gasv_info['Lmax'].astype(str)))
-
-        # batch_filename = os.path.join(temp_directory, 'batch.in')
-
-        # with open(batch_filename, 'w') as batch_file:
-        #     for info in batches:
-        #         batch_file.write('\t'.join(info) + '\n')
 
         gasv_cmd = 'java -jar {0} --batch {1}'.format(
             self.gasv_jar, gasv_pr_filename)
