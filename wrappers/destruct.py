@@ -51,11 +51,12 @@ class DestructWrapper(object):
                 subprocess.check_call(createref_cmd)
 
 
-    def run(self, temp_directory, bam_filenames, output_filename):
+    def run(self, tumour_bam, normal_bam, output_filename, temp_directory):
 
         utils.makedirs(temp_directory)
 
-        lib_ids, bam_files = zip(*list(bam_filenames.items()))
+        lib_ids = ['tumour', 'normal']
+        bams = [tumour_bam, normal_bam]
 
         breakpoint_table_filename = os.path.join(temp_directory, 'breakpoint.tsv')
         breakpoint_library_table_filename = os.path.join(temp_directory, 'breakpoint_library.tsv')
@@ -74,7 +75,7 @@ class DestructWrapper(object):
         destruct_cmd += lib_ids
 
         destruct_cmd += ['--bam_files']
-        destruct_cmd += bam_files
+        destruct_cmd += bams
 
         destruct_cmd += ['--config', self.user_config_filename]
         destruct_cmd += ['--tmp', destruct_tmp_directory]
@@ -100,14 +101,7 @@ class DestructWrapper(object):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('install_directory', help='Destruct installation directory')
-    parser.add_argument('--chromosomes', nargs='*', type=str, default=None, help='Reference chromosomes')
-    args = parser.parse_args()
-
-    delly = DestructWrapper(args.install_directory)
-
-    delly.install(chromosomes=args.chromosomes)
+    cmdline.interface(DestructWrapper)
 
 
 

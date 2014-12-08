@@ -59,10 +59,16 @@ def remove(filename):
             raise
 
 
-def symlink(filename):
-    link_name = os.path.join(os.getcwd(), os.path.basename(filename))
-    remove(link_name)
-    os.symlink(filename, link_name)
+def symlink(filename, link_name=None, link_directory=None):
+    if link_name is None:
+        link_name = os.path.basename(filename)
+    if link_directory is None:
+        link_directory = os.getcwd()
+    link_filename = os.path.join(link_directory, link_name)
+    remove(link_filename)
+    filename = os.path.abspath(filename)
+    os.symlink(filename, link_filename)
+    return link_filename
 
 
 class CurrentDirectory(object):

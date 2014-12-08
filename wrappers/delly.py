@@ -130,9 +130,8 @@ class DellyWrapper(object):
 
                     subprocess.check_call(make_cmd, shell=True)
 
-            with utils.CurrentDirectory(self.bin_directory):
-
-                utils.symlink(os.path.join(self.packages_directory, 'delly', 'src', 'delly'))
+            utils.symlink(os.path.join(self.packages_directory, 'delly', 'src', 'delly'),
+                link_directory=self.bin_directory)
 
 
         with Sentinal('download_genome') as sentinal:
@@ -161,9 +160,16 @@ class DellyWrapper(object):
                                 os.remove(chromosome_filename)
 
 
-    def run(self, temp_directory, bam_filenames, output_filename):
+    def run(self, tumour_bam, normal_bam, output_filename, temp_directory):
 
         utils.makedirs(temp_directory)
+
+        bams = list()
+        bams += [utils.symlink(tumour_bam, link_name='tumour.bam', link_directory=temp_directory)]
+        bams += [utils.symlink(normal_bam, link_name='normal.bam', link_directory=temp_directory)]
+
+        utils.symlink(tumour_bam+'.bai', link_name='tumour.bam.bai', link_directory=temp_directory)
+        utils.symlink(normal_bam+'.bai', link_name='normal.bam.bai', link_directory=temp_directory)
 
         table_filenames = list()
 
@@ -172,19 +178,19 @@ class DellyWrapper(object):
             vcf_filename = os.path.join(temp_directory, 'delly_{0}.vcf'.format(sv_type))
             table_filename = os.path.join(temp_directory, 'delly_{0}.tsv'.format(sv_type))
 
-            self.run_sv_type(sv_type, bam_filenames, vcf_filename)
+            self.run_sv_type(sv_type, bams, vcf_filename)
 
             if not os.path.exists(vcf_filename):
                 continue
 
-            self.convert_output(vcf_filename, bam_filenames, table_filename)
+            self.convert_output(vcf_filename, table_filename)
 
             table_filenames.append(table_filename)
 
         self.merge_tables(table_filenames, output_filename)
 
 
-    def run_sv_type(self, sv_type, bam_filenames, output_filename):
+    def run_sv_type(self, sv_type, bams, output_filename):
 
         delly_cmd = list()
         delly_cmd += [self.delly_bin]
@@ -192,12 +198,12 @@ class DellyWrapper(object):
         delly_cmd += ['-x', self.delly_excl_chrom]
         delly_cmd += ['-o', output_filename]
         delly_cmd += ['-g', self.genome_fasta]
-        delly_cmd += bam_filenames.values()
+        delly_cmd += bams
 
         subprocess.check_call(delly_cmd)
 
 
-    def convert_output(self, vcf_filename, bam_filenames, table_filename):
+    def convert_output(self, vcf_filename, table_filename):
 
         vcf_reader = vcf.Reader(filename=vcf_filename)
 
@@ -240,9 +246,6 @@ class DellyWrapper(object):
 
         counts_table = pd.DataFrame(counts_table, columns=['prediction_id', 'library', 'num_spanning', 'num_split'])
 
-        library_ids = dict([(os.path.basename(bam).rstrip('.bam'), lib_id) for lib_id, bam in bam_filenames.iteritems()])
-        counts_table['library'] = counts_table['library'].apply(lambda a: library_ids[a])
-
         split_read_counts = counts_table.groupby('prediction_id')['num_split'].sum().reset_index()
 
         total_read_counts = counts_table.set_index(['prediction_id', 'library']).sum(axis=1).unstack()
@@ -269,14 +272,7 @@ class DellyWrapper(object):
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('install_directory', help='Delly installation directory')
-    parser.add_argument('--chromosomes', nargs='*', type=str, default=None, help='Reference chromosomes')
-    args = parser.parse_args()
-
-    delly = DellyWrapper(args.install_directory)
-
-    delly.install(chromosomes=args.chromosomes)
+    cmdline.interface(DellyWrapper)
 
 
 
