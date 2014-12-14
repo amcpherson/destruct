@@ -17,7 +17,7 @@ class DellyWrapper(object):
 
     def __init__(self, install_directory):
 
-        self.install_directory = install_directory
+        self.install_directory = os.path.abspath(install_directory)
 
         self.packages_directory = os.path.join(self.install_directory, 'packages')
         self.bin_directory = os.path.join(self.install_directory, 'bin')

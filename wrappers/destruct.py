@@ -17,7 +17,7 @@ class DestructWrapper(object):
 
     def __init__(self, install_directory):
 
-        self.install_directory = install_directory
+        self.install_directory = os.path.abspath(install_directory)
 
         self.ref_data_directory = os.path.join(self.install_directory, 'data')
         self.user_config_filename = os.path.join(self.install_directory, 'user_config.py')
