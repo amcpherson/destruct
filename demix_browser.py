@@ -122,7 +122,12 @@ ax2.add_collection(minor_connectors)
 
 if args.positions is not None:
 
-    positions = pd.read_csv(args.positions, sep='\t', converters={'chrom':str})
+    if args.positions.endswith('.gz'):
+        compression = 'gzip'
+    else:
+        compression = None
+
+    positions = pd.read_csv(args.positions, sep='\t', converters={'chrom':str}, compression=compression)
 
     for idx, row in positions.iterrows():
         pos = chromosome_start[row['chrom']] + row['coord']
