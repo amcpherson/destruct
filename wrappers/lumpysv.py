@@ -140,9 +140,10 @@ class LumpySVWrapper(object):
 
         pypeliner.commandline.execute(
             *'samtools view {paired_bam} \
-            | python bin/sam_max_read_length.py \
+            | python {wrappers_bin_directory}/bin/sam_max_read_length.py \
             > {read_length}' \
                 .format(
+                    wrappers_bin_directory=self.wrappers_bin_directory,
                     paired_bam=bam,
                     read_length=read_length
                     )
