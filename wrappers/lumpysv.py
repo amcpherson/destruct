@@ -203,13 +203,15 @@ class LumpySVWrapper(object):
 
         pypeliner.commandline.execute(
             *'{lumpy_bin} \
-            -mw 4 \
+            -t {lumpy_tmp} \
+            -mw 2 \
             -tt 0.0 \
             {tumour_args} \
             {normal_args} \
             > {results_bed}' \
                 .format(
                     lumpy_bin=self.lumpy_bin,
+                    lumpy_tmp=os.path.join(temp_directory, 'lumpy.'),
                     tumour_args=tumour_args,
                     normal_args=normal_args,
                     results_bed=results_bed
