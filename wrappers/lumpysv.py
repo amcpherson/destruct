@@ -140,7 +140,7 @@ class LumpySVWrapper(object):
 
         pypeliner.commandline.execute(
             *'samtools view {paired_bam} \
-            | python {wrappers_bin_directory}/bin/sam_max_read_length.py \
+            | python {wrappers_bin_directory}/sam_max_read_length.py \
             > {read_length}' \
                 .format(
                     wrappers_bin_directory=self.wrappers_bin_directory,
@@ -209,13 +209,13 @@ class LumpySVWrapper(object):
             -tt 0.0 \
             {tumour_args} \
             {normal_args} \
-            > {results_bed}' \
+            > {results_bedpe}' \
                 .format(
                     lumpy_bin=self.lumpy_bin,
                     lumpy_tmp=os.path.join(temp_directory, 'lumpy.'),
                     tumour_args=tumour_args,
                     normal_args=normal_args,
-                    results_bed=results_bed
+                    results_bedpe=results_bedpe
                     )
                 .split()
             )
@@ -281,9 +281,14 @@ class LumpySVWrapper(object):
 
         read_counts['read_count'] = read_counts['pe_read_count'] + read_counts['sr_read_count']
 
+        read_counts['normal_count'] = 0
+
         read_counts = read_counts.drop(['normal_pe', 'normal_sr'], axis=1)
 
         results = results.merge(read_counts, left_on='prediction_id', right_index=True)
+
+        # Replace inf with large number
+        results.loc[results['evidence_set_score'].isposinf(), 'evidence_set_score'] = 1e6
 
         results.to_csv(output_filename, sep='\t', index=False)
 
