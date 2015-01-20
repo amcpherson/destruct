@@ -13,6 +13,7 @@ argparser.add_argument('preds_filename', help='deMix Predictions Filename')
 argparser.add_argument('--library_id', help='library id to view, omit to print all', default=None)
 argparser.add_argument('--candidate_id', help='candidate id to view', type=int, default=None)
 argparser.add_argument('--positions', help='annotate positions')
+argparser.add_argument('--breakpoints', help='annotate breakpoints')
 argparser.add_argument('--max_copies', help='maximum copies to display', type=float, default=5.0)
 args = argparser.parse_args()
 
@@ -134,6 +135,37 @@ if args.positions is not None:
         markerline, stemlines, baseline = ax2.stem([pos, pos], [-10, 0.5], linefmt='-', markerfmt='-o', color='k')
         plt.setp(markerline, 'markerfacecolor', 'orange', 'markeredgecolor', 'k', 'zorder', 2)
 
+breakpoint_markers = list()
+breakpoint_infos = list()
+
+if args.breakpoints is not None:
+
+    if args.breakpoints.endswith('.gz'):
+        compression = 'gzip'
+    else:
+        compression = None
+
+    breakpoints = pd.read_csv(args.breakpoints, sep='\t', converters={'chromosome_1':str, 'chromosome_2':str}, compression=compression)
+
+    breakpoints = breakpoints.loc[(breakpoints[args.library_id+'_count'] > 0)]
+    breakpoints = breakpoints.loc[(breakpoints['normal_blood_count'] == 0)]
+
+    for idx, row in breakpoints.iterrows():
+        info = repr((row['chromosome_1'], row['strand_1'], row['break_1'],
+                     row['chromosome_2'], row['strand_2'], row['break_2']))
+        for side in ('1', '2'):
+            if row['chromosome_'+side] not in chromosomes:
+                continue
+            pos = chromosome_start[row['chromosome_'+side]] + row['break_'+side]
+            marker = None
+            if row['strand_'+side] == '+':
+                marker = '>'
+            elif row['strand_'+side] == '-':
+                marker = '<'
+            paths = ax2.scatter([pos], [0.], marker=marker, color='orange', s=50, picker=True, zorder=3)
+            breakpoint_markers.append(paths)
+            breakpoint_infos.append(info)
+
 ax2.set_xlim((cnv['plot_start'].min(), cnv['plot_end'].max()))
 ax2.set_ylim((-0.2, args.max_copies + 0.2))
 
@@ -149,7 +181,15 @@ class Picker(object):
     def __init__(self):
         self.selected_chromosome = None
     def __call__(self, event):
-        if isinstance(event.artist, matplotlib.patches.Rectangle):
+        if isinstance(event.artist, matplotlib.collections.PathCollection) and event.artist.zorder == 3:
+            try:
+                ind = breakpoint_markers.index(event.artist)
+            except ValueError:
+                return
+
+            print breakpoint_infos[ind]
+
+        elif isinstance(event.artist, matplotlib.patches.Rectangle):
             try:
                 ind = lgnd_patches.index(event.artist)
             except ValueError:
