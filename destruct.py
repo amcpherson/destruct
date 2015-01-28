@@ -731,7 +731,8 @@ else:
 
     converters = {'chromosome':str,
                   'chromosome_1':str,
-                  'chromosome_2':str}
+                  'chromosome_2':str,
+                  'inserted':str}
 
 
     def create_sequence(row, reference_sequences):

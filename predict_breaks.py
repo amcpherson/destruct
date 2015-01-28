@@ -234,7 +234,7 @@ def calculate_cluster_weights(breakpoints_filename, weights_filename):
     itx_distance = 1000000000
 
     breakpoints = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                              converters={'chromosome_1':str, 'chromosome_2':str})
+                              converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str})
 
     breakpoints = breakpoints[breakpoints['breakpoint_id'] == 0]
 
@@ -256,7 +256,7 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     score_stats = pd.read_csv(score_stats_filename, sep='\t', names=score_stats_fields)
 
     breakpoints = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                              converters={'chromosome_1':str, 'chromosome_2':str},
+                              converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                               na_values=['.'])
 
     breakpoints['inserted'] = breakpoints['inserted'].fillna('')
@@ -329,7 +329,7 @@ def select_clusters(clusters_filename,
     clusters = clusters.drop_duplicates()
 
     breakpoints_iter = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                                   converters={'chromosome_1':str, 'chromosome_2':str},
+                                   converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                                    iterator=True, chunksize=1000000)
 
     cluster_ids = clusters[['cluster_id']].drop_duplicates()
@@ -374,6 +374,7 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
     selected = selected.drop(['template_length_min'], axis=1)
 
     mate_score = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
+                             converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                              usecols=['cluster_id', 'prediction_id', 'mate_score'])
 
     selected = selected.merge(mate_score)
@@ -383,7 +384,7 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
     selected = selected[['cluster_id', 'breakpoint_id']].drop_duplicates()
 
     breakpoints_iter = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                                   converters={'chromosome_1':str, 'chromosome_2':str},
+                                   converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                                    iterator=True, chunksize=1000000)
 
     read_select_write(breakpoints_iter, selected, selected_breakpoints_filename)
