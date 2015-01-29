@@ -259,6 +259,10 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
                               converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                               na_values=['.'])
 
+    if len(breakpoints.index) == 0:
+        pd.DataFrame().to_csv(likelihoods_filename, sep='\t', index=False)
+        return
+
     breakpoints['inserted'] = breakpoints['inserted'].fillna('')
 
     breakpoints['inslen'] = breakpoints['inserted'].apply(len)
