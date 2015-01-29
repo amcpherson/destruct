@@ -182,7 +182,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
     clusters_alignments = clusters[merge_columns].drop_duplicates()
 
     split_iter = pd.read_csv(split_filename, sep='\t', names=split_fields,
-                             converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':True},
+                             converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                              iterator=True, chunksize=1000000)
 
     split_merge_columns = {'1':['library_id', 'read_id', 'read_end', 'align_id_1'],
