@@ -201,7 +201,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
 
     split = pd.concat([filter_split(chunk) for chunk in split_iter])
 
-    split['inserted'] = split['inserted'].fillna('')
+    split.loc[split['inserted'] == '.', 'inserted'] = ''
 
     spanning_iter = pd.read_csv(spanning_filename, sep='\t', names=spanning_fields,
                                 converters={'chromosome':str},
@@ -263,7 +263,7 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
         pd.DataFrame().to_csv(likelihoods_filename, sep='\t', index=False)
         return
 
-    breakpoints['inserted'] = breakpoints['inserted'].fillna('')
+    breakpoints.loc[breakpoints['inserted'] == '.', 'inserted'] = ''
 
     breakpoints['inslen'] = breakpoints['inserted'].apply(len)
 
