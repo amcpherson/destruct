@@ -259,15 +259,16 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
                               converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                               na_values=['.'])
 
-    if len(breakpoints.index) == 0:
-        pd.DataFrame().to_csv(likelihoods_filename, sep='\t', index=False)
-        return
-
     breakpoints.loc[breakpoints['inserted'] == '.', 'inserted'] = ''
 
     breakpoints['inslen'] = breakpoints['inserted'].apply(len)
 
     data = pd.read_csv(realignments_filename, sep='\t', names=realignment_fields)
+
+    if len(data.index) == 0:
+        with open(likelihoods_filename, 'w'):
+            pass
+        return
 
     data = data.merge(score_stats, on='aligned_length')
 
