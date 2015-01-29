@@ -181,8 +181,8 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
 
     clusters_alignments = clusters[merge_columns].drop_duplicates()
 
-    split_iter = pd.read_csv(split_filename, sep='\t', names=split_fields, na_values=['.'],
-                             converters={'chromosome_1':str, 'chromosome_2':str},
+    split_iter = pd.read_csv(split_filename, sep='\t', names=split_fields,
+                             converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':True},
                              iterator=True, chunksize=1000000)
 
     split_merge_columns = {'1':['library_id', 'read_id', 'read_end', 'align_id_1'],
@@ -256,8 +256,7 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     score_stats = pd.read_csv(score_stats_filename, sep='\t', names=score_stats_fields)
 
     breakpoints = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                              converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
-                              na_values=['.'])
+                              converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str})
 
     breakpoints.loc[breakpoints['inserted'] == '.', 'inserted'] = ''
 
