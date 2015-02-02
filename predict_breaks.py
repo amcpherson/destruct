@@ -181,8 +181,8 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
 
     clusters_alignments = clusters[merge_columns].drop_duplicates()
 
-    split_iter = pd.read_csv(split_filename, sep='\t', names=split_fields, na_values=['.'],
-                             converters={'chromosome_1':str, 'chromosome_2':str},
+    split_iter = pd.read_csv(split_filename, sep='\t', names=split_fields,
+                             converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                              iterator=True, chunksize=1000000)
 
     split_merge_columns = {'1':['library_id', 'read_id', 'read_end', 'align_id_1'],
@@ -201,7 +201,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
 
     split = pd.concat([filter_split(chunk) for chunk in split_iter])
 
-    split['inserted'] = split['inserted'].fillna('')
+    split.loc[split['inserted'] == '.', 'inserted'] = ''
 
     spanning_iter = pd.read_csv(spanning_filename, sep='\t', names=spanning_fields,
                                 converters={'chromosome':str},
@@ -234,7 +234,7 @@ def calculate_cluster_weights(breakpoints_filename, weights_filename):
     itx_distance = 1000000000
 
     breakpoints = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                              converters={'chromosome_1':str, 'chromosome_2':str})
+                              converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str})
 
     breakpoints = breakpoints[breakpoints['breakpoint_id'] == 0]
 
@@ -256,14 +256,18 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     score_stats = pd.read_csv(score_stats_filename, sep='\t', names=score_stats_fields)
 
     breakpoints = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                              converters={'chromosome_1':str, 'chromosome_2':str},
-                              na_values=['.'])
+                              converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str})
 
-    breakpoints['inserted'] = breakpoints['inserted'].fillna('')
+    breakpoints.loc[breakpoints['inserted'] == '.', 'inserted'] = ''
 
     breakpoints['inslen'] = breakpoints['inserted'].apply(len)
 
     data = pd.read_csv(realignments_filename, sep='\t', names=realignment_fields)
+
+    if len(data.index) == 0:
+        with open(likelihoods_filename, 'w'):
+            pass
+        return
 
     data = data.merge(score_stats, on='aligned_length')
 
@@ -329,7 +333,7 @@ def select_clusters(clusters_filename,
     clusters = clusters.drop_duplicates()
 
     breakpoints_iter = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                                   converters={'chromosome_1':str, 'chromosome_2':str},
+                                   converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                                    iterator=True, chunksize=1000000)
 
     cluster_ids = clusters[['cluster_id']].drop_duplicates()
@@ -374,6 +378,7 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
     selected = selected.drop(['template_length_min'], axis=1)
 
     mate_score = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
+                             converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                              usecols=['cluster_id', 'prediction_id', 'mate_score'])
 
     selected = selected.merge(mate_score)
@@ -383,7 +388,7 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
     selected = selected[['cluster_id', 'breakpoint_id']].drop_duplicates()
 
     breakpoints_iter = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                                   converters={'chromosome_1':str, 'chromosome_2':str},
+                                   converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                                    iterator=True, chunksize=1000000)
 
     read_select_write(breakpoints_iter, selected, selected_breakpoints_filename)
