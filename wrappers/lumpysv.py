@@ -6,6 +6,7 @@ import subprocess
 import tarfile
 import argparse
 import vcf
+import itertools
 import numpy as np
 import pandas as pd
 
