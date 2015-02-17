@@ -44,14 +44,21 @@ class AutoSentinal(object):
 if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('refdatadir', help='Reference dataset directory')
-    argparser.add_argument('-c', '--config', help='Configuration filename')
-    argparser.add_argument('-d', '--demix', action='store_true', help='Download additional demix data')
+
+    argparser.add_argument('ref_data_dir',
+                           help='Reference dataset directory')
+
+    argparser.add_argument('-c', '--config',
+                           help='Configuration filename')
+
+    argparser.add_argument('-d', '--demix', action='store_true',
+                           help='Download additional demix data')
+
     args = argparser.parse_args()
 
     args = vars(argparser.parse_args())
 
-    config = {'ref_data_directory':args['refdatadir'],
+    config = {'ref_data_directory':args['ref_data_dir'],
               'package_data_directory':data_directory}
     execfile(default_config_filename, {}, config)
 
@@ -61,13 +68,13 @@ if __name__ == '__main__':
     config.update(args)
 
     try:
-        os.makedirs(args['refdatadir'])
+        os.makedirs(args['ref_data_dir'])
     except OSError:
         pass
 
-    auto_sentinal = AutoSentinal(args['refdatadir'] + '/sentinal.')
+    auto_sentinal = AutoSentinal(args['ref_data_dir'] + '/sentinal.')
 
-    temp_directory = os.path.join(args['refdatadir'], 'tmp')
+    temp_directory = os.path.join(args['ref_data_dir'], 'tmp')
 
     try:
         os.makedirs(temp_directory)
@@ -127,7 +134,7 @@ if __name__ == '__main__':
         def wget_thousand_genomes():
             tar_filename = os.path.join(temp_directory, 'thousand_genomes_download.tar.gz')
             wget(config['thousand_genomes_impute_url'], tar_filename)
-            pypeliner.commandline.execute('tar', '-C', args['refdatadir'], '-xzvf', tar_filename)
+            pypeliner.commandline.execute('tar', '-C', args['ref_data_dir'], '-xzvf', tar_filename)
             os.remove(tar_filename)
         auto_sentinal.run(wget_thousand_genomes)
 

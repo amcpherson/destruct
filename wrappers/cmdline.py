@@ -13,10 +13,18 @@ def interface(Wrapper):
     install_parser.add_argument('--chromosomes', nargs='*', type=str, default=None, help='Reference chromosomes')
 
     run_parser = subparsers.add_parser('run')
-    run_parser.add_argument('tumour_bam', help='Tumour bam filename')
-    run_parser.add_argument('normal_bam', help='Normal bam filename')
-    run_parser.add_argument('output_filename', help='Results output filename')
-    run_parser.add_argument('temp_directory', help='Temporary directory')
+
+    run_parser.add_argument('output_filename',
+                            help='Results output filename')
+
+    run_parser.add_argument('temp_directory',
+                            help='Temporary directory')
+
+    run_parser.add_argument('--bam_files', nargs='+', required=True,
+                            help='Input bam filenames')
+
+    run_parser.add_argument('--lib_ids', nargs='+', required=True,
+                            help='Input ids for respective bam filenames')
 
     args = parser.parse_args()
 
@@ -28,7 +36,12 @@ def interface(Wrapper):
 
     else:
 
-        wrapper.run(args.tumour_bam, args.normal_bam, args.output_filename, args.temp_directory)
+        if len(args['bam_files']) != len(args['lib_ids']):
+            raise Exception('--lib_ids must correspond one to one with --bam_files')
+
+        bam_filenames = dict(zip(args['lib_ids'], args['bam_files']))
+
+        wrapper.run(bams, args.output_filename, args.temp_directory)
 
 
 

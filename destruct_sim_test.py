@@ -163,9 +163,11 @@ else:
         except KeyError:
             raise Exception('No wrapper for tool ' + tool)
 
-        wrapper = ToolWrapper(install_directory)
+        tool_wrapper = ToolWrapper(install_directory)
 
-        wrapper.run(temp_directory, {'simulated':bam_filename}, results_filename)
+        bam_filenames = {'simulated':bam_filename}
+
+        tool_wrapper.run(bam_filenames, results_filename, temp_directory)
 
 
     def read_simulation_params(sim_config_filename):
