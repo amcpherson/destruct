@@ -16,7 +16,7 @@ import pypeliner.commandline
 
 class LumpySVWrapper(object):
 
-    features = ['evidence_set_score', 'read_count']
+    features = ['evidence_set_score', 'tumour_count']
 
     def __init__(self, install_directory):
 
@@ -185,20 +185,26 @@ class LumpySVWrapper(object):
         return args
 
 
-    def run(self, tumour_bam, normal_bam, output_filename, temp_directory):
+    def run(self, bam_filenames, output_filename, temp_directory):
 
         utils.makedirs(temp_directory)
 
-        sample_id_map = {
-            1:'tumour_pe',
-            2:'tumour_sr',
-            3:'normal_pe',
-            4:'normal_sr',
-        }
+        lib_args = ''
 
-        tumour_args = self.prepare(tumour_bam, os.path.join(temp_directory, 'tumour.'), 1, 2)
+        sample_id_map = dict()
+        sample_id_gen = itertools.count(start=1)
 
-        normal_args = self.prepare(normal_bam, os.path.join(temp_directory, 'normal.'), 3, 4)
+        for lib_id, bam_filename in bam_filenames.iteritems():
+
+            prefix = os.path.join(temp_directory, '{0}.'.format(lib_id))
+
+            pe_id = next(sample_id_gen)
+            sr_id = next(sample_id_gen)
+
+            lib_args += self.prepare(bam_filename, prefix, pe_id, sr_id)
+
+            sample_id_map[pe_id] = '{0}_pe'.format(lib_id)
+            sample_id_map[sr_id] = '{0}_sr'.format(lib_id)
 
         results_bedpe = os.path.join(temp_directory, 'results.bedpe')
 
@@ -207,14 +213,12 @@ class LumpySVWrapper(object):
             -t {lumpy_tmp} \
             -mw 2 \
             -tt 0.0 \
-            {tumour_args} \
-            {normal_args} \
+            {lib_args} \
             > {results_bedpe}' \
                 .format(
                     lumpy_bin=self.lumpy_bin,
                     lumpy_tmp=os.path.join(temp_directory, 'lumpy.'),
-                    tumour_args=tumour_args,
-                    normal_args=normal_args,
+                    lib_args=lib_args,
                     results_bedpe=results_bedpe
                     )
                 .split()
@@ -273,17 +277,9 @@ class LumpySVWrapper(object):
                                  .fillna(0)\
                                  .rename(columns=sample_id_map)
 
-        # Filter germline
-        read_counts = read_counts[(read_counts['normal_pe'] == 0) & (read_counts['normal_sr'] == 0)]
-
-        read_counts = read_counts.rename(columns={'tumour_pe':'pe_read_count',
-                                                  'tumour_sr':'sr_read_count'})
-
-        read_counts['read_count'] = read_counts['pe_read_count'] + read_counts['sr_read_count']
-
-        read_counts['normal_count'] = 0
-
-        read_counts = read_counts.drop(['normal_pe', 'normal_sr'], axis=1)
+        for lib_id in bam_filenames:
+            read_counts['{0}_count'.format(lib_id)] = read_counts['{0}_pe'.format(lib_id)] + \
+                                                      read_counts['{0}_sr'.format(lib_id)]
 
         results = results.merge(read_counts, left_on='prediction_id', right_index=True)
 

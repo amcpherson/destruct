@@ -184,7 +184,9 @@ else:
 
     def run_tool(tool_wrapper, temp_directory, normal_filename, tumour_filename, results_filename):
 
-        tool_wrapper.run(tumour_filename, normal_filename, results_filename, temp_directory)
+        bam_filenames = {'tumour':tumour_filename, 'normal':normal_filename}
+
+        tool_wrapper.run(bam_filenames, results_filename, temp_directory)
         
 
     def read_simulation_params(sim_config_filename):

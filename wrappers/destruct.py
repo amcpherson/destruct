@@ -51,12 +51,12 @@ class DestructWrapper(object):
                 subprocess.check_call(createref_cmd)
 
 
-    def run(self, tumour_bam, normal_bam, output_filename, temp_directory):
+    def run(self, bam_filenames, output_filename, temp_directory):
 
         utils.makedirs(temp_directory)
 
-        lib_ids = ['tumour', 'normal']
-        bams = [tumour_bam, normal_bam]
+        lib_ids = bam_filenames.keys()
+        bams = bam_filenames.values()
 
         breakpoint_table_filename = os.path.join(temp_directory, 'breakpoint.tsv')
         breakpoint_library_table_filename = os.path.join(temp_directory, 'breakpoint_library.tsv')

@@ -160,16 +160,14 @@ class DellyWrapper(object):
                                 os.remove(chromosome_filename)
 
 
-    def run(self, tumour_bam, normal_bam, output_filename, temp_directory):
+    def run(self, bam_filenames, output_filename, temp_directory):
 
         utils.makedirs(temp_directory)
 
         bams = list()
-        bams += [utils.symlink(tumour_bam, link_name='tumour.bam', link_directory=temp_directory)]
-        bams += [utils.symlink(normal_bam, link_name='normal.bam', link_directory=temp_directory)]
-
-        utils.symlink(tumour_bam+'.bai', link_name='tumour.bam.bai', link_directory=temp_directory)
-        utils.symlink(normal_bam+'.bai', link_name='normal.bam.bai', link_directory=temp_directory)
+        for lib_id, bam_filename in bam_filenames.iteritems():
+            bams += [utils.symlink(bam_filename, link_name='{0}.bam'.format(lib_id), link_directory=temp_directory)]
+            utils.symlink(bam_filename+'.bai', link_name='{0}.bam.bai'.format(lib_id), link_directory=temp_directory)
 
         table_filenames = list()
 
