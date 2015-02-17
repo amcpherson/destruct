@@ -6,6 +6,7 @@ import subprocess
 import tarfile
 import argparse
 import vcf
+import numpy as np
 import pandas as pd
 
 import shared
@@ -284,7 +285,10 @@ class LumpySVWrapper(object):
         results = results.merge(read_counts, left_on='prediction_id', right_index=True)
 
         # Replace inf with large number
-        results.loc[results['evidence_set_score'].isposinf(), 'evidence_set_score'] = 1e6
+        results.loc[np.isposinf(results['evidence_set_score']), 'evidence_set_score'] = 1e6
+
+        # Lower scores are better
+        results['evidence_set_score'] = -results['evidence_set_score']
 
         results.to_csv(output_filename, sep='\t', index=False)
 
