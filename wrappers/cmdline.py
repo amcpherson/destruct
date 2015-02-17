@@ -10,7 +10,9 @@ def interface(Wrapper):
     subparsers = parser.add_subparsers(dest='command')
 
     install_parser = subparsers.add_parser('install')
-    install_parser.add_argument('--chromosomes', nargs='*', type=str, default=None, help='Reference chromosomes')
+    
+    install_parser.add_argument('--chromosomes', nargs='*', type=str, default=None,
+                                help='Reference chromosomes')
 
     run_parser = subparsers.add_parser('run')
 

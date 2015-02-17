@@ -35,10 +35,24 @@ if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser()
     pypeliner.app.add_arguments(argparser)
-    argparser.add_argument('simconfig', help='Simulation configuration filename')
-    argparser.add_argument('installdir', help='Tool installations directory')
-    argparser.add_argument('outdir', help='Output directory')
-    argparser.add_argument('-c', '--config', help='Configuration filename')
+
+    argparser.add_argument('simconfig',
+                           help='Simulation configuration filename')
+
+    argparser.add_argument('installdir',
+                           help='Tool installations directory')
+
+    argparser.add_argument('outdir',
+                           help='Output directory')
+
+    argparser.add_argument('--config',
+                           help='Configuration filename')
+
+    argparser.add_argument('--chromosomes', nargs='*', type=str, default=['20'],
+                           help='Reference chromosomes')
+
+    argparser.add_argument('--include_nonchromosomal',  action='store_true',
+                           help='Include non chromosomal reference sequences')
 
     args = vars(argparser.parse_args())
 
@@ -65,7 +79,8 @@ if __name__ == '__main__':
     pyp.sch.transform('create_genome', (), ctx,
         destruct_sim_test.create_genome,
         None,
-        mgd.TempInputObj('simulation.params'),
+        args['chromosomes'],
+        args['include_nonchromosomal'],
         mgd.OutputFile(os.path.join(args['outdir'], 'genome.fasta')))
 
     pyp.sch.transform('create_sim', (), ctx, create_breakpoint_simulation.create,
@@ -127,11 +142,11 @@ if __name__ == '__main__':
 else:
 
 
-    def create_genome(sim_info, genome_fasta):
+    def create_genome(chromosomes, include_nonchromosomal, genome_fasta):
 
         utils.download.download_genome_fasta(genome_fasta,
-                                             sim_info['chromosomes'],
-                                             sim_info['include_nonchromosomal'])
+                                             chromosomes,
+                                             include_nonchromosomal)
 
         pypeliner.commandline.execute('bwa', 'index', genome_fasta)
         pypeliner.commandline.execute('samtools', 'faidx', genome_fasta)
