@@ -18,7 +18,7 @@ import pypeliner.commandline
 
 class LumpySVWrapper(object):
 
-    features = ['evidence_set_score', 'tumour_count']
+    features = ['evidence_set_score', 'read_count']
 
     def __init__(self, install_directory):
 
@@ -274,16 +274,19 @@ class LumpySVWrapper(object):
 
         read_counts = pd.DataFrame(read_counts, columns=('prediction_id', 'sample_id', 'read_count'))
 
-        read_counts = read_counts.set_index(['prediction_id', 'sample_id'])['read_count']\
-                                 .unstack()\
-                                 .fillna(0)\
-                                 .rename(columns=sample_id_map)
+        total_read_counts = read_counts.groupby('prediction_id')[['read_count']].sum()
+
+        sample_read_counts = read_counts.set_index(['prediction_id', 'sample_id'])['read_count']\
+                                        .unstack()\
+                                        .fillna(0)\
+                                        .rename(columns=sample_id_map)
 
         for lib_id in bam_filenames:
-            read_counts['{0}_count'.format(lib_id)] = read_counts['{0}_pe'.format(lib_id)] + \
-                                                      read_counts['{0}_sr'.format(lib_id)]
+            sample_read_counts['{0}_count'.format(lib_id)] = sample_read_counts['{0}_pe'.format(lib_id)] + \
+                                                             sample_read_counts['{0}_sr'.format(lib_id)]
 
-        results = results.merge(read_counts, left_on='prediction_id', right_index=True)
+        results = results.merge(total_read_counts, left_on='prediction_id', right_index=True)
+        results = results.merge(sample_read_counts, left_on='prediction_id', right_index=True)
 
         # Replace inf with large number
         results.loc[np.isposinf(results['evidence_set_score']), 'evidence_set_score'] = 1e6
