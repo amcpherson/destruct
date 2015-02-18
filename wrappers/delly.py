@@ -13,7 +13,7 @@ import utils
 
 class DellyWrapper(object):
 
-    features = ['tumour_count', 'num_split']
+    features = ['num_spanning', 'num_split']
 
     def __init__(self, install_directory):
 
@@ -244,12 +244,14 @@ class DellyWrapper(object):
 
         counts_table = pd.DataFrame(counts_table, columns=['prediction_id', 'library', 'num_spanning', 'num_split'])
 
+        spanning_read_counts = counts_table.groupby('prediction_id')['num_spanning'].sum().reset_index()
         split_read_counts = counts_table.groupby('prediction_id')['num_split'].sum().reset_index()
 
         total_read_counts = counts_table.set_index(['prediction_id', 'library']).sum(axis=1).unstack()
         total_read_counts.columns = [a + '_count' for a in total_read_counts.columns]
         total_read_counts = total_read_counts.reset_index()
 
+        breakpoint_table = breakpoint_table.merge(spanning_read_counts, on='prediction_id')
         breakpoint_table = breakpoint_table.merge(split_read_counts, on='prediction_id')
         breakpoint_table = breakpoint_table.merge(total_read_counts, on='prediction_id')
 
