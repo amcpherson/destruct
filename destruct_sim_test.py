@@ -71,11 +71,14 @@ if __name__ == '__main__':
         mgd.TempOutputObj('simulation.params'),
         mgd.InputFile(args['simconfig']))
 
+    pyp.sch.setobj(mgd.TempOutputObj('chromosomes'), args['chromosomes'])
+    pyp.sch.setobj(mgd.TempOutputObj('include_nonchromosomal'), args['include_nonchromosomal'])
+
     pyp.sch.transform('create_genome', (), ctx,
         destruct_test.create_genome,
         None,
-        args['chromosomes'],
-        args['include_nonchromosomal'],
+        mgd.TempInputObj('chromosomes'),
+        mgd.TempInputObj('include_nonchromosomal'),
         mgd.OutputFile(os.path.join(args['outdir'], 'genome.fasta')))
 
     pyp.sch.transform('create_sim', (), ctx,
