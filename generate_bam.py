@@ -2,7 +2,7 @@ import csv
 import sys
 import logging
 import os
-import ConfigParser
+import argparse
 
 import pypeliner
 import pypeliner.managed as mgd
@@ -15,7 +15,7 @@ destruct_directory = os.path.abspath(os.path.dirname(__file__))
 
 if __name__ == '__main__':
 
-    import destruct_sim_test
+    import destruct_test
     import create_breakpoint_simulation
 
     argparser = argparse.ArgumentParser()
@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     config.update(args)
 
-    pyp = pypeliner.app.Pypeline([destruct_sim_test, create_breakpoint_simulation], config)
+    pyp = pypeliner.app.Pypeline([destruct_test, create_breakpoint_simulation], config)
 
     try:
         os.makedirs(args['outdir'])
@@ -54,18 +54,20 @@ if __name__ == '__main__':
 
     ctx = {'mem':4}
 
-    pyp.sch.transform('read_params', (), ctx, destruct_sim_test.read_simulation_params,
+    pyp.sch.transform('read_params', (), ctx,
+        destruct_test.read_simulation_params,
         mgd.TempOutputObj('simulation.params'),
         mgd.InputFile(args['simconfig']))
 
     pyp.sch.transform('create_genome', (), ctx,
-        destruct_sim_test.create_genome,
+        destruct_test.create_genome,
         None,
         args['chromosomes'],
         args['include_nonchromosomal'],
         mgd.OutputFile(os.path.join(args['outdir'], 'genome.fasta')))
 
-    pyp.sch.transform('create_sim', (), ctx, create_breakpoint_simulation.create,
+    pyp.sch.transform('create_sim', (), ctx,
+        create_breakpoint_simulation.create,
         None,
         mgd.TempInputObj('simulation.params'),
         mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
@@ -91,7 +93,7 @@ if __name__ == '__main__':
         '--tmp', mgd.TempFile('bwa_tmp'))
 
     pyp.sch.transform('samtools_sort_index', (), ctx,
-        destruct_sim_test.samtools_sort_index,
+        destruct_test.samtools_sort_index,
         None,
         mgd.TempInputFile('simulated.unsorted.bam'),
         mgd.OutputFile(os.path.join(args['outdir'], 'simulated.bam')))
