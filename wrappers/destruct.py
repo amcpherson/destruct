@@ -51,7 +51,7 @@ class DestructWrapper(object):
                 subprocess.check_call(createref_cmd)
 
 
-    def run(self, bam_filenames, output_filename, temp_directory):
+    def run(self, bam_filenames, output_filename, temp_directory, control_id=None):
 
         utils.makedirs(temp_directory)
 
@@ -95,6 +95,10 @@ class DestructWrapper(object):
         breakpoint_table = breakpoint_table.merge(breakpoint_counts,
                                                   left_on='prediction_id',
                                                   right_index=True)
+        
+        # Filter based on evidence in control dataset
+        if control_id is not None:
+             breakpoint_table = breakpoint_table[breakpoint_table['{0}_count'.format(control_id)] == 0]          
 
         breakpoint_table.to_csv(output_filename, sep='\t', index=False)
 

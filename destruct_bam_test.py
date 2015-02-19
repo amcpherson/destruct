@@ -125,6 +125,7 @@ if __name__ == '__main__':
         mgd.TempInputObj('tool_wrapper', 'bytool'),
         mgd.TempFile('tool_tmp', 'bytool'),
         mgd.OutputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
+        control_id='normal',
         **{'tumour':mgd.InputFile(os.path.join(args['outdir'], 'tumour.bam')),
            'normal':mgd.InputFile(os.path.join(args['outdir'], 'normal.bam'))})
 

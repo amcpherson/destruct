@@ -187,7 +187,7 @@ class LumpySVWrapper(object):
         return args
 
 
-    def run(self, bam_filenames, output_filename, temp_directory):
+    def run(self, bam_filenames, output_filename, temp_directory, control_id=None):
 
         utils.makedirs(temp_directory)
 
@@ -293,6 +293,10 @@ class LumpySVWrapper(object):
 
         # Lower scores are better
         results['evidence_set_score'] = -results['evidence_set_score']
+
+        # Filter based on evidence in control dataset
+        if control_id is not None:
+             results = results[results['{0}_count'.format(control_id)] == 0]          
 
         results.to_csv(output_filename, sep='\t', index=False)
 
