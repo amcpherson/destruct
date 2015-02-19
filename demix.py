@@ -20,10 +20,20 @@ import math
 import scipy.stats
 import sklearn
 import sklearn.mixture
+import statsmodels.api as sm
 
 import pypeliner
+import pypeliner.managed as mgd
 
 import subclonal_sampling
+
+
+destruct_directory = os.path.abspath(os.path.dirname(__file__))
+
+data_directory = os.path.join(destruct_directory, 'data')
+tools_directory = os.path.join(destruct_directory, 'tools')
+default_config_filename = os.path.join(destruct_directory, 'defaultconfig.py')
+
 
 __version__ = '0.0.1'
 
@@ -32,98 +42,197 @@ if __name__ == '__main__':
     import demix
     
     argparser = argparse.ArgumentParser()
-    pypeliner.easypypeliner.add_arguments(argparser)
-    argparser.add_argument('--version', action='version', version=__version__)
-    argparser.add_argument('libraries', help='library info')
-    argparser.add_argument('normal', help='normal library id')
-    argparser.add_argument('changepoints', help='changepoints file')
-    argparser.add_argument('stats', help='statistics file')
-    argparser.add_argument('preds', help='predictions file')
-    argparser.add_argument('plots', help='plots file tarball')
-    argparser.add_argument('plots_prefix', help='plots filename prefix')
 
-    cfg = pypeliner.easypypeliner.Config(vars(argparser.parse_args()))
-    pyp = pypeliner.easypypeliner.EasyPypeliner([demix], cfg)
+    pypeliner.app.add_arguments(argparser)
+
+    argparser.add_argument('--version', action='version', version=__version__)
+
+    argparser.add_argument('ref_data_dir',
+                           help='Reference dataset directory')
+
+    argparser.add_argument('libraries',
+                           help='library info')
+
+    argparser.add_argument('normal',
+                           help='normal library id')
+
+    argparser.add_argument('changepoints',
+                           help='changepoints file')
+
+    argparser.add_argument('stats',
+                           help='statistics file')
+
+    argparser.add_argument('preds',
+                           help='predictions file')
+
+    argparser.add_argument('plots',
+                           help='plots file tarball')
+
+    argparser.add_argument('plots_prefix',
+                           help='plots filename prefix')
+
+    argparser.add_argument('--config', required=False,
+                           help='Configuration Filename')
+
+    args = vars(argparser.parse_args())
+
+    config = {'ref_data_directory':args['ref_data_dir'],
+              'package_data_directory':data_directory}
+    execfile(default_config_filename, {}, config)
+
+    if args['config'] is not None:
+        execfile(args['config'], {}, config)
+
+    config.update(args)
+
+    pyp = pypeliner.app.Pypeline([demix], config)
 
     ctx_general = {'mem':16, 'ncpus':1}
 
-    tumour_lib_infos = demix.read_libs(cfg.libraries)
+    tumour_lib_infos = demix.read_libs(config['libraries'])
 
     try:
-        normal_lib_info = tumour_lib_infos[cfg.normal]
-        del tumour_lib_infos[cfg.normal]
+        normal_lib_info = tumour_lib_infos[config['normal']]
+        del tumour_lib_infos[config['normal']]
     except KeyError:
-        raise Exception('normal library id "{0}" should match one entry in library list "{1}"'.format(cfg.normal, cfg.libraries))
+        raise Exception('normal library id "{0}" should match one entry in library list "{1}"'.format(config['normal'], config['libraries']))
 
     for lib_info in tumour_lib_infos.values() + [normal_lib_info]:
-        pyp.sch.commandline('bam_stats_'+lib_info.id, (), ctx_general, cfg.bamstats_tool, '-b', pyp.sch.input(lib_info.bam_filename), '--flen', '1000',
-                '-s', pyp.sch.ofile('bamstats.file.'+lib_info.id))
-        pyp.sch.transform('read_bam_stats_'+lib_info.id, (), ctx_general, demix.read_stats, pyp.sch.oobj('bamstats.'+lib_info.id), pyp.sch.ifile('bamstats.file.'+lib_info.id))
 
-    for chromosome in cfg.chromosomes.split():
-        pyp.sch.commandline('read_concordant_{0}_{1}'.format(chromosome, normal_lib_info.id), (), ctx_general, cfg.bamconcordantreads_tool,
-                            '--clipmax', '8', '--flen', '1000', '--chr', chromosome,
-                            '-b', pyp.sch.input(normal_lib_info.bam_filename),
-                            '-s', cfg.snp_positions,
-                            '-r', pyp.sch.ofile('reads.{0}.{1}'.format(chromosome, normal_lib_info.id)),
-                            '-a', pyp.sch.ofile('alleles.{0}.{1}'.format(chromosome, normal_lib_info.id)))
-        pyp.sch.transform('infer_haps_{0}'.format(chromosome), (), ctx_general, demix.infer_haps, None,
-                          cfg, pyp.sch.temps_dir, normal_lib_info.id, chromosome, cfg.snp_positions,
-                          pyp.sch.ifile('alleles.{0}.{1}'.format(chromosome, normal_lib_info.id)),
-                          pyp.sch.ofile('hets.{0}'.format(chromosome)),
-                          pyp.sch.ofile('haps.{0}'.format(chromosome)))
+        pyp.sch.commandline('bam_stats_'+lib_info.id, (), ctx_general,
+            os.path.join(tools_directory, 'bamstats'),
+            '-b', mgd.InputFile(lib_info.bam_filename),
+            '--flen', '1000',
+            '-s', mgd.TempOutputFile('bamstats.file.'+lib_info.id))
 
-    for lib_info in tumour_lib_infos.values():
-        for chromosome in cfg.chromosomes.split():
-            pyp.sch.commandline('read_concordant_{0}_{1}'.format(chromosome, lib_info.id), (), ctx_general, cfg.bamconcordantreads_tool,
-                                '--clipmax', '8', '--flen', '1000', '--chr', chromosome,
-                                '-b', pyp.sch.input(lib_info.bam_filename),
-                                '-s', pyp.sch.ifile('hets.{0}'.format(chromosome)),
-                                '-r', pyp.sch.ofile('reads.{0}.{1}'.format(chromosome, lib_info.id)),
-                                '-a', pyp.sch.ofile('alleles.{0}.{1}'.format(chromosome, lib_info.id)))
+        pyp.sch.transform('read_bam_stats_'+lib_info.id, (), ctx_general,
+            demix.read_stats,
+            mgd.TempOutputObj('bamstats.'+lib_info.id),
+            mgd.TempInputFile('bamstats.file.'+lib_info.id))
 
-    for lib_info in tumour_lib_infos.values():
-        for chromosome in cfg.chromosomes.split():
-            pyp.sch.transform('create_readcounts_{0}_{1}'.format(chromosome, lib_info.id), (), ctx_general, 
-                              demix.create_counts, None, chromosome, 
-                              pyp.sch.input(cfg.changepoints),
-                              pyp.sch.ifile('haps.{0}'.format(chromosome)),
-                              pyp.sch.ifile('reads.{0}.{1}'.format(chromosome, lib_info.id)),
-                              pyp.sch.ifile('alleles.{0}.{1}'.format(chromosome, lib_info.id)),
-                              pyp.sch.ofile('interval.readcounts.{0}.{1}'.format(chromosome, lib_info.id)),
-                              pyp.sch.ofile('alleles.readcounts.{0}.{1}'.format(chromosome, lib_info.id)),
-                              pyp.sch.input(cfg.genome_fai))
+    for chromosome in config['chromosomes']:
 
-    for chromosome in cfg.chromosomes.split():
-        pyp.sch.transform('phase_intervals_{0}'.format(chromosome), (), ctx_general, demix.phase_intervals, None,
-            *([pyp.sch.ifile('alleles.readcounts.{0}.{1}'.format(chromosome, lib_info.id)) for lib_info in sorted(tumour_lib_infos.values())] + 
-              [pyp.sch.ofile('alleles.readcounts.phased.{0}.{1}'.format(chromosome, lib_info.id)) for lib_info in sorted(tumour_lib_infos.values())]))
+        pyp.sch.commandline('read_concordant_{0}_{1}'.format(chromosome, normal_lib_info.id), (), ctx_general,
+            os.path.join(tools_directory, 'bamconcordantreads'),
+            '--clipmax', '8',
+            '--flen', '1000',
+            '--chr', chromosome,
+            '-b', mgd.InputFile(normal_lib_info.bam_filename),
+            '-s', config['snp_positions'],
+            '-r', mgd.TempOutputFile('reads.{0}.{1}'.format(chromosome, normal_lib_info.id)),
+            '-a', mgd.TempOutputFile('alleles.{0}.{1}'.format(chromosome, normal_lib_info.id)))
+
+        pyp.sch.transform('infer_haps_{0}'.format(chromosome), (), ctx_general,
+            demix.infer_haps,
+            None,
+            config,
+            pyp.sch.temps_dir,
+            normal_lib_info.id,
+            chromosome,
+            config['snp_positions'],
+            mgd.TempInputFile('alleles.{0}.{1}'.format(chromosome, normal_lib_info.id)),
+            mgd.TempOutputFile('hets.{0}'.format(chromosome)),
+            mgd.TempOutputFile('haps.{0}'.format(chromosome)))
 
     for lib_info in tumour_lib_infos.values():
-        pyp.sch.transform('merge_interval_readcounts_{0}'.format(lib_info.id), (), ctx_general, demix.merge_files, None,
-                          pyp.sch.ofile('interval.readcounts.{0}'.format(lib_info.id)),
-                          *[pyp.sch.ifile('interval.readcounts.{0}.{1}'.format(chromosome, lib_info.id)) for chromosome in cfg.chromosomes.split()])
-        pyp.sch.transform('merge_allele_readcounts_{0}'.format(lib_info.id), (), ctx_general, demix.merge_files, None,
-                          pyp.sch.ofile('alleles.readcounts.phased.{0}'.format(lib_info.id)),
-                          *[pyp.sch.ifile('alleles.readcounts.phased.{0}.{1}'.format(chromosome, lib_info.id)) for chromosome in cfg.chromosomes.split()])
-        pyp.sch.commandline('samplegc_'+lib_info.id, (), ctx_general, cfg.samplegc_tool, '-b', pyp.sch.input(lib_info.bam_filename), '-m', cfg.mappability_filename,
-                '-g', cfg.genome_fasta, '-o', '4', '-n', '10000000', '-f', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_length'), '>', pyp.sch.ofile('gcsamples.'+lib_info.id))
-        pyp.sch.commandline('gcloess_'+lib_info.id, (), ctx_general, cfg.rscript_bin, cfg.gc_loess_rscript, pyp.sch.ifile('gcsamples.'+lib_info.id),
-                pyp.sch.ofile('gcloess.'+lib_info.id), pyp.sch.ofile('gcplots.'+lib_info.id))
-        pyp.sch.commandline('gc_interval_'+lib_info.id, (), ctx_general, cfg.estimategc_tool, '-m', cfg.mappability_filename, '-g', cfg.genome_fasta,
-                '-c', pyp.sch.ifile('interval.readcounts.'+lib_info.id), '-i', '-o', '4', '-u', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_mean'), '-s', pyp.sch.iobj('bamstats.'+lib_info.id).prop('fragment_stddev'),
-                '-a', cfg.mappability_length, '-l', pyp.sch.ifile('gcloess.'+lib_info.id), '>', pyp.sch.ofile('interval.readcounts.lengths.'+lib_info.id))
-        pyp.sch.transform('solve_and_plot_'+lib_info.id, (), ctx_general, demix.solve_and_plot, None, lib_info.id,
-                pyp.sch.ifile('interval.readcounts.lengths.'+lib_info.id), pyp.sch.ifile('alleles.readcounts.phased.{0}'.format(lib_info.id)),
-                pyp.sch.ofile('stats.{0}'.format(lib_info.id)), pyp.sch.ofile('preds.{0}'.format(lib_info.id)),
-                pyp.sch.ofile('plots.{0}'.format(lib_info.id)), cfg.plots_prefix)
 
-    pyp.sch.transform('merge_stats', (), ctx_general, demix.merge_tables, None, pyp.sch.output(cfg.stats),
-        *[pyp.sch.ifile('stats.{0}'.format(lib_info.id)) for lib_info in tumour_lib_infos.values()])
-    pyp.sch.transform('merge_preds', (), ctx_general, demix.merge_tables, None, pyp.sch.output(cfg.preds),
-        *[pyp.sch.ifile('preds.{0}'.format(lib_info.id)) for lib_info in tumour_lib_infos.values()])
-    pyp.sch.transform('merge_plots', (), ctx_general, demix.merge_tars, None, pyp.sch.output(cfg.plots),
-        *[pyp.sch.ifile('plots.{0}'.format(lib_info.id)) for lib_info in tumour_lib_infos.values()])
+        for chromosome in config['chromosomes']:
+
+            pyp.sch.commandline('read_concordant_{0}_{1}'.format(chromosome, lib_info.id), (), ctx_general,
+                os.path.join(tools_directory, 'bamconcordantreads'),
+                '--clipmax', '8',
+                '--flen', '1000',
+                '--chr', chromosome,
+                '-b', mgd.InputFile(lib_info.bam_filename),
+                '-s', mgd.TempInputFile('hets.{0}'.format(chromosome)),
+                '-r', mgd.TempOutputFile('reads.{0}.{1}'.format(chromosome, lib_info.id)),
+                '-a', mgd.TempOutputFile('alleles.{0}.{1}'.format(chromosome, lib_info.id)))
+
+    for lib_info in tumour_lib_infos.values():
+
+        for chromosome in config['chromosomes']:
+
+            pyp.sch.transform('create_readcounts_{0}_{1}'.format(chromosome, lib_info.id), (), ctx_general,
+                demix.create_counts,
+                None,
+                chromosome, 
+                mgd.InputFile(config['changepoints']),
+                mgd.TempInputFile('haps.{0}'.format(chromosome)),
+                mgd.TempInputFile('reads.{0}.{1}'.format(chromosome, lib_info.id)),
+                mgd.TempInputFile('alleles.{0}.{1}'.format(chromosome, lib_info.id)),
+                mgd.TempOutputFile('interval.readcounts.{0}.{1}'.format(chromosome, lib_info.id)),
+                mgd.TempOutputFile('alleles.readcounts.{0}.{1}'.format(chromosome, lib_info.id)),
+                mgd.InputFile(config['genome_fai']))
+
+    for chromosome in config['chromosomes']:
+
+        pyp.sch.transform('phase_intervals_{0}'.format(chromosome), (), ctx_general,
+            demix.phase_intervals,
+            None,
+            *([mgd.TempInputFile('alleles.readcounts.{0}.{1}'.format(chromosome, lib_info.id)) for lib_info in sorted(tumour_lib_infos.values())] + 
+              [mgd.TempOutputFile('alleles.readcounts.phased.{0}.{1}'.format(chromosome, lib_info.id)) for lib_info in sorted(tumour_lib_infos.values())]))
+
+    for lib_info in tumour_lib_infos.values():
+
+        pyp.sch.transform('merge_interval_readcounts_{0}'.format(lib_info.id), (), ctx_general,
+            demix.merge_files,
+            None,
+            mgd.TempOutputFile('interval.readcounts.{0}'.format(lib_info.id)),
+            *[mgd.TempInputFile('interval.readcounts.{0}.{1}'.format(chromosome, lib_info.id)) for chromosome in config['chromosomes']])
+
+        pyp.sch.transform('merge_allele_readcounts_{0}'.format(lib_info.id), (), ctx_general,
+            demix.merge_files,
+            None,
+            mgd.TempOutputFile('alleles.readcounts.phased.{0}'.format(lib_info.id)),
+            *[mgd.TempInputFile('alleles.readcounts.phased.{0}.{1}'.format(chromosome, lib_info.id)) for chromosome in config['chromosomes']])
+
+        pyp.sch.commandline('samplegc_'+lib_info.id, (), ctx_general,
+            os.path.join(tools_directory, 'samplegc'),
+            '-b', mgd.InputFile(lib_info.bam_filename),
+            '-m', config['mappability_filename'],
+            '-g', config['genome_fasta'],
+            '-o', '4',
+            '-n', '10000000',
+            '-f', mgd.TempInputObj('bamstats.'+lib_info.id).prop('fragment_length'),
+            '>', mgd.TempOutputFile('gcsamples.'+lib_info.id))
+
+        pyp.sch.transform('gcloess_'+lib_info.id, (), ctx_general,
+            demix.gc_lowess,
+            None,
+            mgd.TempInputFile('gcsamples.'+lib_info.id),
+            mgd.TempOutputFile('gcloess.'+lib_info.id),
+            mgd.TempOutputFile('gcplots.'+lib_info.id))
+
+        pyp.sch.commandline('gc_interval_'+lib_info.id, (), ctx_general,
+            os.path.join(tools_directory, 'estimategc'),
+            '-m', config['mappability_filename'],
+            '-g', config['genome_fasta'],
+            '-c', mgd.TempInputFile('interval.readcounts.'+lib_info.id),
+            '-i',
+            '-o', '4',
+            '-u', mgd.TempInputObj('bamstats.'+lib_info.id).prop('fragment_mean'),
+            '-s', mgd.TempInputObj('bamstats.'+lib_info.id).prop('fragment_stddev'),
+            '-a', config['mappability_length'],
+            '-l', mgd.TempInputFile('gcloess.'+lib_info.id),
+            '>', mgd.TempOutputFile('interval.readcounts.lengths.'+lib_info.id))
+
+        pyp.sch.transform('solve_and_plot_'+lib_info.id, (), ctx_general,
+            demix.solve_and_plot,
+            None,
+            lib_info.id,
+            mgd.TempInputFile('interval.readcounts.lengths.'+lib_info.id),
+            mgd.TempInputFile('alleles.readcounts.phased.{0}'.format(lib_info.id)),
+            mgd.TempOutputFile('stats.{0}'.format(lib_info.id)),
+            mgd.TempOutputFile('preds.{0}'.format(lib_info.id)),
+            mgd.TempOutputFile('plots.{0}'.format(lib_info.id)),
+            config['plots_prefix'])
+
+    pyp.sch.transform('merge_stats', (), ctx_general, demix.merge_tables, None, mgd.OutputFile(config['stats']),
+        *[mgd.TempInputFile('stats.{0}'.format(lib_info.id)) for lib_info in tumour_lib_infos.values()])
+    pyp.sch.transform('merge_preds', (), ctx_general, demix.merge_tables, None, mgd.OutputFile(config['preds']),
+        *[mgd.TempInputFile('preds.{0}'.format(lib_info.id)) for lib_info in tumour_lib_infos.values()])
+    pyp.sch.transform('merge_plots', (), ctx_general, demix.merge_tars, None, mgd.OutputFile(config['plots']),
+        *[mgd.TempInputFile('plots.{0}'.format(lib_info.id)) for lib_info in tumour_lib_infos.values()])
 
     pyp.run()
 
@@ -321,7 +430,7 @@ def create_counts(chromosome, changepoints_filename, haps_filename, reads_filena
     allele_counts.to_csv(allele_counts_filename, sep='\t', cols=['region_id', 'hap_label', 'allele_id', 'count'], index=False, header=False)
 
 
-def infer_haps(cfg, temps_directory, library, chromosome, snps_filename, normal_alleles_filename, hets_filename, haps_filename):
+def infer_haps(config, temps_directory, library, chromosome, snps_filename, normal_alleles_filename, hets_filename, haps_filename):
     
     def write_null():
         with open(hets_filename, 'w') as hets_file:
@@ -344,10 +453,10 @@ def infer_haps(cfg, temps_directory, library, chromosome, snps_filename, normal_
     # Impute 2 files for thousand genomes data by chromosome
     phased_chromosome = chromosome
     if chromosome == 'X':
-        phased_chromosome = cfg.phased_chromosome_x
-    genetic_map_filename = cfg.genetic_map_template.format(phased_chromosome)
-    hap_filename = cfg.haplotypes_template.format(phased_chromosome)
-    legend_filename = cfg.legend_template.format(phased_chromosome)
+        phased_chromosome = config['phased_chromosome_x']
+    genetic_map_filename = config['genetic_map_template'].format(phased_chromosome)
+    hap_filename = config['haplotypes_template'].format(phased_chromosome)
+    legend_filename = config['legend_template'].format(phased_chromosome)
 
     # Call snps based on reference and alternate read counts from normal
     snp_counts_df = list()
@@ -366,18 +475,18 @@ def infer_haps(cfg, temps_directory, library, chromosome, snps_filename, normal_
 
     snp_counts_df['total_count'] = snp_counts_df['ref_count'] + snp_counts_df['alt_count']
 
-    snp_counts_df['likelihood_AA'] = scipy.stats.binom.pmf(snp_counts_df['alt_count'], snp_counts_df['total_count'], float(cfg.sequencing_base_call_error))
+    snp_counts_df['likelihood_AA'] = scipy.stats.binom.pmf(snp_counts_df['alt_count'], snp_counts_df['total_count'], float(config['sequencing_base_call_error']))
     snp_counts_df['likelihood_AB'] = scipy.stats.binom.pmf(snp_counts_df['alt_count'], snp_counts_df['total_count'], 0.5)
-    snp_counts_df['likelihood_BB'] = scipy.stats.binom.pmf(snp_counts_df['ref_count'], snp_counts_df['total_count'], float(cfg.sequencing_base_call_error))
+    snp_counts_df['likelihood_BB'] = scipy.stats.binom.pmf(snp_counts_df['ref_count'], snp_counts_df['total_count'], float(config['sequencing_base_call_error']))
     snp_counts_df['evidence'] = snp_counts_df['likelihood_AA'] + snp_counts_df['likelihood_AB'] + snp_counts_df['likelihood_BB']
 
     snp_counts_df['posterior_AA'] = snp_counts_df['likelihood_AA'] / snp_counts_df['evidence']
     snp_counts_df['posterior_AB'] = snp_counts_df['likelihood_AB'] / snp_counts_df['evidence']
     snp_counts_df['posterior_BB'] = snp_counts_df['likelihood_BB'] / snp_counts_df['evidence']
 
-    snp_counts_df['AA'] = (snp_counts_df['posterior_AA'] >= float(cfg.het_snp_call_threshold)) * 1
-    snp_counts_df['AB'] = (snp_counts_df['posterior_AB'] >= float(cfg.het_snp_call_threshold)) * 1
-    snp_counts_df['BB'] = (snp_counts_df['posterior_BB'] >= float(cfg.het_snp_call_threshold)) * 1
+    snp_counts_df['AA'] = (snp_counts_df['posterior_AA'] >= float(config['het_snp_call_threshold'])) * 1
+    snp_counts_df['AB'] = (snp_counts_df['posterior_AB'] >= float(config['het_snp_call_threshold'])) * 1
+    snp_counts_df['BB'] = (snp_counts_df['posterior_BB'] >= float(config['het_snp_call_threshold'])) * 1
 
     snp_counts_df = snp_counts_df[(snp_counts_df['AA'] == 1) | (snp_counts_df['AB'] == 1) | (snp_counts_df['BB'] == 1)]
 
@@ -412,19 +521,19 @@ def infer_haps(cfg, temps_directory, library, chromosome, snps_filename, normal_
     chr_x_flag = ''
     if chromosome == 'X':
         chr_x_flag = '--chrX'
-    pypeliner.commandline.execute(cfg.shapeit_bin, '-M', genetic_map_filename, '-R', hap_filename, legend_filename, cfg.sample_filename,
+    pypeliner.commandline.execute('shapeit', '-M', genetic_map_filename, '-R', hap_filename, legend_filename, config['sample_filename'],
                                   '-G', temp_gen_filename, temp_sample_filename, '--output-graph', hgraph_filename, chr_x_flag,
                                   '--no-mcmc', '-L', hgraph_logs_prefix)
 
     # Run shapeit to sample from phased haplotype graph
     sample_template = os.path.join(haps_temp_directory, 'sampled.{0}')
     averaged_changepoints = None
-    for s in range(int(cfg.shapeit_num_samples)):
+    for s in range(int(config['shapeit_num_samples'])):
         sample_prefix = sample_template.format(s)
         sample_log_filename = sample_prefix + '.log'
         sample_haps_filename = sample_prefix + '.haps'
         sample_sample_filename = sample_prefix + '.sample'
-        pypeliner.commandline.execute(cfg.shapeit_bin, '-convert', '--input-graph', hgraph_filename, '--output-sample', 
+        pypeliner.commandline.execute('shapeit', '-convert', '--input-graph', hgraph_filename, '--output-sample', 
                                       sample_prefix, '--seed', str(s), '-L', sample_log_filename)
         sample_haps = pd.read_csv(sample_haps_filename, sep=' ', header=None, 
                                   names=['id', 'id2', 'pos', 'ref', 'alt', 'allele1', 'allele2'],
@@ -441,7 +550,7 @@ def infer_haps(cfg, temps_directory, library, chromosome, snps_filename, normal_
         os.remove(sample_log_filename)
         os.remove(sample_haps_filename)
         os.remove(sample_sample_filename)
-    averaged_changepoints /= float(cfg.shapeit_num_samples)
+    averaged_changepoints /= float(config['shapeit_num_samples'])
     last_sample_haps = sample_haps
 
     # Identify changepoints recurrent across samples
@@ -451,7 +560,7 @@ def infer_haps(cfg, temps_directory, library, chromosome, snps_filename, normal_
     current_hap_label = 0
     hap_label = list()
     for x in changepoint_confidence:
-        if x < float(cfg.shapeit_confidence_threshold):
+        if x < float(config['shapeit_confidence_threshold']):
             current_hap_label += 1
         hap_label.append(current_hap_label)
 
@@ -605,6 +714,44 @@ def phase_intervals(*args):
         allele_data = allele_data[['interval_id', 'hap_label', 'allele_id', 'readcount', 'is_allele_a']]
 
         allele_data.to_csv(output_allele_filename, sep='\t', header=False, index=False)
+
+
+def gc_lowess(gc_samples_filename, gc_dist_filename, plot_filename, gc_resolution=100):
+
+    gc_samples = pd.read_csv(gc_samples_filename, sep='\t', names=['chromosome', 'position', 'gc', 'count'])
+
+    gc_samples['gc_bin'] = np.round(gc_samples['gc'] * gc_resolution)
+
+    gc_binned = gc_samples.groupby('gc_bin')['count'] \
+                          .agg({'sum':np.sum, 'len':len, 'mean':np.mean}) \
+                          .reindex(xrange(gc_resolution+1)) \
+                          .fillna(0) \
+                          .reset_index() \
+                          .rename(columns={'index':'gc_bin'}) \
+                          .astype(float)
+
+    gc_binned['smoothed'] = sm.nonparametric.lowess(gc_binned['mean'].values, gc_binned['gc_bin'].values, frac=0.1).T[1]
+
+    rescale = 1. / gc_binned['smoothed'].max()
+
+    gc_binned['mean'] = gc_binned['mean'] * rescale
+    gc_binned['smoothed'] = gc_binned['smoothed'] * rescale
+
+    fig = plt.figure(figsize=(4,4))
+
+    plt.scatter(gc_binned['gc_bin'].values, gc_binned['mean'].values, c='k', s=4)
+    plt.plot(gc_binned['gc_bin'].values, gc_binned['smoothed'].values, c='r')
+
+    plt.xlabel('gc %')
+    plt.ylabel('density')
+    plt.xlim((-0.5, 100.5))
+    plt.ylim((-0.01, gc_binned['mean'].max() * 1.1))
+
+    plt.tight_layout()
+
+    fig.savefig(plot_filename, format='pdf', bbox_inches='tight')
+
+    gc_binned[['smoothed']].to_csv(gc_dist_filename, sep='\t', index=False, header=False)
 
 
 def solve_and_plot(library_id, intervals_filename, alleles_filename, stats_filename, pred_filename, plots_tar_filename, plots_prefix):
