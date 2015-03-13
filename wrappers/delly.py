@@ -160,7 +160,7 @@ class DellyWrapper(object):
                                 os.remove(chromosome_filename)
 
 
-    def run(self, bam_filenames, output_filename, temp_directory):
+    def run(self, bam_filenames, output_filename, temp_directory, control_id=None):
 
         utils.makedirs(temp_directory)
 
@@ -181,7 +181,7 @@ class DellyWrapper(object):
             if not os.path.exists(vcf_filename):
                 continue
 
-            self.convert_output(vcf_filename, table_filename)
+            self.convert_output(vcf_filename, table_filename, control_id=control_id)
 
             table_filenames.append(table_filename)
 
@@ -201,7 +201,7 @@ class DellyWrapper(object):
         subprocess.check_call(delly_cmd)
 
 
-    def convert_output(self, vcf_filename, table_filename):
+    def convert_output(self, vcf_filename, table_filename, control_id=None):
 
         vcf_reader = vcf.Reader(filename=vcf_filename)
 
@@ -254,6 +254,10 @@ class DellyWrapper(object):
         breakpoint_table = breakpoint_table.merge(spanning_read_counts, on='prediction_id')
         breakpoint_table = breakpoint_table.merge(split_read_counts, on='prediction_id')
         breakpoint_table = breakpoint_table.merge(total_read_counts, on='prediction_id')
+
+        # Filter based on evidence in control dataset
+        if control_id is not None:
+             breakpoint_table = breakpoint_table[breakpoint_table['{0}_count'.format(control_id)] == 0]          
 
         breakpoint_table.to_csv(table_filename, sep='\t', index=False)
 

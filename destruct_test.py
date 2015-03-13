@@ -74,9 +74,9 @@ def create_tool_wrappers(install_directory):
     return tool_wrappers
 
 
-def run_tool(tool_wrapper, temp_directory, results_filename, **bam_filenames):
+def run_tool(tool_wrapper, temp_directory, results_filename, control_id=None, **bam_filenames):
 
-    tool_wrapper.run(bam_filenames, results_filename, temp_directory)
+    tool_wrapper.run(bam_filenames, results_filename, temp_directory, control_id=control_id)
     
 
 def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
@@ -94,8 +94,6 @@ def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filena
 
         results = pd.read_csv(predicted_filename, sep='\t',
                               converters={'prediction_id':str, 'chromosome_1':str, 'chromosome_2':str})
-
-        # results = results[results['normal_count'] == 0]
 
         min_dist = 200
 
