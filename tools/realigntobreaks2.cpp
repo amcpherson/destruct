@@ -66,7 +66,7 @@ int main(int argc, char* argv[])
 
 	cerr << "Reading reference fasta" << endl;
 	
-	Sequences referenceSequences(1000);
+	Sequences referenceSequences(1000 + maxFragmentLength * 2);
 	referenceSequences.Read(referenceFasta);
 	
 	cerr << "Reading fastq sequences" << endl;
