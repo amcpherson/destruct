@@ -4,3 +4,6 @@
 [submodule "pypeliner"]
 	path = pypeliner
 	url = https://dranew@bitbucket.org/dranew/pypeliner.git
+[submodule "src/external/tclap"]
+	path = src/external/tclap
+	url = git://git.code.sf.net/p/tclap/code
