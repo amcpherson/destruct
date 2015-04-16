@@ -129,7 +129,6 @@ if __name__ == '__main__':
         **{'tumour':mgd.InputFile(os.path.join(args['outdir'], 'tumour.bam')),
            'normal':mgd.InputFile(os.path.join(args['outdir'], 'normal.bam'))})
 
-
     pyp.sch.transform('plot', ('bytool',), ctx,
         destruct_test.create_roc_plot,
         None,
