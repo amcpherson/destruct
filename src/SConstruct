@@ -2,7 +2,8 @@ import os
 import fnmatch
 import subprocess
 
-external_dir = os.path.join(os.pardir, 'external')
+external_dir = os.path.abspath('external')
+install_dir = os.path.abspath(os.path.join(os.pardir, 'bin'))
 
 boost_version = '1.55.0'
 boost_basename = 'boost_1_55_0'
@@ -26,7 +27,9 @@ common_sources = """
     DebugCheck.cpp
 """.split()
 
-bamtools_dir = os.path.join(external_dir, 'BamTools-2.0')
+bamtools_dir = os.path.join(external_dir, 'bamtools', 'src')
+bamtools_api_dir = os.path.join(bamtools_dir, 'api')
+bamtools_utils_dir = os.path.join(bamtools_dir, 'utils')
 
 def find_files(directory, pattern):
     for root, dirs, files in os.walk(directory):
@@ -35,12 +38,17 @@ def find_files(directory, pattern):
                 filename = os.path.join(root, basename)
                 yield filename
 
-bamtools_sources = list(find_files(bamtools_dir, '*.cpp'))
+bamtools_sources = []
+bamtools_sources += list(find_files(bamtools_api_dir, '*.cpp'))
+bamtools_sources += list(find_files(bamtools_utils_dir, '*.cpp'))
+bamtools_sources = filter(lambda a: not a.endswith('win_p.cpp'), bamtools_sources)
 
 boost_iostreams_sources = list(find_files(os.path.join(boost_dir, 'libs/iostreams/src'), '*.cpp'))
 boost_serialization_sources = list(find_files(os.path.join(boost_dir, 'libs/serialization/src'), '*.cpp'))
 
-env.Append(CPPPATH=[external_dir, bamtools_dir, boost_dir])
+tclap_dir = os.path.join(external_dir, 'tclap', 'include')
+
+env.Append(CPPPATH=[external_dir, bamtools_dir, boost_dir, tclap_dir])
 env.Append(LIBS=['z', 'bz2'])
 env.Append(CCFLAGS='-O3')
 env.Append(CCFLAGS='-g')
@@ -54,12 +62,14 @@ sources = """
     mclustermatepairs.cpp
 """.split()
 env.Program(target='mclustermatepairs', source=common_sources+sources)
+env.Install(install_dir, 'mclustermatepairs')
 
 sources = """
     AlignmentRecord.cpp
     setcover.cpp
 """.split()
 env.Program(target='setcover', source=common_sources+sources)
+env.Install(install_dir, 'setcover')
 
 sources = """
     realign2.cpp
@@ -71,6 +81,7 @@ sources = """
     SimpleAligner.cpp
 """.split()
 env.Program(target='realign2', source=common_sources+sources)
+env.Install(install_dir, 'realign2')
 
 sources = """
     realigntobreaks2.cpp
@@ -80,6 +91,7 @@ sources = """
     SimpleAligner.cpp
 """.split()
 env.Program(target='realigntobreaks2', source=common_sources+sources)
+env.Install(install_dir, 'realigntobreaks2')
 
 sources = """
     AlignmentStream.cpp
@@ -88,6 +100,7 @@ sources = """
     testsplit.cpp
 """.split()
 env.Program(target='testsplit', source=common_sources+sources)
+env.Install(install_dir, 'testsplit')
 
 sources = """
     aligntrue.cpp
@@ -97,6 +110,7 @@ sources = """
     SimpleAligner.cpp
 """.split()
 env.Program(target='aligntrue', source=common_sources+sources)
+env.Install(install_dir, 'aligntrue')
 
 sources = """
     ShortestPath.cpp
@@ -104,6 +118,7 @@ sources = """
     cycles.cpp
 """.split()
 env.Program(target='cycles', source=common_sources+sources)
+env.Install(install_dir, 'cycles')
 
 sources = """
     AlignmentRecord.cpp
@@ -111,80 +126,65 @@ sources = """
     filterreads.cpp
 """.split()
 env.Program(target='filterreads', source=common_sources+sources)
+env.Install(install_dir, 'filterreads')
 
 sources = """
     SimpleAligner.cpp
     testssealign.cpp
 """.split()
 env.Program(target='testssealign', source=common_sources+sources)
+env.Install(install_dir, 'testssealign')
 
 sources = """
     samplefastq.cpp
 """.split()
 env.Program(target='samplefastq', source=common_sources+sources)
+env.Install(install_dir, 'samplefastq')
 
 sources = """
     bamdiscordantfastq.cpp
 """.split()
-env.Program(target='bamdiscordantfastq', source=common_sources+bamtools_sources+sources+boost_iostreams_sources+boost_serialization_sources)
+env.Program(target='bamdiscordantfastq', source=common_sources+bamtools_sources+sources+
+    boost_iostreams_sources+boost_serialization_sources)
+env.Install(install_dir, 'bamdiscordantfastq')
 
 sources = """
     bamsamplefastq.cpp
 """.split()
 env.Program(target='bamsamplefastq', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'bamsamplefastq')
 
 sources = """
     bamfastq.cpp
 """.split()
 env.Program(target='bamfastq', source=common_sources+bamtools_sources+sources)
-
-sources = """
-    bamconcordantreads.cpp
-""".split()
-env.Program(target='bamconcordantreads', source=common_sources+bamtools_sources+sources+boost_iostreams_sources+boost_serialization_sources)
+env.Install(install_dir, 'bamfastq')
 
 sources = """
     bamextractsimreads.cpp
     Sequences.cpp
 """.split()
 env.Program(target='bamextractsimreads', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'bamextractsimreads')
 
 sources = """
     bampartition.cpp
     Sequences.cpp
 """.split()
 env.Program(target='bampartition', source=common_sources+bamtools_sources+sources)
-
-sources = """
-    bamstats.cpp
-""".split()
-env.Program(target='bamstats', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'bampartition')
 
 sources = """
     bamreheader.cpp
 """.split()
 env.Program(target='bamreheader', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'bamreheader')
 
 sources = """
     bammixture.cpp
 """.split()
 env.Program(target='bammixture', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'bammixture')
 
-sources = """
-    Sequences.cpp
-    samplegc.cpp
-""".split()
-env.Program(target='samplegc', source=common_sources+bamtools_sources+sources)
-
-sources = """
-    Sequences.cpp
-    samplemap.cpp
-""".split()
-env.Program(target='samplemap', source=common_sources+bamtools_sources+sources)
-
-sources = """
-    Sequences.cpp
-    estimategc.cpp
-""".split()
-env.Program(target='estimategc', source=common_sources+bamtools_sources+sources)
+env.Alias('install', [install_dir])
 
