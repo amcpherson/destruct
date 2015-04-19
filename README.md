@@ -52,6 +52,12 @@ Destruct requires compilation of a number of executables using scons.
     cd src
     scons install
 
+You will also need to build the `pygenes` python library.
+
+    cd pygenes
+    python setup.py --boost_source ../src/external/boost_1_55_0/ \
+        install --prefix pygenes/ --install-purelib=. --install-platlib=.
+
 ### Install Python Libraries
 
 There are two options for installing the python libraries.
@@ -70,6 +76,11 @@ To install pypeliner, a pipeline management system:
 
     cd pypeliner
     python setup.py install
+
+To install pygenes, a gene annotation helper library:
+
+    cd pygenes
+    python setup.py --boost_source ../src/external/boost_1_55_0/ install
 
 ## Setup
 

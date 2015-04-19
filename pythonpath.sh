@@ -4,4 +4,4 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-export PYTHONPATH=$DIR/pypeliner:$PYTHONPATH
+export PYTHONPATH=$DIR/pypeliner:$DIR/pygenes:$PYTHONPATH
