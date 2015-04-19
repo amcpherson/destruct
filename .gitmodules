@@ -7,3 +7,6 @@
 [submodule "src/external/tclap"]
 	path = src/external/tclap
 	url = git://git.code.sf.net/p/tclap/code
+[submodule "pygenes"]
+	path = pygenes
+	url = https://dranew@bitbucket.org/dranew/pygenes.git
