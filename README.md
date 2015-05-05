@@ -185,4 +185,3 @@ Often a call to qsub requires specific command line parameters to request the co
 
     --submit asyncqsub --nativespec "-q all.q -l mem_free={mem}G"
 
-momac01:destruct2 amcphers$
