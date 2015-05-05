@@ -29,7 +29,7 @@ import predict_breaks
 destruct_directory = os.path.abspath(os.path.dirname(__file__))
 
 data_directory = os.path.join(destruct_directory, 'data')
-tools_directory = os.path.join(destruct_directory, 'tools')
+bin_directory = os.path.join(destruct_directory, 'bin')
 default_config_filename = os.path.join(destruct_directory, 'defaultconfig.py')
 
 
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     # Retrieve discordant reads and stats from bam files
 
     sch.commandline('bamdisc', ('bylibrary',), medmem,
-        os.path.join(tools_directory, 'bamdiscordantfastq'),
+        os.path.join(bin_directory, 'bamdiscordantfastq'),
         '-r',
         '-c', config['bam_max_soft_clipped'],
         '-f', config['bam_max_fragment_length'],
@@ -142,7 +142,7 @@ if __name__ == '__main__':
         '-t', mgd.TempFile('bamdisc.tempspace', 'bylibrary'))
 
     sch.commandline('bamsample', ('bylibrary',), medmem,
-        os.path.join(tools_directory, 'bamsamplefastq'),
+        os.path.join(bin_directory, 'bamsamplefastq'),
         '-r',
         '-b', mgd.TempInputFile('bam', 'bylibrary'),
         '-n', config['num_read_samples'],
@@ -179,7 +179,7 @@ if __name__ == '__main__':
         '--best',
         '-S',
         '|',
-        os.path.join(tools_directory, 'aligntrue'),
+        os.path.join(bin_directory, 'aligntrue'),
         '-a', '-',
         '-1', mgd.TempInputFile('sample1', 'bylibrary'),
         '-2', mgd.TempInputFile('sample2', 'bylibrary'),
@@ -238,7 +238,7 @@ if __name__ == '__main__':
         '--best',
         '-S',
         '|',
-        os.path.join(tools_directory, 'realign2'),
+        os.path.join(bin_directory, 'realign2'),
         '-l', mgd.TempInputObj('libinfo', 'bylibrary').prop('id'),
         '-a', '-',
         '-1', mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
@@ -264,7 +264,7 @@ if __name__ == '__main__':
         mgd.TempOutputFile('spanning.alignments_2', 'bylibrary'))
 
     sch.commandline('filterreads', ('bylibrary',), lowmem,
-        os.path.join(tools_directory, 'filterreads'),
+        os.path.join(bin_directory, 'filterreads'),
         '-n', '2',
         '-a', mgd.TempInputFile('spanning.alignments_2', 'bylibrary'),
         '-r', config['satellite_regions'],
@@ -310,7 +310,7 @@ if __name__ == '__main__':
         mgd.TempOutputFile('libstats.tsv'))
 
     sch.commandline('cluster', ('bychromarg',), medmem,
-        os.path.join(tools_directory, 'mclustermatepairs'),
+        os.path.join(bin_directory, 'mclustermatepairs'),
         '-a', mgd.TempInputFile('spanning.alignments'),
         '-s', mgd.TempInputFile('libstats.tsv'),
         '-c', mgd.TempOutputFile('clusters', 'bychromarg'),
@@ -342,7 +342,7 @@ if __name__ == '__main__':
     # Realign reads to breakpoints
 
     sch.commandline('realigntobreaks', ('bylibrary', 'byread'), medmem,
-        os.path.join(tools_directory, 'realigntobreaks2'),
+        os.path.join(bin_directory, 'realigntobreaks2'),
         '-r', config['genome_fasta'],
         '-b', mgd.TempInputFile('breakpoints_2'),
         '-c', mgd.TempInputFile('clusters'),
@@ -391,7 +391,7 @@ if __name__ == '__main__':
         mgd.TempOutputFile('cluster_weights'))
 
     sch.commandline('setcover', (), medmem,
-        os.path.join(tools_directory, 'setcover'),
+        os.path.join(bin_directory, 'setcover'),
         '-c', mgd.TempInputFile('clusters'),
         '-w', mgd.TempInputFile('cluster_weights'),
         '-a', mgd.TempOutputFile('clusters_setcover'))
