@@ -261,20 +261,14 @@ if __name__ == '__main__':
         destruct.merge_files_by_line,
         None,
         mgd.TempInputFile('spanning.alignments', 'bylibrary', 'byread'),
-        mgd.TempOutputFile('spanning.alignments_2', 'bylibrary'))
+        mgd.TempOutputFile('spanning.alignments_1', 'bylibrary'))
 
     sch.commandline('filterreads', ('bylibrary',), lowmem,
         os.path.join(bin_directory, 'filterreads'),
         '-n', '2',
-        '-a', mgd.TempInputFile('spanning.alignments_2', 'bylibrary'),
+        '-a', mgd.TempInputFile('spanning.alignments_1', 'bylibrary'),
         '-r', config['satellite_regions'],
-        '>', mgd.TempOutputFile('spanning.alignments_1', 'bylibrary'))
-
-    sch.transform('filterdups', ('bylibrary',), medmem,
-        predict_breaks.remove_duplicates,
-        None,
-        mgd.TempInputFile('spanning.alignments_1', 'bylibrary'),
-        mgd.TempOutputFile('spanning.alignments', 'bylibrary'))
+        '>', mgd.TempOutputFile('spanning.alignments', 'bylibrary'))
 
     sch.transform('merge_split_1', ('bylibrary',), lowmem,
         destruct.merge_files_by_line,
