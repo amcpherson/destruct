@@ -812,29 +812,56 @@ else:
                                   converters=converters)
         likelihoods = likelihoods.drop(['breakpoint_id'], axis=1)
 
-        breakpoint_library = likelihoods.groupby(['cluster_id', 'library_id'])\
-                                        .size()\
-                                        .reset_index()
-        breakpoint_library.columns = ['cluster_id', 'library_id', 'num_reads']
+        breakpoint_reads = (
+            likelihoods.groupby(['cluster_id', 'library_id'])
+            .size()
+            .reset_index()
+        )
+        breakpoint_reads.columns = ['cluster_id', 'library_id', 'num_reads']
 
-        breakpoint_library = breakpoint_library.merge(lib_names)\
-                                               .drop(['library_id'], axis=1)
+        breakpoint_unique_reads = (
+            likelihoods.drop_duplicates(['cluster_id', 'library_id', 'template_length_1', 'template_length_2'])
+            .groupby(['cluster_id', 'library_id'])
+            .size()
+            .reset_index()
+        )
+        breakpoint_unique_reads.columns = ['cluster_id', 'library_id', 'num_unique_reads']
 
-        agg_f = {'log_likelihood':np.average,
-                 'log_cdf':np.average,
-                 'template_length_1':max,
-                 'template_length_2':max}
+        breakpoint_library = (
+            breakpoint_reads.merge(breakpoint_unique_reads)
+            .merge(lib_names)
+            .drop(['library_id'], axis=1)
+        )
 
-        breakpoint_stats = likelihoods.groupby('cluster_id')\
-                                            .agg(agg_f)\
-                                            .reset_index()
+        agg_f = {
+            'log_likelihood':np.average,
+            'log_cdf':np.average,
+            'template_length_1':max,
+            'template_length_2':max,
+        }
+
+        breakpoint_stats = (
+            likelihoods.groupby('cluster_id')
+            .agg(agg_f)
+            .reset_index()
+        )
 
         breakpoint_stats['template_length_min'] = breakpoint_stats[['template_length_1', 'template_length_2']].min(axis=1)
 
-        breakpoint_counts = likelihoods.groupby('cluster_id')\
-                                       .size()\
-                                       .reset_index()
+        breakpoint_counts = (
+            likelihoods.groupby('cluster_id')
+            .size()
+            .reset_index()
+        )
         breakpoint_counts.columns = ['cluster_id', 'num_reads']
+
+        breakpoint_unique_counts = (
+            likelihoods.drop_duplicates(['cluster_id', 'library_id', 'template_length_1', 'template_length_2'])
+            .groupby('cluster_id')
+            .size()
+            .reset_index()
+        )
+        breakpoint_unique_counts.columns = ['cluster_id', 'num_unique_reads']
 
         breakpoints = breakpoints.merge(breakpoint_stats, on='cluster_id', how='left')
 
