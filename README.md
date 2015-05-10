@@ -132,6 +132,7 @@ The breakpoint library table contains information per breakpoint.  The file is t
 * `gene_location2`: Location of the gene with respect to the breakpoint for breakend 2
 * `type`: Breakpoint orientation type deletion: +-, inversion: ++ or --, duplication -+, translocation: 2 different chromosomes
 * `num_reads`: Total number of discordant reads
+* `num_unique_reads`: Total number of discordant reads, potential PCR duplicates removed
 * `num_split`: Total number of discordant reads split by the breakpoint
 * `num_inserted`: Number of untemplated nucleotides inserted at the breakpoint
 * `homology`: Sequence homology at the breakpoint
@@ -151,7 +152,8 @@ The breakpoint library table contains information per breakpoint per input datas
 
 * `prediction_id`: Unique identifier of the breakpoint prediction
 * `library_id`: ID of the dataset as given on the command line or in the input dataset table
-* `num_reads`: Number of reads for this dataset.
+* `num_reads`: Number of reads for this dataset
+* `num_unique_reads`: Number of reads for this dataset, potential PCR duplicates removed
 
 #### Plots Tar
 
