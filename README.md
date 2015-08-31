@@ -144,7 +144,7 @@ The breakpoint library table contains information per breakpoint.  The file is t
 * `template_length_2`: length of region to which discordant reads align at breakend 2
 * `log_cdf`: mean cdf of discordant read alignment likelihood
 * `log_likelihood`: mean likelihood of discordant read alignments
-* `template_length_min`: minimum of `template_length_1` and `t`emplate_length_2`
+* `template_length_min`: minimum of `template_length_1` and `template_length_2`
 
 #### Breakpoint Library Table
 
