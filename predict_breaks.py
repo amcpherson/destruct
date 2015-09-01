@@ -6,6 +6,7 @@ import scipy
 import scipy.stats
 
 import utils.misc
+import utils.streaming
 
 
 cluster_fields = ['cluster_id', 'cluster_end',
@@ -317,13 +318,6 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
     data.to_csv(likelihoods_filename, sep='\t', index=False, header=False)
 
 
-def read_select_write(in_iter, select, out_filename):
-    with open(out_filename, 'w') as out_file:
-        for chunk in in_iter:
-            chunk = chunk.merge(select, how='inner')
-            chunk.to_csv(out_file, sep='\t', header=False, index=False)
-
-
 def select_clusters(clusters_filename,
                     breakpoints_filename, selected_breakpoints_filename,
                     likelihoods_filename, selected_likelihoods_filename):
@@ -338,12 +332,12 @@ def select_clusters(clusters_filename,
 
     cluster_ids = clusters[['cluster_id']].drop_duplicates()
 
-    read_select_write(breakpoints_iter, cluster_ids, selected_breakpoints_filename)
+    utils.streaming.read_select_write(breakpoints_iter, cluster_ids, selected_breakpoints_filename)
 
     likelihoods_iter = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
                                    iterator=True, chunksize=1000000)
 
-    read_select_write(likelihoods_iter, clusters, selected_likelihoods_filename)
+    utils.streaming.read_select_write(likelihoods_iter, clusters, selected_likelihoods_filename)
 
 
 def select_predictions(breakpoints_filename, selected_breakpoints_filename,
@@ -391,11 +385,11 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                                    converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                                    iterator=True, chunksize=1000000)
 
-    read_select_write(breakpoints_iter, selected, selected_breakpoints_filename)
+    utils.streaming.read_select_write(breakpoints_iter, selected, selected_breakpoints_filename)
 
     likelihoods_iter = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
                                    iterator=True, chunksize=1000000)
 
-    read_select_write(likelihoods_iter, selected, selected_likelihoods_filename)
+    utils.streaming.read_select_write(likelihoods_iter, selected, selected_likelihoods_filename)
 
 
