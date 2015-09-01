@@ -340,44 +340,61 @@ def select_clusters(clusters_filename,
     utils.streaming.read_select_write(likelihoods_iter, clusters, selected_likelihoods_filename)
 
 
+def select_breakpoint_prediction(likelihoods, template_length_min_threshold):
+    """ Select and filter breakpoint predictions.
+
+    Args:
+        likelihoods(pandas.DataFrame): likelihoods table
+        template_length_min_threshold (int): min template length filter
+
+    Select the maximum likelihoods breakpoint prediction, preferring solutions
+    with split reads.  Filter predictions based on minimum of template lengths on
+    either side of the breakpoint.
+
+    """
+
+    # Calculate total breakpoint likelihood, max template lengths
+    agg_f = {
+        'log_likelihood':sum,
+        'template_length_1':max,
+        'template_length_2':max,
+    }
+    data = likelihoods.groupby(['cluster_id', 'breakpoint_id']).agg(agg_f).reset_index()
+
+    # Select highest likelihood breakpoint predictions
+    # Prefer a higher breakpoint id, thus preferring solutions with split reads
+    data.sort(['cluster_id', 'log_likelihood', 'breakpoint_id'],
+        ascending=[True, False, False], inplace=True)
+    selected = data.groupby('cluster_id', sort=False).first().reset_index()
+
+    # Filter by template length
+    selected['template_length_min'] = selected[['template_length_1', 'template_length_2']].min(axis=1)
+    selected.drop(['template_length_1', 'template_length_2'], axis=1, inplace=True)
+    selected = selected[selected['template_length_min'] >= template_length_min_threshold]
+
+    return selected
+
+
 def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                        likelihoods_filename, selected_likelihoods_filename,
                        mate_score_threshold, template_length_min_threshold):
 
-    likelihoods = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
-                              usecols=['cluster_id', 'breakpoint_id', 'log_likelihood'])
+    read_likelihoods_iter = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
+        usecols=['cluster_id', 'breakpoint_id', 'log_likelihood', 'template_length_1', 'template_length_2'],
+        chunksize=int(1e7))
 
-    # Calculate total likelihood
-    likelihoods = likelihoods.groupby(['cluster_id', 'breakpoint_id'])['log_likelihood']\
-                             .sum()\
-                             .reset_index()
+    read_likelihoods_iter = utils.streaming.group_aware_iter(read_likelihoods_iter, ['cluster_id'])
 
-    # Select highest likelihood breakpoint predictions
-    # Prefer a higher breakpoint id, thus preferring solutions with split reads
-    likelihoods = likelihoods.sort(['cluster_id', 'log_likelihood', 'breakpoint_id'],
-                                   ascending=[True, False, False])
-    selected = likelihoods.groupby('cluster_id')\
-                          .first()\
-                          .reset_index()\
-                          .drop(['log_likelihood'], axis=1)
-
-    template_length_min = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
-                                      usecols=['cluster_id', 'breakpoint_id',
-                                               'template_length_1', 'template_length_2'])
-    template_length_min['template_length_min'] = template_length_min[['template_length_1', 'template_length_2']].min(axis=1)
-    template_length_min = template_length_min.drop(['template_length_1', 'template_length_2'], axis=1)
-
-    selected = selected.merge(template_length_min)
-    selected = selected[selected['template_length_min'] >= template_length_min_threshold]
-    selected = selected.drop(['template_length_min'], axis=1)
+    selected = pd.concat([
+        select_breakpoint_prediction(df, template_length_min_threshold)
+        for df in read_likelihoods_iter], ignore_index=True)
 
     mate_score = pd.read_csv(breakpoints_filename, sep='\t', names=breakpoint_fields,
-                             converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
-                             usecols=['cluster_id', 'prediction_id', 'mate_score'])
+        converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
+        usecols=['cluster_id', 'breakpoint_id', 'mate_score'])
 
+    mate_score = mate_score.loc[mate_score['mate_score'] <= mate_score_threshold, ['cluster_id', 'breakpoint_id']]
     selected = selected.merge(mate_score)
-    selected = selected[selected['mate_score'] <= mate_score_threshold]
-    selected = selected.drop(['mate_score'], axis=1)
 
     selected = selected[['cluster_id', 'breakpoint_id']].drop_duplicates()
 
