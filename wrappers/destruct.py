@@ -9,6 +9,7 @@ import vcf
 import pandas as pd
 
 import utils
+import pypeliner
 
 
 class DestructWrapper(object):
@@ -81,7 +82,7 @@ class DestructWrapper(object):
         destruct_cmd += ['--tmp', destruct_tmp_directory]
         destruct_cmd += ['--nocleanup', '--repopulate', '--maxjobs', '4', '--loglevel', 'DEBUG']
 
-        subprocess.check_call(destruct_cmd)
+        pypeliner.commandline.execute(*destruct_cmd)
 
         breakpoint_table = pd.read_csv(breakpoint_table_filename, sep='\t')
         breakpoint_library_table = pd.read_csv(breakpoint_library_table_filename, sep='\t')
