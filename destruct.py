@@ -487,20 +487,22 @@ if __name__ == '__main__':
         name='merge_likelihoods_1',
         axes=('bylibrary',),
         ctx=lowmem,
-        func=destruct.merge_files_by_line,
+        func=destruct.merge_sorted_files_by_line,
         args=(
             mgd.TempInputFile('likelihoods_2', 'bylibrary', 'byread'),
             mgd.TempOutputFile('likelihoods_2', 'bylibrary'),
+            '1',
         ),
     )
 
     workflow.transform(
         name='merge_likelihoods_2',
         ctx=lowmem,
-        func=destruct.merge_files_by_line,
+        func=destruct.merge_sorted_files_by_line,
         args=(
             mgd.TempInputFile('likelihoods_2', 'bylibrary'),
             mgd.TempOutputFile('likelihoods_2'),
+            '1',
         ),
     )
 
@@ -731,6 +733,10 @@ else:
                 with open(in_filename, 'r') as in_file:
                     for line in in_file:
                         out_file.write(line)
+
+
+    def merge_sorted_files_by_line(in_filenames, out_filename, sort_fields):
+        pypeliner.commandline.execute(*['sort', '-m', '-n', '-k', sort_fields] + in_filenames.values() + ['>', out_filename])
 
 
     def generate_chromosome_args(chromosomes):
