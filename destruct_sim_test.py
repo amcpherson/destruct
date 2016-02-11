@@ -11,6 +11,7 @@ import argparse
 import string
 
 import pypeliner
+import pypeliner.workflow
 import pypeliner.managed as mgd
 
 import wrappers
@@ -66,76 +67,122 @@ if __name__ == '__main__':
 
     ctx = {'mem':4}
 
-    pyp.sch.transform('read_params', (), ctx,
-        destruct_test.read_simulation_params,
-        mgd.TempOutputObj('simulation.params'),
-        mgd.InputFile(args['simconfig']))
+    workflow = pypeliner.workflow.Workflow(default_ctx=ctx)
 
-    pyp.sch.setobj(mgd.TempOutputObj('chromosomes'), args['chromosomes'])
-    pyp.sch.setobj(mgd.TempOutputObj('include_nonchromosomal'), args['include_nonchromosomal'])
+    workflow.transform(
+        name='read_params',
+        func=destruct_test.read_simulation_params,
+        ret=mgd.TempOutputObj('simulation.params'),
+        args=(mgd.InputFile(args['simconfig']),),
+    )
 
-    pyp.sch.transform('create_genome', (), ctx,
-        destruct_test.create_genome,
-        None,
-        mgd.TempInputObj('chromosomes'),
-        mgd.TempInputObj('include_nonchromosomal'),
-        mgd.OutputFile(os.path.join(args['outdir'], 'genome.fasta')))
+    workflow.setobj(mgd.TempOutputObj('chromosomes'), args['chromosomes'])
+    workflow.setobj(mgd.TempOutputObj('include_nonchromosomal'), args['include_nonchromosomal'])
 
-    pyp.sch.transform('create_sim', (), ctx,
-        create_breakpoint_simulation.create,
-        None,
-        mgd.TempInputObj('simulation.params'),
-        mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
-        mgd.OutputFile(os.path.join(args['outdir'], 'simulated.fasta')),
-        mgd.OutputFile(os.path.join(args['outdir'], 'simulated.tsv')),
-        mgd.TempOutputFile('concordant.1.fastq'),
-        mgd.TempOutputFile('concordant.2.fastq'),
-        mgd.TempOutputFile('discordant.1.fastq'),
-        mgd.TempOutputFile('discordant.2.fastq'))
+    workflow.transform(
+        name='create_genome',
+        func=destruct_test.create_genome,
+        args=(
+            mgd.TempInputObj('chromosomes'),
+            mgd.TempInputObj('include_nonchromosomal'),
+            mgd.OutputFile(os.path.join(args['outdir'], 'genome.fasta')),
+        ),
+    )
 
-    pyp.sch.commandline('cat1', (), ctx, 'cat', mgd.TempInputFile('concordant.1.fastq'), mgd.TempInputFile('discordant.1.fastq'), '>', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.1.fastq')))
-    pyp.sch.commandline('cat2', (), ctx, 'cat', mgd.TempInputFile('concordant.2.fastq'), mgd.TempInputFile('discordant.2.fastq'), '>', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.2.fastq')))
+    workflow.transform(
+        name='create_sim',
+        func=create_breakpoint_simulation.create,
+        args=(
+            mgd.TempInputObj('simulation.params'),
+            mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
+            mgd.OutputFile(os.path.join(args['outdir'], 'simulated.fasta')),
+            mgd.OutputFile(os.path.join(args['outdir'], 'simulated.tsv')),
+            mgd.TempOutputFile('concordant.1.fastq'),
+            mgd.TempOutputFile('concordant.2.fastq'),
+            mgd.TempOutputFile('discordant.1.fastq'),
+            mgd.TempOutputFile('discordant.2.fastq'),
+        ),
+    )
+
+    workflow.commandline(
+        name='cat1',
+        args=(
+            'cat',
+            mgd.TempInputFile('concordant.1.fastq'),
+            mgd.TempInputFile('discordant.1.fastq'),
+            '>', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
+        ),
+    )
+    
+    workflow.commandline(
+        name='cat2',
+        args=(
+            'cat',
+            mgd.TempInputFile('concordant.2.fastq'),
+            mgd.TempInputFile('discordant.2.fastq'),
+            '>', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
+        ),
+    )
 
     bwaalign_script = os.path.join(destruct_directory, 'bwaalign.py')
 
-    pyp.sch.commandline('bwa_align', (), ctx, 
-        sys.executable,
-        bwaalign_script,
-        mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
-        mgd.InputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
-        mgd.InputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
-        mgd.TempOutputFile('simulated.unsorted.bam'),
-        '--tmp', mgd.TempFile('bwa_tmp'))
+    workflow.commandline(
+        name='bwa_align',
+        args=(
+            sys.executable,
+            bwaalign_script,
+            mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
+            mgd.InputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
+            mgd.InputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
+            mgd.TempOutputFile('simulated.unsorted.bam'),
+            '--tmp', mgd.TempSpace('bwa_tmp'),
+        ),
+    )
 
-    pyp.sch.transform('samtools_sort_index', (), ctx,
-        destruct_test.samtools_sort_index,
-        None,
-        mgd.TempInputFile('simulated.unsorted.bam'),
-        mgd.OutputFile(os.path.join(args['outdir'], 'simulated.bam')))
+    workflow.transform(
+        name='samtools_sort_index',
+        func=destruct_test.samtools_sort_index,
+        args=(
+            mgd.TempInputFile('simulated.unsorted.bam'),
+            mgd.OutputFile(os.path.join(args['outdir'], 'simulated.bam')),
+        ),
+    )
 
-    pyp.sch.transform('create_tool_wrappers', (), ctx,
-        destruct_test.create_tool_wrappers,
-        mgd.TempOutputObj('tool_wrapper', 'bytool'),
-        args['installdir'])
+    workflow.transform(
+        name='create_tool_wrappers',
+        func=destruct_test.create_tool_wrappers,
+        ret=mgd.TempOutputObj('tool_wrapper', 'bytool'),
+        args=(args['installdir'],),
+    )
 
-    pyp.sch.transform('run_tool', ('bytool',), ctx,
-        destruct_test.run_tool,
-        None,
-        mgd.TempInputObj('tool_wrapper', 'bytool'),
-        mgd.TempFile('tool_tmp', 'bytool'),
-        mgd.OutputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
-        **{'simulated':mgd.InputFile(os.path.join(args['outdir'], 'simulated.bam'))})
+    workflow.transform(
+        name='run_tool',
+        axes=('bytool',),
+        func=destruct_test.run_tool,
+        args=(
+            mgd.TempInputObj('tool_wrapper', 'bytool'),
+            mgd.TempSpace('tool_tmp', 'bytool'),
+            mgd.OutputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
+        ),
+        kwargs={
+            'simulated': mgd.InputFile(os.path.join(args['outdir'], 'simulated.bam')),
+        },
+    )
 
-    pyp.sch.transform('plot', ('bytool',), ctx,
-        destruct_test.create_roc_plot,
-        None,
-        mgd.TempInputObj('simulation.params'),
-        mgd.TempInputObj('tool_wrapper', 'bytool'),
-        mgd.InputFile(os.path.join(args['outdir'], 'simulated.tsv')),
-        mgd.InputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
-        mgd.OutputFile(os.path.join(args['outdir'], 'annotated_{bytool}.tsv'), 'bytool'),
-        mgd.OutputFile(os.path.join(args['outdir'], 'identified_{bytool}.tsv'), 'bytool'),
-        mgd.OutputFile(os.path.join(args['outdir'], 'plots_{bytool}.pdf'), 'bytool'))
+    workflow.transform(
+        name='plot',
+        axes=('bytool',),
+        func=destruct_test.create_roc_plot,
+        args=(
+            mgd.TempInputObj('simulation.params'),
+            mgd.TempInputObj('tool_wrapper', 'bytool'),
+            mgd.InputFile(os.path.join(args['outdir'], 'simulated.tsv')),
+            mgd.InputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
+            mgd.OutputFile(os.path.join(args['outdir'], 'annotated_{bytool}.tsv'), 'bytool'),
+            mgd.OutputFile(os.path.join(args['outdir'], 'identified_{bytool}.tsv'), 'bytool'),
+            mgd.OutputFile(os.path.join(args['outdir'], 'plots_{bytool}.pdf'), 'bytool'),
+        ),
+    )
 
-    pyp.run()
+    pyp.run(workflow)
 

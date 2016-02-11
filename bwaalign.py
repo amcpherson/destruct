@@ -42,63 +42,98 @@ if __name__ == '__main__':
     if not os.path.exists(args['genome']+'.bwt'):
         raise Exception('No index for ' + args['genome'])
 
-    pyp.sch.transform('split1', (), lowmem,
-        bwaalign.split_fastq,
-        None,
-        mgd.InputFile(args['fastq1']),
-        args['reads_per_job'],
-        mgd.TempOutputFile('fastq1', 'byread'))
+    workflow = pypeliner.workflow.Workflow()
 
-    pyp.sch.transform('split2', (), lowmem,
-        bwaalign.split_fastq,
-        None, 
-        mgd.InputFile(args['fastq2']), 
-        args['reads_per_job'], 
-        mgd.TempOutputFile('fastq2', 'byread2'))
+    workflow.transform(
+        name='split1',
+        ctx=lowmem,
+        func=bwaalign.split_fastq,
+        args=(
+            mgd.InputFile(args['fastq1']),
+            args['reads_per_job'],
+            mgd.TempOutputFile('fastq1', 'byread'),
+        ),
+    )
 
-    pyp.sch.changeaxis('axis', (), 'fastq2', 'byread2', 'byread')
+    workflow.transform(
+        name='split2',
+        ctx=lowmem,
+        func=bwaalign.split_fastq,
+        args=(
+            mgd.InputFile(args['fastq2']), 
+            args['reads_per_job'], 
+            mgd.TempOutputFile('fastq2', 'byread', axes_origin=[]),
+        ),
+    )
 
-    pyp.sch.commandline('aln1', ('byread',), medmem,
-        'bwa', 'aln',
-        args['genome'],
-        mgd.TempInputFile('fastq1', 'byread'),
-        '>',
-        mgd.TempOutputFile('sai1', 'byread'))
+    workflow.commandline(
+        name='aln1',
+        axes=('byread',),
+        ctx=medmem,
+        args=(
+            'bwa', 'aln',
+            args['genome'],
+            mgd.TempInputFile('fastq1', 'byread'),
+            '>',
+            mgd.TempOutputFile('sai1', 'byread'),
+        ),
+    )
 
-    pyp.sch.commandline('aln2', ('byread',), medmem,
-        'bwa', 'aln',
-        args['genome'],
-        mgd.TempInputFile('fastq2', 'byread'),
-        '>',
-        mgd.TempOutputFile('sai2', 'byread'))
+    workflow.commandline(
+        name='aln2',
+        axes=('byread',),
+        ctx=medmem,
+        args=(
+            'bwa', 'aln',
+            args['genome'],
+            mgd.TempInputFile('fastq2', 'byread'),
+            '>',
+            mgd.TempOutputFile('sai2', 'byread'),
+        ),
+    )
 
-    pyp.sch.commandline('sampe', ('byread',), medmem,
-        'bwa', 'sampe',
-        args['genome'],
-        mgd.TempInputFile('sai1', 'byread'),
-        mgd.TempInputFile('sai2', 'byread'),
-        mgd.TempInputFile('fastq1', 'byread'),
-        mgd.TempInputFile('fastq2', 'byread'),
-        '>',
-        mgd.TempOutputFile('sam', 'byread'))
+    workflow.commandline(
+        name='sampe',
+        axes=('byread',),
+        ctx=medmem,
+        args=(
+            'bwa', 'sampe',
+            args['genome'],
+            mgd.TempInputFile('sai1', 'byread'),
+            mgd.TempInputFile('sai2', 'byread'),
+            mgd.TempInputFile('fastq1', 'byread'),
+            mgd.TempInputFile('fastq2', 'byread'),
+            '>',
+            mgd.TempOutputFile('sam', 'byread'),
+        ),
+    )
 
-    pyp.sch.transform('cat', (), lowmem,
-        bwaalign.cat_merge,
-        None,
-        mgd.TempInputFile('sam', 'byread'),
-        mgd.TempOutputFile('sam'))
+    workflow.transform(
+        name='cat',
+        ctx=lowmem,
+        func=bwaalign.cat_merge,
+        args=(
+            mgd.TempInputFile('sam', 'byread'),
+            mgd.TempOutputFile('sam'),
+        ),
+    )
 
-    pyp.sch.commandline('bam', (), lowmem,
-        'grep', '-v', '^@',
-        mgd.TempInputFile('sam'),
-        '|',
-        'samtools', 'view', '-bt',
-        args['genome']+'.fai',
-        '-',
-        '>',
-        mgd.OutputFile(args['output_bam']))
+    workflow.commandline(
+        name='bam',
+        ctx=lowmem,
+        args=(
+            'grep', '-v', '^@',
+            mgd.TempInputFile('sam'),
+            '|',
+            'samtools', 'view', '-bt',
+            args['genome']+'.fai',
+            '-',
+            '>',
+            mgd.OutputFile(args['output_bam']),
+        ),
+    )
 
-    pyp.run()
+    pyp.run(workflow)
 
 else:
 
