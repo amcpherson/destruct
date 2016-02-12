@@ -331,7 +331,7 @@ if __name__ == '__main__':
             mgd.TempInputFile('spanning.alignments', 'bylibrary', 'byread'),
             mgd.TempOutputFile('spanning.alignments_1', 'bylibrary'),
         ),
-    )           
+    )
 
     workflow.commandline(
         name='filterreads',
@@ -491,6 +491,7 @@ if __name__ == '__main__':
         args=(
             mgd.TempInputFile('likelihoods_2', 'bylibrary', 'byread'),
             mgd.TempOutputFile('likelihoods_2', 'bylibrary'),
+            mgd.TempSpace('merge_likelihoods_1_temp', 'bylibrary'),
             '1',
         ),
     )
@@ -502,6 +503,7 @@ if __name__ == '__main__':
         args=(
             mgd.TempInputFile('likelihoods_2', 'bylibrary'),
             mgd.TempOutputFile('likelihoods_2'),
+            mgd.TempSpace('merge_likelihoods_2_temp'),
             '1',
         ),
     )
@@ -735,8 +737,8 @@ else:
                         out_file.write(line)
 
 
-    def merge_sorted_files_by_line(in_filenames, out_filename, sort_fields):
-        pypeliner.commandline.execute(*['sort', '-m', '-n', '-k', sort_fields] + in_filenames.values() + ['>', out_filename])
+    def merge_sorted_files_by_line(in_filenames, out_filename, temp_space, sort_fields):
+        pypeliner.commandline.execute(*['sort', '-T', temp_space, '-m', '-n', '-k', sort_fields] + in_filenames.values() + ['>', out_filename])
 
 
     def generate_chromosome_args(chromosomes):
