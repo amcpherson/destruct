@@ -23,7 +23,7 @@ import pypeliner.managed as mgd
 import score_stats
 import utils.plots
 import utils.misc
-import utils.io
+import utils.seq
 import predict_breaks
 
 
@@ -1050,7 +1050,7 @@ else:
 
         # Annotate sequence
         reference_sequences = dict()
-        for id, seq in utils.io.read_sequences(open(genome_fasta, 'r')):
+        for id, seq in utils.seq.read_sequences(open(genome_fasta, 'r')):
             reference_sequences[id] = seq
 
         breakpoints['sequence'] = breakpoints.apply(lambda row: create_sequence(row, reference_sequences), axis=1)

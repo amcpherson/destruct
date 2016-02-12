@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-import utils.io
+import utils.seq
 import utils.misc
 
 
@@ -265,7 +265,7 @@ def simulate(cfg, sim_info, read_count, sequences_fasta, reads1, reads2, random_
 
 def create(cfg, sim_info, chromosomes_info, breakpoints_info, reads_fastq_1, reads_fastq_2, temps_prefix):
     random.seed(int(sim_info['rearrangements_seed']))
-    genome = dict(utils.io.read_sequences(open(cfg.genome_fasta, 'r')))
+    genome = dict(utils.seq.read_sequences(open(cfg.genome_fasta, 'r')))
     simulation_chromosome = sim_info['simulation_chromosome']
     # Create simulated chromosomes by applying random operations
     tumour_proportions = [float(a) for a in sim_info['chromosome_proportions'].split()]

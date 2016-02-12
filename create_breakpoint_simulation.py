@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-import utils.io
+import utils.seq
 import utils.misc
 
 
@@ -117,7 +117,7 @@ def simulate(sim_info, read_count, sequences_fasta, reads1, reads2, random_reads
 
 def create_breakpoints(sim_info, genome_fasta, breakpoints_fasta, breakpoints_info):
     random.seed(int(sim_info['breakpoints_seed']))
-    genome = dict(utils.io.read_sequences(open(genome_fasta, 'r')))
+    genome = dict(utils.seq.read_sequences(open(genome_fasta, 'r')))
     with open(breakpoints_fasta, 'w') as fasta, open(breakpoints_info, 'w') as info:
         for idx in range(int(sim_info['num_breakpoints'])):
             chr1, str1, pos1, chr2, str2, pos2, inserted, sequence, homology = create_random_breakpoint(genome, int(sim_info['num_inserted']), int(sim_info['adjacent_length']), int(sim_info['homology']))
@@ -126,7 +126,7 @@ def create_breakpoints(sim_info, genome_fasta, breakpoints_fasta, breakpoints_in
 
 def create(sim_info, genome_fasta, breakpoints_fasta, breakpoints_info, concordant1, concordant2, discordant1, discordant2):
     create_breakpoints(sim_info, genome_fasta, breakpoints_fasta, breakpoints_info)
-    sequences_size = sum([len(seq) for id, seq in utils.io.read_sequences(open(breakpoints_fasta, 'r'))])
+    sequences_size = sum([len(seq) for id, seq in utils.seq.read_sequences(open(breakpoints_fasta, 'r'))])
     read_count = int(float(sim_info['coverage']) * sequences_size / float(sim_info['fragment_mean']))
     simulate(sim_info, read_count, breakpoints_fasta, discordant1, discordant2, False)
     simulate(sim_info, sim_info['num_concordant'], genome_fasta, concordant1, concordant2)
