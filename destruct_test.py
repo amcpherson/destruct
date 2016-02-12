@@ -16,7 +16,7 @@ import utils.download
 
 
 destruct_directory = os.path.abspath(os.path.dirname(__file__))
-tools_directory = os.path.join(destruct_directory, 'tools')
+bin_directory = os.path.join(destruct_directory, 'bin')
 
 
 def read_simulation_params(sim_config_filename):
@@ -150,24 +150,13 @@ def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filena
 
         pdf.savefig(fig)
 
+        results['Status'] = np.where(results['true_pos_id'].notnull(), 'True', 'False')
+
         for feature in features:
 
             fig = plt.figure(figsize=(16,16))
 
-            true_features = results.loc[results['true_pos_id'].notnull(), feature].values.astype(float)
-            false_features = results.loc[results['true_pos_id'].isnull(), feature].values.astype(float)
-
-            def add_optional_noise(feature_values):
-                if len(feature_values) == 1:
-                    feature_values = np.concatenate([feature_values, feature_values])
-                if len(np.unique(feature_values)) <= 1:
-                    feature_values += np.random.randn(*feature_values.shape) * 1e-4
-                return feature_values
-
-            true_features = add_optional_noise(true_features)
-            false_features = add_optional_noise(false_features)
-
-            seaborn.violinplot([true_features, false_features],
+            seaborn.violinplot(x='Status', y=feature, data=results,
                                names=['True', 'False'])
 
             plt.title('True vs false for ' + feature)
@@ -190,7 +179,7 @@ def create_genome(chromosomes, include_nonchromosomal, genome_fasta):
 
 def partition_bam(original_filename, output_a_filename, output_b_filename, fraction_a):
 
-    pypeliner.commandline.execute(os.path.join(tools_directory, 'bampartition'),
+    pypeliner.commandline.execute(os.path.join(bin_directory, 'bampartition'),
                                   '-i', original_filename,
                                   '-a', output_a_filename,
                                   '-b', output_b_filename,
