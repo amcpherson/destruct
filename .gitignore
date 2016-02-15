@@ -4,3 +4,4 @@ external/boost_*/
 src/external/boost*
 .sconsign.dblite
 bin/*
+.DS_Store

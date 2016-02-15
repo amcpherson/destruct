@@ -14,10 +14,10 @@ import pypeliner
 import pypeliner.workflow
 import pypeliner.managed as mgd
 
-import wrappers
-import utils.download
 
-destruct_directory = os.path.abspath(os.path.dirname(__file__))
+destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
+if destruct_directory is None:
+    raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
 
 default_config_filename = os.path.join(destruct_directory, 'defaultconfig.py')
 
@@ -42,6 +42,9 @@ if __name__ == '__main__':
 
     argparser.add_argument('--config',
                            help='Configuration filename')
+
+    argparser.add_argument('--tool_names', nargs='+',
+                           help='Tools to benchmark')
 
     argparser.add_argument('--chromosomes', nargs='*', type=str, default=['20'],
                            help='Reference chromosomes')
@@ -124,7 +127,7 @@ if __name__ == '__main__':
         ),
     )
 
-    bwaalign_script = os.path.join(destruct_directory, 'bwaalign.py')
+    bwaalign_script = os.path.join(destruct_directory, 'scripts', 'bwaalign.py')
 
     workflow.commandline(
         name='bwa_align',
@@ -152,7 +155,10 @@ if __name__ == '__main__':
         name='create_tool_wrappers',
         func=destruct_test.create_tool_wrappers,
         ret=mgd.TempOutputObj('tool_wrapper', 'bytool'),
-        args=(args['installdir'],),
+        args=(
+            args['installdir'],
+            args['tool_names'],
+        ),
     )
 
     workflow.transform(

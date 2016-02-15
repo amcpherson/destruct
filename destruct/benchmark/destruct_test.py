@@ -1,4 +1,5 @@
 import os
+import shutil
 import collections
 import bisect
 import pandas as pd
@@ -11,11 +12,14 @@ import seaborn
 import pygenes
 import pypeliner
 
-import wrappers
-import utils.download
+import destruct.benchmark.wrappers
+import destruct.utils.download
 
 
-destruct_directory = os.path.abspath(os.path.dirname(__file__))
+destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
+if destruct_directory is None:
+    raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
+
 bin_directory = os.path.join(destruct_directory, 'bin')
 
 
@@ -63,12 +67,15 @@ class BreakpointDatabase(object):
         return sorted(matched_ids_bypos)[0][1]
 
 
-def create_tool_wrappers(install_directory):
+def create_tool_wrappers(install_directory, tool_names=None):
+
+    if tool_names is None:
+        tool_names = destruct.benchmark.wrappers.catalog.keys()
 
     tool_wrappers = dict()
 
-    for tool_name, ToolWrapper in wrappers.catalog.iteritems():
-
+    for tool_name in tool_names:
+        ToolWrapper = destruct.benchmark.wrappers.catalog[tool_name]
         tool_wrappers[tool_name] = ToolWrapper(os.path.join(install_directory, tool_name))
 
     return tool_wrappers
@@ -166,9 +173,9 @@ def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filena
 
 def create_genome(chromosomes, include_nonchromosomal, genome_fasta):
 
-    utils.download.download_genome_fasta(genome_fasta,
-                                         chromosomes,
-                                         include_nonchromosomal)
+    destruct.utils.download.download_genome_fasta(genome_fasta,
+                                                  chromosomes,
+                                                  include_nonchromosomal)
 
     pypeliner.commandline.execute('bwa', 'index', genome_fasta)
     pypeliner.commandline.execute('samtools', 'faidx', genome_fasta)
@@ -198,7 +205,8 @@ def samtools_sort_index(input_filename, output_filename):
     assert output_filename.endswith('.tmp')
     index_filename = output_filename[:-4] + '.bai'
 
-    pypeliner.commandline.execute('samtools', 'index', output_filename, index_filename)
+    pypeliner.commandline.execute('samtools', 'index', output_filename)
+    shutil.move(output_filename + '.bai', index_filename)
 
 
 def samtools_merge_sort_index(output_filename, *input_filenames):

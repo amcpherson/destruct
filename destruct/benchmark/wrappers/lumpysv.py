@@ -40,35 +40,6 @@ class LumpySVWrapper(object):
 
         Sentinal = utils.SentinalFactory(os.path.join(self.install_directory, 'sentinal_'), kwargs)
 
-        with Sentinal('download_lumpysv') as sentinal:
-
-            if sentinal.unfinished:
-
-                with utils.CurrentDirectory(self.packages_directory):
-
-                    utils.rmtree('lumpy-sv')
-                    subprocess.check_call('git clone git://github.com/arq5x/lumpy-sv.git', shell=True)
-
-        with Sentinal('install_lumpysv') as sentinal:
-
-            if sentinal.unfinished:
-
-                with utils.CurrentDirectory(os.path.join(self.packages_directory, 'lumpy-sv')):
-
-                    subprocess.check_call('make', shell=True)
-
-                    utils.makedirs(self.bin_directory)
-                    utils.symlink(os.path.join('bin', 'lumpy'), link_directory=self.bin_directory)
-
-        with Sentinal('install_yaya') as sentinal:
-
-            if sentinal.unfinished:
-
-                with utils.CurrentDirectory(self.packages_directory):
-
-                    utils.rmtree('yaha')
-                    subprocess.check_call('git clone https://github.com/GregoryFaust/yaha.git', shell=True)
-
         with Sentinal('download_genome') as sentinal:
 
             if sentinal.unfinished:

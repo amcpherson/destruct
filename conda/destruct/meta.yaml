@@ -1,0 +1,27 @@
+package:
+  name: destruct
+  version: '0.3.1'
+
+source:
+  git_url: https://dranew@bitbucket.org/dranew/destruct.git
+  git_rev: v0.3.1
+
+requirements:
+  build:
+    - python
+    - scons
+    - boost_source ==1.60.0
+    - tclap ==1.2.1
+
+  run:
+    - python
+    - pandas >=0.17.1
+    - pypeliner >=0.4.1
+    - pygenes >=0.0.4
+    - bowtie
+
+about:
+  home: http://bitbucket.org/dranew/destruct
+  license: MIT
+  summary: 'Bioinformatics tool for joint prediction of rearrangement breakpoints from single or multiple tumour samples'
+

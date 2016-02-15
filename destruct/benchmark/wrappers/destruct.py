@@ -24,8 +24,8 @@ class DestructWrapper(object):
         self.ref_data_directory = os.path.join(self.install_directory, 'data')
         self.user_config_filename = os.path.join(self.install_directory, 'user_config.py')
 
-        self.createref_script = os.path.join(os.path.dirname(__file__), os.path.pardir, 'create_ref_data.py')
-        self.destruct_script = os.path.join(os.path.dirname(__file__), os.path.pardir, 'destruct.py')
+        self.createref_script = 'create_ref_data.py'
+        self.destruct_script = 'run_destruct.py'
 
 
     def install(self, **kwargs):
@@ -45,8 +45,7 @@ class DestructWrapper(object):
                         user_config_file.write('chromosomes = '+repr(chromosomes)+'\n')
                         user_config_file.write('ensembl_assemblies = '+repr(ensembl_assemblies)+'\n')
 
-                createref_cmd = [sys.executable]
-                createref_cmd += [self.createref_script]
+                createref_cmd = [self.createref_script]
                 createref_cmd += [self.ref_data_directory]
                 createref_cmd += ['-c', self.user_config_filename]
 
@@ -62,16 +61,12 @@ class DestructWrapper(object):
 
         breakpoint_table_filename = os.path.join(temp_directory, 'breakpoint.tsv')
         breakpoint_library_table_filename = os.path.join(temp_directory, 'breakpoint_library.tsv')
-        plots_tar_filename = os.path.join(temp_directory, 'plots.tar')
         destruct_tmp_directory = os.path.join(temp_directory, 'tmp')
 
-        destruct_cmd = list()
-        destruct_cmd += [sys.executable]
-        destruct_cmd += [self.destruct_script]
+        destruct_cmd = [self.destruct_script]
         destruct_cmd += [self.ref_data_directory]
         destruct_cmd += [breakpoint_table_filename]
         destruct_cmd += [breakpoint_library_table_filename]
-        destruct_cmd += [plots_tar_filename]
 
         destruct_cmd += ['--lib_ids']
         destruct_cmd += lib_ids

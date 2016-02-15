@@ -1,22 +1,10 @@
-import csv
-import sys
-import logging
-import os
-import ConfigParser
-import re
-import itertools
-import subprocess
 import argparse
-import string
-import gzip
-from collections import *
+import csv
+import os
 
 import pypeliner
 
-destruct_directory = os.path.abspath(os.path.dirname(__file__))
-
-data_directory = os.path.join(destruct_directory, 'data')
-default_config_filename = os.path.join(destruct_directory, 'defaultconfig.py')
+import destruct.defaultconfig
 
 
 def wget_gunzip(url, filename):
@@ -38,40 +26,20 @@ class AutoSentinal(object):
         if os.path.exists(sentinal_filename):
             return
         func()
-        with open(sentinal_filename, 'w') as sentinal_file:
+        with open(sentinal_filename, 'w'):
             pass
 
-if __name__ == '__main__':
-
-    argparser = argparse.ArgumentParser()
-
-    argparser.add_argument('ref_data_dir',
-                           help='Reference dataset directory')
-
-    argparser.add_argument('-c', '--config',
-                           help='Configuration filename')
-
-    args = argparser.parse_args()
-
-    args = vars(argparser.parse_args())
-
-    config = {'ref_data_directory':args['ref_data_dir'],
-              'package_data_directory':data_directory}
-    execfile(default_config_filename, {}, config)
-
-    if args['config'] is not None:
-        execfile(args['config'], {}, config)
-
-    config.update(args)
+def create_ref_data(config, ref_data_dir):
+    config = destruct.defaultconfig.get_config(ref_data_dir, config)
 
     try:
-        os.makedirs(args['ref_data_dir'])
+        os.makedirs(ref_data_dir)
     except OSError:
         pass
 
-    auto_sentinal = AutoSentinal(args['ref_data_dir'] + '/sentinal.')
+    auto_sentinal = AutoSentinal(ref_data_dir + '/sentinal.')
 
-    temp_directory = os.path.join(args['ref_data_dir'], 'tmp')
+    temp_directory = os.path.join(ref_data_dir, 'tmp')
 
     try:
         os.makedirs(temp_directory)
@@ -125,4 +93,25 @@ if __name__ == '__main__':
     def samtools_faidx():
         pypeliner.commandline.execute('samtools', 'faidx', config['genome_fasta'])
     auto_sentinal.run(samtools_faidx)
+
+
+if __name__ == '__main__':
+    argparser = argparse.ArgumentParser()
+
+    argparser.add_argument('ref_data_dir',
+                           help='Reference dataset directory')
+
+    argparser.add_argument('-c', '--config',
+                           help='Configuration filename')
+
+    args = argparser.parse_args()
+
+    args = vars(argparser.parse_args())
+
+    config = {}
+    if args['config'] is not None:
+        execfile(args['config'], {}, config)
+
+    create_ref_data(config, args['ref_data_dir'])
+
 
