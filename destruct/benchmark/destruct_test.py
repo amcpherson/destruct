@@ -11,11 +11,14 @@ import seaborn
 import pygenes
 import pypeliner
 
-import wrappers
-import utils.download
+import destruct.benchmark.wrappers
+import destruct.utils.download
 
 
-destruct_directory = os.path.abspath(os.path.dirname(__file__))
+destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
+if destruct_directory is None:
+    raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
+
 bin_directory = os.path.join(destruct_directory, 'bin')
 
 
@@ -67,7 +70,7 @@ def create_tool_wrappers(install_directory):
 
     tool_wrappers = dict()
 
-    for tool_name, ToolWrapper in wrappers.catalog.iteritems():
+    for tool_name, ToolWrapper in destruct.benchmark.wrappers.catalog.iteritems():
 
         tool_wrappers[tool_name] = ToolWrapper(os.path.join(install_directory, tool_name))
 
@@ -166,9 +169,9 @@ def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filena
 
 def create_genome(chromosomes, include_nonchromosomal, genome_fasta):
 
-    utils.download.download_genome_fasta(genome_fasta,
-                                         chromosomes,
-                                         include_nonchromosomal)
+    destruct.utils.download.download_genome_fasta(genome_fasta,
+                                                  chromosomes,
+                                                  include_nonchromosomal)
 
     pypeliner.commandline.execute('bwa', 'index', genome_fasta)
     pypeliner.commandline.execute('samtools', 'faidx', genome_fasta)

@@ -27,7 +27,9 @@ import utils.seq
 import predict_breaks
 
 
-destruct_directory = os.path.abspath(os.path.dirname(__file__))
+destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
+if destruct_directory is None:
+    raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
 
 data_directory = os.path.join(destruct_directory, 'data')
 bin_directory = os.path.join(destruct_directory, 'bin')

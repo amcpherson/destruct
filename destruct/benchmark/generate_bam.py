@@ -10,7 +10,9 @@ import pypeliner.managed as mgd
 import wrappers
 import utils.download
 
-destruct_directory = os.path.abspath(os.path.dirname(__file__))
+destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
+if destruct_directory is None:
+    raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
 
 
 if __name__ == '__main__':
