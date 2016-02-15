@@ -111,7 +111,7 @@ if __name__ == '__main__':
         ),
     )        
 
-    bwaalign_script = os.path.join(destruct_directory, 'bwaalign.py')
+    bwaalign_script = os.path.join(destruct_directory, 'scripts', 'bwaalign.py')
 
     workflow.commandline(
         name='bwa_align',

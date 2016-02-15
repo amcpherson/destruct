@@ -24,8 +24,8 @@ class DestructWrapper(object):
         self.ref_data_directory = os.path.join(self.install_directory, 'data')
         self.user_config_filename = os.path.join(self.install_directory, 'user_config.py')
 
-        self.createref_script = os.path.join(os.path.dirname(__file__), os.path.pardir, 'create_ref_data.py')
-        self.destruct_script = os.path.join(os.path.dirname(__file__), os.path.pardir, 'destruct.py')
+        self.createref_script = os.path.join(os.path.dirname(__file__), os.path.pardir, os.path.pardir, 'create_ref_data.py')
+        self.destruct_script = os.path.join(os.path.dirname(__file__), os.path.pardir, os.path.pardir, 'destruct.py')
 
 
     def install(self, **kwargs):

@@ -86,7 +86,7 @@ if __name__ == '__main__':
     pyp.sch.commandline('cat1', (), ctx, 'cat', mgd.TempInputFile('concordant.1.fastq'), mgd.TempInputFile('discordant.1.fastq'), '>', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.1.fastq')))
     pyp.sch.commandline('cat2', (), ctx, 'cat', mgd.TempInputFile('concordant.2.fastq'), mgd.TempInputFile('discordant.2.fastq'), '>', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.2.fastq')))
 
-    bwaalign_script = os.path.join(destruct_directory, 'bwaalign.py')
+    bwaalign_script = os.path.join(destruct_directory, 'scripts', 'bwaalign.py')
 
     pyp.sch.commandline('bwa_align', (), ctx, 
         sys.executable,

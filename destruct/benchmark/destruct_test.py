@@ -1,4 +1,5 @@
 import os
+import shutil
 import collections
 import bisect
 import pandas as pd
@@ -201,7 +202,8 @@ def samtools_sort_index(input_filename, output_filename):
     assert output_filename.endswith('.tmp')
     index_filename = output_filename[:-4] + '.bai'
 
-    pypeliner.commandline.execute('samtools', 'index', output_filename, index_filename)
+    pypeliner.commandline.execute('samtools', 'index', output_filename)
+    shutil.move(output_filename + '.bai', index_filename)
 
 
 def samtools_merge_sort_index(output_filename, *input_filenames):

@@ -20,11 +20,11 @@ import pypeliner
 import pypeliner.workflow
 import pypeliner.managed as mgd
 
-import score_stats
-import utils.plots
-import utils.misc
-import utils.seq
-import predict_breaks
+import destruct.score_stats
+import destruct.utils.plots
+import destruct.utils.misc
+import destruct.utils.seq
+import destruct.predict_breaks
 
 
 destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
@@ -239,7 +239,7 @@ if __name__ == '__main__':
         name='scorestats',
         axes=('bylibrary',),
         ctx=medmem,
-        func=score_stats.create_score_stats,
+        func=destruct.score_stats.create_score_stats,
         args=(
             mgd.TempInputFile('samples.align.true', 'bylibrary'),
             config['match_score'],
@@ -423,7 +423,7 @@ if __name__ == '__main__':
         name='predict_breaks',
         axes=('bychromarg',),
         ctx=medmem,
-        func=predict_breaks.predict_breaks,
+        func=destruct.predict_breaks.predict_breaks,
         args=(
             mgd.TempInputFile('clusters', 'bychromarg'),
             mgd.TempInputFile('spanning.alignments'),
@@ -473,7 +473,7 @@ if __name__ == '__main__':
         name='calculate_realignment_likelihoods',
         axes=('bylibrary', 'byread'),
         ctx=medmem,
-        func=predict_breaks.calculate_realignment_likelihoods,
+        func=destruct.predict_breaks.calculate_realignment_likelihoods,
         args=(
             mgd.TempInputFile('breakpoints_2'),
             mgd.TempInputFile('realignments', 'bylibrary', 'byread'),
@@ -515,7 +515,7 @@ if __name__ == '__main__':
     workflow.transform(
         name='calc_weights',
         ctx=medmem,
-        func=predict_breaks.calculate_cluster_weights,
+        func=destruct.predict_breaks.calculate_cluster_weights,
         args=(
             mgd.TempInputFile('breakpoints_2'),
             mgd.TempOutputFile('cluster_weights'),
@@ -538,7 +538,7 @@ if __name__ == '__main__':
     workflow.transform(
         name='select_clusters',
         ctx=medmem,
-        func=predict_breaks.select_clusters,
+        func=destruct.predict_breaks.select_clusters,
         args=(
             mgd.TempInputFile('clusters_setcover'),
             mgd.TempInputFile('breakpoints_2'),
@@ -553,7 +553,7 @@ if __name__ == '__main__':
     workflow.transform(
         name='select_predictions',
         ctx=himem,
-        func=predict_breaks.select_predictions,
+        func=destruct.predict_breaks.select_predictions,
         args=(
             mgd.TempInputFile('breakpoints_1'),
             mgd.TempOutputFile('breakpoints'),
@@ -673,9 +673,9 @@ else:
         fragment_stddev = fragment_variance**0.5
         with tarfile.open(plots_tar_filename, 'w') as plots_tar:
             fig = plt.figure(figsize=(8,8))
-            utils.plots.filled_density_weighted(plt.gca(), flen_stats['key'].values, flen_stats['value'].values, 'b', 0.5, 0, flen_stats['key'].max(), 4)
+            destruct.utils.plots.filled_density_weighted(plt.gca(), flen_stats['key'].values, flen_stats['value'].values, 'b', 0.5, 0, flen_stats['key'].max(), 4)
             plt.title('fragment lengths for library {0}'.format(library_id))
-            utils.plots.savefig_tar(plots_tar, fig, 'fragment_length_{0}.pdf'.format(library_id))
+            destruct.utils.plots.savefig_tar(plots_tar, fig, 'fragment_length_{0}.pdf'.format(library_id))
             plt.clf()
         return ConcordantReadStats({'fragment_mean':fragment_mean, 'fragment_stddev':fragment_stddev}, fragment_length_num_stddevs)
 
@@ -916,7 +916,7 @@ else:
                 end = position + length - 1
             breakend_sequences[side] = reference_sequences[chromosome][start-1:end]
             if strand != expected_strands[side]:
-                breakend_sequences[side] = utils.misc.reverse_complement(breakend_sequences[side])
+                breakend_sequences[side] = destruct.utils.misc.reverse_complement(breakend_sequences[side])
         return breakend_sequences[0] + '[' + inserted + ']' + breakend_sequences[1]
 
 
@@ -967,16 +967,16 @@ else:
         lib_names = lib_names.rename(columns={'id':'library_id', 'name':'library'})
 
         breakpoints = pd.read_csv(breakpoints_filename, sep='\t',
-                                  names=predict_breaks.breakpoint_fields,
+                                  names=destruct.predict_breaks.breakpoint_fields,
                                   converters=converters)
         breakpoints = breakpoints.drop(['breakpoint_id'], axis=1)
         breakpoints = breakpoints.rename(columns={'count':'num_split'})
         breakpoints.loc[breakpoints['inserted'] == '.', 'inserted'] = ''
 
-        breakpoints = utils.misc.normalize_breakpoints(breakpoints)
+        breakpoints = destruct.utils.misc.normalize_breakpoints(breakpoints)
 
         likelihoods = pd.read_csv(likelihoods_filename, sep='\t',
-                                  names=predict_breaks.likelihoods_fields,
+                                  names=destruct.predict_breaks.likelihoods_fields,
                                   converters=converters)
         likelihoods = likelihoods.drop(['breakpoint_id'], axis=1)
 
@@ -1060,7 +1060,7 @@ else:
 
         # Annotate sequence
         reference_sequences = dict()
-        for id, seq in utils.seq.read_sequences(open(genome_fasta, 'r')):
+        for id, seq in destruct.utils.seq.read_sequences(open(genome_fasta, 'r')):
             reference_sequences[id] = seq
 
         breakpoints['sequence'] = breakpoints.apply(lambda row: create_sequence(row, reference_sequences), axis=1)
