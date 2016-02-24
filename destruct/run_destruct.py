@@ -62,13 +62,10 @@ if __name__ == '__main__':
     argparser.add_argument('--breakpoint_read_table', required=False,
                            help='Output table of breakpoint read information in TSV format')
 
-    argparser.add_argument('--libs_table', required=False,
-                           help='Input libraries list table filename')
-
-    argparser.add_argument('--bam_files', nargs='+', required=False,
+    argparser.add_argument('--bam_files', nargs='+',
                            help='Input bam filenames')
 
-    argparser.add_argument('--lib_ids', nargs='+', required=False,
+    argparser.add_argument('--lib_ids', nargs='+',
                            help='Input ids for respective bam filenames')
 
     argparser.add_argument('--config', required=False,
@@ -76,14 +73,10 @@ if __name__ == '__main__':
 
     args = vars(argparser.parse_args())
 
-    if not ((args['libs_table'] is not None) or (args['bam_files'] is not None and args['lib_ids'] is not None)):
-        raise Exception('either --libs_table or both --bam_files and --lib_ids are required')
-
-    if (args['libs_table'] is not None) == (args['bam_files'] is not None or args['lib_ids'] is not None):
-        raise Exception('--libs_table is mutually exclusive with --bam_files and --lib_ids')
-
-    if args['bam_files'] is not None and (len(args['bam_files']) != len(args['lib_ids'])):
+    if len(args['bam_files']) != len(args['lib_ids']):
         raise Exception('--lib_ids must correspond one to one with --bam_files')
+
+    bam_filenames = dict(zip(args['lib_ids'], args['bam_files']))
 
     config = {'ref_data_directory':args['ref_data_dir'],
               'package_data_directory':data_directory}
@@ -106,42 +99,9 @@ if __name__ == '__main__':
 
     workflow = pypeliner.workflow.Workflow()
 
-    # Read in the bam file information
-
-    if args['libs_table'] is not None:
-        workflow.transform(
-            name='readlibs',
-            ctx=locally,
-            func=destruct.tasks.read_libraries,
-            ret=mgd.TempOutputObj('libinfo', 'bylibrary'),
-            arg=(
-                args['libs_table'],
-            ),
-        )
-    else:
-        workflow.transform(
-            name='initlibs',
-            ctx=locally,
-            func=destruct.tasks.init_libraries,
-            ret=mgd.TempOutputObj('libinfo', 'bylibrary'),
-            args=(
-                args['lib_ids'],
-                args['bam_files'],
-            ),
-        )
-
-    # Symlink the bam files locally
-
-    workflow.transform(
-        name='linklibs',
-        axes=('bylibrary',),
-        ctx=locally,
-        func=destruct.tasks.link_libraries,
-        args=(
-            mgd.TempInputObj('libinfo', 'bylibrary').prop('bam'),
-            mgd.TempOutputFile('bam', 'bylibrary'),
-        ),
-    )
+    # Set the library ids
+    
+    workflow.setobj(mgd.OutputChunks('bylibrary'), value=bam_filenames.keys())
 
     # Retrieve discordant reads and stats from bam files
 
@@ -154,7 +114,7 @@ if __name__ == '__main__':
             '-r',
             '-c', config['bam_max_soft_clipped'],
             '-f', config['bam_max_fragment_length'],
-            '-b', mgd.TempInputFile('bam', 'bylibrary'),
+            '-b', mgd.InputFile('bam', 'bylibrary', fnames=bam_filenames),
             '-s', mgd.TempOutputFile('stats.file', 'bylibrary'),
             '-1', mgd.TempOutputFile('reads1', 'bylibrary'),
             '-2', mgd.TempOutputFile('reads2', 'bylibrary'),
@@ -169,7 +129,7 @@ if __name__ == '__main__':
         args=(
             os.path.join(bin_directory, 'bamsamplefastq'),
             '-r',
-            '-b', mgd.TempInputFile('bam', 'bylibrary'),
+            '-b', mgd.InputFile('bam', 'bylibrary', fnames=bam_filenames),
             '-n', config['num_read_samples'],
             '-1', mgd.TempOutputFile('sample1', 'bylibrary'),
             '-2', mgd.TempOutputFile('sample2', 'bylibrary'),
