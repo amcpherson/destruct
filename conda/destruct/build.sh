@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# Build executables
+# Build and install executables
 cd src
-scons install
+scons install --prefix $PREFIX --boost_source $PREFIX/src/boost/
 cd ..
 
-# Environment variable for location of executables
-export DESTRUCT_PACKAGE_DIRECTORY=`pwd`/
-
+# Build and install python package
 python setup.py install

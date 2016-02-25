@@ -27,19 +27,14 @@ if destruct_directory is None:
     raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
 
 data_directory = os.path.join(destruct_directory, 'data')
-bin_directory = os.path.join(destruct_directory, 'bin')
 default_config_filename = os.path.join(destruct_directory, 'defaultconfig.py')
 
-
-__version__ = '0.1.0'
 
 if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser()
 
     pypeliner.app.add_arguments(argparser)
-
-    argparser.add_argument('--version', action='version', version=__version__)
 
     argparser.add_argument('ref_data_dir',
                            help='Reference dataset directory')
@@ -85,7 +80,6 @@ if __name__ == '__main__':
         args['breakpoint_table'],
         args['breakpoint_library_table'],
         config,
-        bin_directory,
         breakpoint_read_table=args['breakpoint_read_table'],
     )
 

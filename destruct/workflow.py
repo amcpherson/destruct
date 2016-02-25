@@ -23,7 +23,6 @@ def create_destruct_workflow(
     breakpoint_table,
     breakpoint_library_table,
     config,
-    bin_directory,
     breakpoint_read_table=None,
 ):
     workflow = pypeliner.workflow.Workflow()
@@ -45,7 +44,7 @@ def create_destruct_workflow(
         axes=('bylibrary',),
         ctx=medmem,
         args=(
-            os.path.join(bin_directory, 'bamdiscordantfastq'),
+            'destruct_bamdiscordantfastq',
             '-r',
             '-c', config['bam_max_soft_clipped'],
             '-f', config['bam_max_fragment_length'],
@@ -62,7 +61,7 @@ def create_destruct_workflow(
         axes=('bylibrary',),
         ctx=medmem,
         args=(
-            os.path.join(bin_directory, 'bamsamplefastq'),
+            'destruct_bamsamplefastq',
             '-r',
             '-b', mgd.InputFile('bam', 'bylibrary', fnames=bam_filenames),
             '-n', config['num_read_samples'],
@@ -113,7 +112,7 @@ def create_destruct_workflow(
             '--best',
             '-S',
             '|',
-            os.path.join(bin_directory, 'aligntrue'),
+            'destruct_aligntrue',
             '-a', '-',
             '-1', mgd.TempInputFile('sample1', 'bylibrary'),
             '-2', mgd.TempInputFile('sample2', 'bylibrary'),
@@ -193,7 +192,7 @@ def create_destruct_workflow(
             '--best',
             '-S',
             '|',
-            os.path.join(bin_directory, 'realign2'),
+            'destruct_realign2',
             '-l', mgd.TempInputObj('library_id', 'bylibrary'),
             '-a', '-',
             '-1', mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
@@ -230,7 +229,7 @@ def create_destruct_workflow(
         axes=('bylibrary',),
         ctx=lowmem,
         args=(
-            os.path.join(bin_directory, 'filterreads'),
+            'destruct_filterreads',
             '-n', '2',
             '-a', mgd.TempInputFile('spanning.alignments_1', 'bylibrary'),
             '-r', config['satellite_regions'],
@@ -299,7 +298,7 @@ def create_destruct_workflow(
         axes=('bychromarg',),
         ctx=medmem,
         args=(
-            os.path.join(bin_directory, 'mclustermatepairs'),
+            'destruct_mclustermatepairs',
             '-a', mgd.TempInputFile('spanning.alignments'),
             '-s', mgd.TempInputFile('libstats.tsv'),
             '-c', mgd.TempOutputFile('clusters', 'bychromarg'),
@@ -344,7 +343,7 @@ def create_destruct_workflow(
         axes=('bylibrary', 'byread'),
         ctx=medmem,
         args=(
-            os.path.join(bin_directory, 'realigntobreaks2'),
+            'destruct_realigntobreaks2',
             '-r', config['genome_fasta'],
             '-b', mgd.TempInputFile('breakpoints_2'),
             '-c', mgd.TempInputFile('clusters'),
@@ -418,7 +417,7 @@ def create_destruct_workflow(
         name='setcover',
         ctx=medmem,
         args=(
-            os.path.join(bin_directory, 'setcover'),
+            'destruct_setcover',
             '-c', mgd.TempInputFile('clusters'),
             '-w', mgd.TempInputFile('cluster_weights'),
             '-a', mgd.TempOutputFile('clusters_setcover'),

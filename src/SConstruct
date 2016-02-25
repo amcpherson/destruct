@@ -2,23 +2,32 @@ import os
 import fnmatch
 import subprocess
 
+default_install_dir = os.path.abspath(os.path.join(os.pardir, 'bin'))
+
+AddOption(
+	'--prefix',
+	dest='prefix',
+	type='string',
+	nargs=1,
+	action='store',
+	metavar='DIR',
+	help='installation prefix',
+	default=default_install_dir,
+)
+
+AddOption(
+	'--boost_source',
+	dest='boost_source',
+	type='string',
+	nargs=1,
+	action='store',
+	metavar='DIR',
+	help='boost source directory',
+)
+
 external_dir = os.path.abspath('external')
-install_dir = os.path.abspath(os.path.join(os.pardir, 'bin'))
-
-boost_version = '1.55.0'
-boost_basename = 'boost_1_55_0'
-
-boost_url = 'http://downloads.sourceforge.net/project/boost/boost/' + boost_version + '/' + boost_basename + '.tar.gz'
-boost_tgz_filename = boost_basename + '.tar.gz'
-boost_dir = os.path.join(external_dir, boost_basename)
-boost_sentinal = os.path.join(boost_dir, 'sentinal')
-
-if not os.path.exists(boost_sentinal):
-    subprocess.check_call('wget -c ' + boost_url, shell=True)
-    subprocess.check_call('tar -C ' + external_dir + ' -xzvf ' + boost_tgz_filename, shell=True)
-    os.remove(boost_tgz_filename)
-    with open(boost_sentinal, 'w'):
-        pass
+install_dir = GetOption('prefix')
+boost_dir = GetOption('boost_source')
 
 env = Environment(ENV=os.environ)
 
@@ -61,15 +70,15 @@ sources = """
     ../external/Triangle/triangle.c
     mclustermatepairs.cpp
 """.split()
-env.Program(target='mclustermatepairs', source=common_sources+sources)
-env.Install(install_dir, 'mclustermatepairs')
+env.Program(target='destruct_mclustermatepairs', source=common_sources+sources)
+env.Install(install_dir, 'destruct_mclustermatepairs')
 
 sources = """
     AlignmentRecord.cpp
     setcover.cpp
 """.split()
-env.Program(target='setcover', source=common_sources+sources)
-env.Install(install_dir, 'setcover')
+env.Program(target='destruct_setcover', source=common_sources+sources)
+env.Install(install_dir, 'destruct_setcover')
 
 sources = """
     realign2.cpp
@@ -80,8 +89,8 @@ sources = """
     Sequences.cpp
     SimpleAligner.cpp
 """.split()
-env.Program(target='realign2', source=common_sources+sources)
-env.Install(install_dir, 'realign2')
+env.Program(target='destruct_realign2', source=common_sources+sources)
+env.Install(install_dir, 'destruct_realign2')
 
 sources = """
     realigntobreaks2.cpp
@@ -90,8 +99,8 @@ sources = """
     Sequences.cpp
     SimpleAligner.cpp
 """.split()
-env.Program(target='realigntobreaks2', source=common_sources+sources)
-env.Install(install_dir, 'realigntobreaks2')
+env.Program(target='destruct_realigntobreaks2', source=common_sources+sources)
+env.Install(install_dir, 'destruct_realigntobreaks2')
 
 sources = """
     AlignmentStream.cpp
@@ -99,8 +108,8 @@ sources = """
     Sequences.cpp
     testsplit.cpp
 """.split()
-env.Program(target='testsplit', source=common_sources+sources)
-env.Install(install_dir, 'testsplit')
+env.Program(target='destruct_testsplit', source=common_sources+sources)
+env.Install(install_dir, 'destruct_testsplit')
 
 sources = """
     aligntrue.cpp
@@ -109,82 +118,82 @@ sources = """
     Sequences.cpp
     SimpleAligner.cpp
 """.split()
-env.Program(target='aligntrue', source=common_sources+sources)
-env.Install(install_dir, 'aligntrue')
+env.Program(target='destruct_aligntrue', source=common_sources+sources)
+env.Install(install_dir, 'destruct_aligntrue')
 
 sources = """
     ShortestPath.cpp
     AlignmentRecord.cpp
     cycles.cpp
 """.split()
-env.Program(target='cycles', source=common_sources+sources)
-env.Install(install_dir, 'cycles')
+env.Program(target='destruct_cycles', source=common_sources+sources)
+env.Install(install_dir, 'destruct_cycles')
 
 sources = """
     AlignmentRecord.cpp
     RegionDB.cpp
     filterreads.cpp
 """.split()
-env.Program(target='filterreads', source=common_sources+sources)
-env.Install(install_dir, 'filterreads')
+env.Program(target='destruct_filterreads', source=common_sources+sources)
+env.Install(install_dir, 'destruct_filterreads')
 
 sources = """
     SimpleAligner.cpp
     testssealign.cpp
 """.split()
-env.Program(target='testssealign', source=common_sources+sources)
-env.Install(install_dir, 'testssealign')
+env.Program(target='destruct_testssealign', source=common_sources+sources)
+env.Install(install_dir, 'destruct_testssealign')
 
 sources = """
     samplefastq.cpp
 """.split()
-env.Program(target='samplefastq', source=common_sources+sources)
-env.Install(install_dir, 'samplefastq')
+env.Program(target='destruct_samplefastq', source=common_sources+sources)
+env.Install(install_dir, 'destruct_samplefastq')
 
 sources = """
     bamdiscordantfastq.cpp
 """.split()
-env.Program(target='bamdiscordantfastq', source=common_sources+bamtools_sources+sources+
+env.Program(target='destruct_bamdiscordantfastq', source=common_sources+bamtools_sources+sources+
     boost_iostreams_sources+boost_serialization_sources)
-env.Install(install_dir, 'bamdiscordantfastq')
+env.Install(install_dir, 'destruct_bamdiscordantfastq')
 
 sources = """
     bamsamplefastq.cpp
 """.split()
-env.Program(target='bamsamplefastq', source=common_sources+bamtools_sources+sources)
-env.Install(install_dir, 'bamsamplefastq')
+env.Program(target='destruct_bamsamplefastq', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'destruct_bamsamplefastq')
 
 sources = """
     bamfastq.cpp
 """.split()
-env.Program(target='bamfastq', source=common_sources+bamtools_sources+sources)
-env.Install(install_dir, 'bamfastq')
+env.Program(target='destruct_bamfastq', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'destruct_bamfastq')
 
 sources = """
     bamextractsimreads.cpp
     Sequences.cpp
 """.split()
-env.Program(target='bamextractsimreads', source=common_sources+bamtools_sources+sources)
-env.Install(install_dir, 'bamextractsimreads')
+env.Program(target='destruct_bamextractsimreads', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'destruct_bamextractsimreads')
 
 sources = """
     bampartition.cpp
     Sequences.cpp
 """.split()
-env.Program(target='bampartition', source=common_sources+bamtools_sources+sources)
-env.Install(install_dir, 'bampartition')
+env.Program(target='destruct_bampartition', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'destruct_bampartition')
 
 sources = """
     bamreheader.cpp
 """.split()
-env.Program(target='bamreheader', source=common_sources+bamtools_sources+sources)
-env.Install(install_dir, 'bamreheader')
+env.Program(target='destruct_bamreheader', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'destruct_bamreheader')
 
 sources = """
     bammixture.cpp
 """.split()
-env.Program(target='bammixture', source=common_sources+bamtools_sources+sources)
-env.Install(install_dir, 'bammixture')
+env.Program(target='destruct_bammixture', source=common_sources+bamtools_sources+sources)
+env.Install(install_dir, 'destruct_bammixture')
 
 env.Alias('install', [install_dir])
 

@@ -13,6 +13,7 @@
 #include <vector>
 #include <functional>
 #include <numeric>
+#include <iostream>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/random/mersenne_twister.hpp>
