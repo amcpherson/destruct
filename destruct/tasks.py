@@ -312,7 +312,7 @@ def tabulate_results(breakpoints_filename, likelihoods_filename, library_ids,
                      genome_fasta, gtf_filename, dgv_filename,
                      breakpoint_table, breakpoint_library_table):
 
-    lib_names = pd.DataFrame(library_ids.items(), columns=['library_name', 'library_id'])
+    lib_names = pd.DataFrame(library_ids.items(), columns=['library', 'library_id'])
 
     breakpoints = pd.read_csv(breakpoints_filename, sep='\t',
                               names=destruct.predict_breaks.breakpoint_fields,
