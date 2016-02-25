@@ -10,7 +10,6 @@
 #include "AlignmentStream.h"
 #include "RegionDB.h"
 #include "Sequences.h"
-#include "api/BamReader.h"
 #include "utils/bamtools_pileup_engine.h"
 #include "utils/bamtools_utilities.h"
 #include "utils/bamtools_fasta.h"
@@ -21,6 +20,7 @@
 #include <map>
 #include <set>
 #include <tclap/CmdLine.h>
+#include <bamtools/api/BamReader.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/iostreams/filtering_stream.hpp>

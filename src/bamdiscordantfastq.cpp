@@ -9,7 +9,6 @@
 #include "Indexer.h"
 #include "AlignmentStream.h"
 #include "RegionDB.h"
-#include "api/BamReader.h"
 #include "DiskPriorityQueue.h"
 
 #include <fstream>
@@ -18,6 +17,7 @@
 #include <map>
 #include <set>
 #include <tclap/CmdLine.h>
+#include <bamtools/api/BamReader.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
