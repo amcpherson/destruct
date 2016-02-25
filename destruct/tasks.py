@@ -5,7 +5,6 @@ import os
 import tarfile
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import pypeliner
 import pygenes
 
@@ -63,10 +62,10 @@ def read_stats(stats_filename, fragment_length_num_stddevs):
     return ConcordantReadStats({'fragment_mean': fragment_mean, 'fragment_stddev': fragment_stddev}, fragment_length_num_stddevs)
 
 
-def write_stats_table(lib_infos, lib_stats, stats_table_filename):
+def write_stats_table(library_ids, lib_stats, stats_table_filename):
     with open(stats_table_filename, 'w') as stats_table_file:
-        for lib_name, lib_info in lib_infos.iteritems():
-            stats_table_file.write(str(lib_infos[lib_name].id) + '\t')
+        for lib_name, library_id in library_ids.iteritems():
+            stats_table_file.write(str(library_id) + '\t')
             stats_table_file.write(str(lib_stats[lib_name].fragment_length_mean) + '\t')
             stats_table_file.write(str(lib_stats[lib_name].fragment_length_stddev) + '\n')
 
@@ -122,8 +121,8 @@ def merge_files_by_line(in_filenames, out_filename):
                     out_file.write(line)
 
 
-def create_library_idxs(library_ids):
-    return dict(enumerate(library_ids))
+def create_library_ids(library_names):
+    return dict([(library_name, library_id) for library_id, library_name in enumerate(library_names)])
 
 
 def merge_alignment_files(in_filenames, out_filename, library_idxs):
@@ -179,61 +178,13 @@ def merge_clusters(in_clusters_filenames, in_breakpoints_filenames,
                 new_cluster_id += 1
 
 
-def remove_duplicates(input_filename, output_filename):
-    with open(input_filename, 'r') as input_file, open(output_filename, 'w') as output_file:
-        for cluster_id, cluster_rows in itertools.groupby(csv.reader(input_file, delimiter='\t'), lambda row: row[0]):
-            fragment_mappings = set()
-            for fragment_lib, fragment_rows in itertools.groupby(cluster_rows, lambda row: (row[2], row[11])):
-                fragment_rows = list(fragment_rows)
-                if len(fragment_rows) != 2:
-                    raise Exception('require 2 lines per fragment for fragment ' + ','.join(fragment_lib))
-                fragment_mapping = set()
-                for read_end in (0, 1):
-                    chromosome = fragment_rows[read_end][4]
-                    position = fragment_rows[read_end][6] if fragment_rows[read_end][5] == '+' else fragment_rows[read_end][7]
-                    fragment_mapping.add((fragment_lib[1], chromosome, position))
-                fragment_mapping = frozenset(fragment_mapping)
-                if fragment_mapping not in fragment_mappings:
-                    for row in fragment_rows:
-                        output_file.write('\t'.join(row) + '\n')
-                    fragment_mappings.add(fragment_mapping)
-
-
-LibInfo = collections.namedtuple('LibInfo', ['id', 'name', 'bam'])
-
-
-def read_libraries(libraries_filename):
-    libraries = dict()
-    with open(libraries_filename, 'r') as libraries_file:
-        for lib_idx, row in enumerate(csv.reader(libraries_file, delimiter='\t')):
-            lib_name = row[0]
-            lib_bam = row[1]
-            libraries[lib_name] = LibInfo(lib_idx, lib_name, lib_bam)
-    return libraries
-
-
-def init_libraries(lib_names, bam_filenames):
-    libraries = dict()
-    for lib_idx, (lib_name, lib_bam) in enumerate(sorted(zip(lib_names, bam_filenames))):
-        libraries[lib_name] = LibInfo(lib_idx, lib_name, lib_bam)
-    return libraries
-
-
-def link_libraries(target_bam_filename, link_bam_filename):
-    try:
-        os.remove(link_bam_filename)
-    except OSError:
-        pass
-    os.symlink(os.path.abspath(target_bam_filename), link_bam_filename)
-
-
-def tabulate_reads(clusters_filename, lib_infos, reads1_filenames, reads2_filenames, reads_table_filename):
+def tabulate_reads(clusters_filename, library_ids, reads1_filenames, reads2_filenames, reads_table_filename):
     fields = ['cluster_id', 'cluster_end', 'lib_id', 'read_id', 'read_end', 'align_id']
     clusters = pd.read_csv(clusters_filename, sep='\t', names=fields, usecols=['cluster_id', 'lib_id', 'read_id'])
     clusters = clusters.drop_duplicates().set_index(['lib_id', 'read_id']).sort_index()['cluster_id']
     with open(reads_table_filename, 'w') as reads_table_file:
         for lib_name in set(reads1_filenames.keys()).union(set(reads2_filenames.keys())):
-            lib_id = lib_infos[lib_name].id
+            lib_id = library_ids[lib_name]
             for reads_filename in [reads1_filenames[lib_name], reads2_filenames[lib_name]]:
                 with open(reads_filename, 'r') as reads_file:
                     for name, seq, comment, qual in itertools.izip_longest(*[(a.rstrip() for a in reads_file)]*4):
@@ -357,12 +308,11 @@ def query_dgv(row, dgv):
     return ', '.join(variants)
 
 
-def tabulate_results(breakpoints_filename, likelihoods_filename, lib_infos,
+def tabulate_results(breakpoints_filename, likelihoods_filename, library_ids,
                      genome_fasta, gtf_filename, dgv_filename,
                      breakpoint_table, breakpoint_library_table):
 
-    lib_names = pd.DataFrame.from_records(lib_infos.values(), columns=LibInfo._fields, exclude=['bam'])
-    lib_names = lib_names.rename(columns={'id':'library_id', 'name':'library'})
+    lib_names = pd.DataFrame(library_ids.items(), columns=['library_name', 'library_id'])
 
     breakpoints = pd.read_csv(breakpoints_filename, sep='\t',
                               names=destruct.predict_breaks.breakpoint_fields,

@@ -62,7 +62,6 @@ class DestructWrapper(object):
 
         breakpoint_table_filename = os.path.join(temp_directory, 'breakpoint.tsv')
         breakpoint_library_table_filename = os.path.join(temp_directory, 'breakpoint_library.tsv')
-        plots_tar_filename = os.path.join(temp_directory, 'plots.tar')
         destruct_tmp_directory = os.path.join(temp_directory, 'tmp')
 
         destruct_cmd = list()
@@ -71,7 +70,6 @@ class DestructWrapper(object):
         destruct_cmd += [self.ref_data_directory]
         destruct_cmd += [breakpoint_table_filename]
         destruct_cmd += [breakpoint_library_table_filename]
-        destruct_cmd += [plots_tar_filename]
 
         destruct_cmd += ['--lib_ids']
         destruct_cmd += lib_ids

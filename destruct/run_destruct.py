@@ -13,7 +13,6 @@ import collections
 import math
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 
 import pygenes
 import pypeliner
@@ -55,9 +54,6 @@ if __name__ == '__main__':
 
     argparser.add_argument('breakpoint_library_table',
                            help='Output table of library specific breakpoint information in TSV format')
-
-    argparser.add_argument('plots_tar',
-                           help='Output diagnostic plots tar filename')
 
     argparser.add_argument('--breakpoint_read_table', required=False,
                            help='Output table of breakpoint read information in TSV format')
@@ -101,7 +97,13 @@ if __name__ == '__main__':
 
     # Set the library ids
     
-    workflow.setobj(mgd.OutputChunks('bylibrary'), value=bam_filenames.keys())
+    workflow.transform(
+        name='create_library_ids',
+        ctx=locally,
+        func=destruct.tasks.create_library_ids,
+        ret=mgd.TempOutputObj('library_id', 'bylibrary'),
+        args=(bam_filenames.keys(),),
+    )
 
     # Retrieve discordant reads and stats from bam files
 
@@ -145,8 +147,6 @@ if __name__ == '__main__':
         args=(
             mgd.TempInputFile('stats.file', 'bylibrary'),
             config['fragment_length_num_stddevs'],
-            mgd.TempOutputFile('flen.plots', 'bylibrary'),
-            mgd.InputInstance('bylibrary'),
         ),
     )
 
@@ -203,8 +203,6 @@ if __name__ == '__main__':
             mgd.TempInputFile('samples.align.true', 'bylibrary'),
             config['match_score'],
             mgd.TempOutputFile('score.stats', 'bylibrary'),
-            mgd.TempOutputFile('score.stats.plots', 'bylibrary'),
-            mgd.InputInstance('bylibrary'),
         ),
     )
 
@@ -263,7 +261,7 @@ if __name__ == '__main__':
             '-S',
             '|',
             os.path.join(bin_directory, 'realign2'),
-            '-l', mgd.TempInputObj('libinfo', 'bylibrary').prop('id'),
+            '-l', mgd.TempInputObj('library_id', 'bylibrary'),
             '-a', '-',
             '-1', mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
             '-2', mgd.TempInputFile('reads2', 'bylibrary', 'byread'),
@@ -321,20 +319,22 @@ if __name__ == '__main__':
     workflow.transform(
         name='merge_spanning_2',
         ctx=lowmem,
-        func=destruct.tasks.merge_files_by_line,
+        func=destruct.tasks.merge_alignment_files,
         args=(
             mgd.TempInputFile('spanning.alignments', 'bylibrary'),
             mgd.TempOutputFile('spanning.alignments'),
+            mgd.TempInputObj('library_id', 'bylibrary'),
         ),
     )
 
     workflow.transform(
         name='merge_split_2',
         ctx=lowmem,
-        func=destruct.tasks.merge_files_by_line,
+        func=destruct.tasks.merge_alignment_files,
         args=(
             mgd.TempInputFile('split.alignments', 'bylibrary'),
             mgd.TempOutputFile('split.alignments'),
+            mgd.TempInputObj('library_id', 'bylibrary'),
         ),
     )
 
@@ -355,7 +355,7 @@ if __name__ == '__main__':
         ctx=lowmem,
         func=destruct.tasks.write_stats_table,
         args=(
-            mgd.TempInputObj('libinfo', 'bylibrary'),
+            mgd.TempInputObj('library_id', 'bylibrary'),
             mgd.TempInputObj('stats', 'bylibrary'),
             mgd.TempOutputFile('libstats.tsv'),
         ),
@@ -533,7 +533,7 @@ if __name__ == '__main__':
             func=destruct.tasks.tabulate_reads,
             args=(
                 mgd.TempInputFile('clusters_setcover'),
-                mgd.TempInputObj('libinfo', 'bylibrary'),
+                mgd.TempInputObj('library_id', 'bylibrary'),
                 mgd.TempInputFile('reads1', 'bylibrary'),
                 mgd.TempInputFile('reads2', 'bylibrary'),
                 mgd.TempOutputFile('breakreads.table.unsorted'),
@@ -560,23 +560,12 @@ if __name__ == '__main__':
         args=(
             mgd.TempInputFile('breakpoints'),
             mgd.TempInputFile('likelihoods'),
-            mgd.TempInputObj('libinfo', 'bylibrary'),
+            mgd.TempInputObj('library_id', 'bylibrary'),
             config['genome_fasta'],
             config['gtf_filename'],
             config['dgv_filename'],
             mgd.OutputFile(args['breakpoint_table']),
             mgd.OutputFile(args['breakpoint_library_table']),
-        ),
-    )
-
-    workflow.transform(
-        name='merge_plots',
-        ctx=lowmem,
-        func=destruct.tasks.merge_tars,
-        args=(
-            mgd.OutputFile(args['plots_tar']),
-            mgd.TempInputFile('score.stats.plots', 'bylibrary'),
-            mgd.TempInputFile('flen.plots', 'bylibrary'),
         ),
     )
 
