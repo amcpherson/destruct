@@ -1,0 +1,24 @@
+package:
+  name: destruct
+  version: "0.3.1"
+
+source:
+  fn: destruct-0.3.1.tar.gz
+  url: https://bitbucket.org/dranew/destruct/get/v0.3.1.tar.gz
+
+requirements:
+  build:
+    - python
+    - scons
+
+  run:
+    - python
+    - pandas >=0.17.1
+    - pypeliner >=0.4.1
+    - pygenes >=0.0.4
+
+about:
+  home: http://bitbucket.org/dranew/destruct
+  license: MIT
+  summary: 'Bioinformatics tool for joint prediction of rearrangement breakpoints from single or multiple tumour samples'
+
