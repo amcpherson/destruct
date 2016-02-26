@@ -5,14 +5,14 @@
 
 #include "Common.h"
 #include "DebugCheck.h"
+#include "api/BamReader.h"
+#include "api/BamWriter.h"
+#include "api/SamSequenceDictionary.h"
 
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <tclap/CmdLine.h>
-#include <bamtools/api/BamReader.h>
-#include <bamtools/api/BamWriter.h>
-#include <bamtools/api/SamSequenceDictionary.h>
 #include <boost/unordered_map.hpp>
 
 using namespace boost;

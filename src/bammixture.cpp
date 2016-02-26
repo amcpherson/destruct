@@ -7,6 +7,8 @@
 
 #include "Common.h"
 #include "DebugCheck.h"
+#include "api/BamReader.h"
+#include "api/BamWriter.h"
 
 #include <fstream>
 #include <iostream>
@@ -15,8 +17,6 @@
 #include <set>
 #include <cstdlib>
 #include <tclap/CmdLine.h>
-#include <bamtools/api/BamReader.h>
-#include <bamtools/api/BamWriter.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/unordered_map.hpp>
 
