@@ -1,10 +1,10 @@
 package:
   name: destruct
-  version: "0.3.1"
+  version: '0.3.1'
 
 source:
-  fn: destruct-0.3.1.tar.gz
-  url: https://bitbucket.org/dranew/destruct/get/v0.3.1.tar.gz
+  git_url: https://dranew@bitbucket.org/dranew/destruct.git
+  git_rev: v0.3.1
 
 requirements:
   build:
