@@ -26,7 +26,7 @@ AddOption(
 )
 
 external_dir = os.path.abspath('external')
-install_dir = GetOption('prefix')
+install_dir = os.path.abspath(os.path.join(GetOption('prefix'), 'bin'))
 boost_dir = GetOption('boost_source')
 
 env = Environment(ENV=os.environ)
