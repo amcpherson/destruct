@@ -7,4 +7,4 @@ scons install --prefix $PREFIX --boost_source $PREFIX/src/boost/
 cd ..
 
 # Build and install python package
-python setup.py install
+$PYTHON setup.py install
