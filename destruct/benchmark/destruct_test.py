@@ -67,12 +67,15 @@ class BreakpointDatabase(object):
         return sorted(matched_ids_bypos)[0][1]
 
 
-def create_tool_wrappers(install_directory):
+def create_tool_wrappers(install_directory, tool_names=None):
+
+    if tool_names is None:
+        tool_names = destruct.benchmark.wrappers.catalog.keys()
 
     tool_wrappers = dict()
 
-    for tool_name, ToolWrapper in destruct.benchmark.wrappers.catalog.iteritems():
-
+    for tool_name in tool_names:
+        ToolWrapper = destruct.benchmark.wrappers.catalog[tool_name]
         tool_wrappers[tool_name] = ToolWrapper(os.path.join(install_directory, tool_name))
 
     return tool_wrappers

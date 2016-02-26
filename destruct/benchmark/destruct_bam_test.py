@@ -49,6 +49,9 @@ if __name__ == '__main__':
     argparser.add_argument('--config',
                            help='Configuration filename')
 
+    argparser.add_argument('--tool_names', nargs='+',
+                           help='Tools to benchmark')
+
     args = vars(argparser.parse_args())
 
     config = {}
@@ -140,7 +143,10 @@ if __name__ == '__main__':
         name='create_tool_wrappers',
         func=destruct_test.create_tool_wrappers,
         ret=mgd.TempOutputObj('tool_wrapper', 'bytool'),
-        args=(args['installdir'],),
+        args=(
+            args['installdir'],
+            args['tool_names'],
+        ),
     )        
 
     workflow.transform(
