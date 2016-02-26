@@ -10,7 +10,9 @@ requirements:
   build:
     - python
     - scons
-    - boost_source
+    - boost_source ==1.60.0
+    - tclap ==1.2.1
+    - bamtools ==2.4.0
 
   run:
     - python
