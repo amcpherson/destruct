@@ -6,6 +6,7 @@ import ConfigParser
 import re
 import itertools
 import subprocess
+import errno
 import argparse
 import string
 import tarfile
@@ -738,6 +739,11 @@ else:
 
 
     def merge_sorted_files_by_line(in_filenames, out_filename, temp_space, sort_fields):
+        try:
+            os.makedirs(temp_space)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
         pypeliner.commandline.execute(*['sort', '-T', temp_space, '-m', '-n', '-k', sort_fields] + in_filenames.values() + ['>', out_filename])
 
 
