@@ -123,8 +123,8 @@ def predict_breaks_split(clusters, split, max_predictions_per_cluster=10):
 
     # Positions have already been flipped, thus we have to
     # add to the second and subtract from the first
-    data.loc[data['flip'], 'position_1'] -= data['advance_1']
-    data.loc[data['flip'], 'position_2'] += data['advance_2']
+    data.loc[data['flip'], 'position_1'] -= data.loc[data['flip'], 'advance_1']
+    data.loc[data['flip'], 'position_2'] += data.loc[data['flip'], 'advance_2']
 
     # Track which end of the cluster was the seed end for this read
     data['seed_end'] = np.where(data['flip'], 1-data['read_end'], data['read_end'])
