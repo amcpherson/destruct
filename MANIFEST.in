@@ -1,0 +1,2 @@
+include versioneer.py
+include destruct/_version.py
