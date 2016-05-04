@@ -61,7 +61,7 @@ def get_config(ref_data_dir, user_config):
     satellite_regions                           = ref_data_dir+'/repeats.satellite.regions'
 
     # Mapping between ensembl and ucsc chromosome names, hg19 and hg18 provided for you
-    chromosome_map                              = pkg_resources.resource_filename('destruct', ucsc_genome_version+'_chr_map.tsv')
+    chromosome_map                              = pkg_resources.resource_filename('destruct', 'data/'+ucsc_genome_version+'_chr_map.tsv')
 
     ###
     # Algorithm parameters
@@ -94,18 +94,6 @@ def get_config(ref_data_dir, user_config):
     # Number of concordant reads sampled to calculate valid alignment score distribution
     num_read_samples                            = 100000
 
-    # Minimum width of region covered by discordant reads on either side of the breakpoint
-    cluster_coverage_threshold                  = 100
-
-    # Minimum aggregate alignment probability for filtering clusters
-    cluster_align_threshold                     = 0.1
-
-    # Minimum aggregate chimeric probability for filtering clusters
-    cluster_chimeric_threshold                  = 0.5
-
-    # Minimum aggregate read valid probability for filtering clusters
-    cluster_valid_threshold                     = 0.5
-
     # Minimum discordant read count for filtering clusters
     cluster_readcount_threshold                 = 2
 
@@ -128,33 +116,6 @@ def get_config(ref_data_dir, user_config):
 
     # Lambda parameter for complex rearrangement discovery (see nFuse, McPherson et al. 2012)
     cycles_lambda                               = 2000
-
-    ###
-    # Demix parameters
-    ###
-
-    mappability_length                          = 100
-    mappability_filename                        = ref_data_dir+'/'+ucsc_genome_version+'.'+str(mappability_length)+'.bwa.mappability'
-
-    # Thousand genomes dataset
-    thousand_genomes_impute_url                 = 'http://mathgen.stats.ox.ac.uk/impute/ALL_1000G_phase1integrated_v3_impute.tgz'
-    thousand_genomes_dir                        = ref_data_dir+'/ALL_1000G_phase1integrated_v3_impute'
-    sample_filename                             = thousand_genomes_dir+'/ALL_1000G_phase1integrated_v3.sample'
-    legend_template                             = thousand_genomes_dir+'/ALL_1000G_phase1integrated_v3_chr{0}_impute.legend.gz'
-    haplotypes_template                         = thousand_genomes_dir+'/ALL_1000G_phase1integrated_v3_chr{0}_impute.hap.gz'
-    genetic_map_template                        = thousand_genomes_dir+'/genetic_map_chr{0}_combined_b37.txt'
-    phased_chromosome_x                         = 'X_nonPAR'
-
-    # All snps from thousand genomes
-    snp_positions                               = ref_data_dir+'/thousand_genomes_snps.tsv'
-
-    # Heterozygous snp calling
-    sequencing_base_call_error                  = 0.01
-    het_snp_call_threshold                      = 0.9
-
-    # Shapeit haplotype block resolution
-    shapeit_num_samples                         = 100
-    shapeit_confidence_threshold                = 0.95
 
     ###
     # Simulation test parameters
