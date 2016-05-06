@@ -14,8 +14,8 @@ setup(
     keywords=['scientific', 'sequence analysis', 'cancer'],
     classifiers=[],
     scripts=[
-        'destruct/run_destruct.py',
-        'destruct/create_ref_data.py',
+        'destruct/scripts/destruct_run.py',
+        'destruct/scripts/destruct_create_ref_data.py',
     ],
     package_data={'destruct': ['data/*_chr_map.tsv']},
 )

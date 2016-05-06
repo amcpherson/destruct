@@ -95,23 +95,3 @@ def create_ref_data(config, ref_data_dir):
     auto_sentinal.run(samtools_faidx)
 
 
-if __name__ == '__main__':
-    argparser = argparse.ArgumentParser()
-
-    argparser.add_argument('ref_data_dir',
-                           help='Reference dataset directory')
-
-    argparser.add_argument('-c', '--config',
-                           help='Configuration filename')
-
-    args = argparser.parse_args()
-
-    args = vars(argparser.parse_args())
-
-    config = {}
-    if args['config'] is not None:
-        execfile(args['config'], {}, config)
-
-    create_ref_data(config, args['ref_data_dir'])
-
-
