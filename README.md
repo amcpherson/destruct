@@ -2,85 +2,32 @@
 
 Destruct is a tool for joint prediction of rearrangement breakpoints from single or multiple tumour samples.
 
-## Prerequisites
+## Installation
 
-### Python
+### Installing from conda
 
-Destruct requires python and the numpy/scipy stack.  The recommended way to install python (also the easiest), is to download and install the latest (Anaconda Python](https://store.continuum.io/cshop/anaconda/) from the Continuum website.
+The recommended method of installation for destruct is using `conda`.  First install [anaconda python](https://store.continuum.io/cshop/anaconda/) from the continuum website.  Then add my channel, and install destruct as follows.
 
-#### Python libraries
+    conda config --add channels https://conda.anaconda.org/dranew
+    conda install destruct
 
-If you do no use anaconda, you will be required to install the following python libraries.
+### Installing from source
 
-* [numpy/scipy](http://www.numpy.org)
-* [pandas](http://pandas.pydata.org)
-* [matplotlib](http://matplotlib.org)
-
-### Scons
-
-Building the source requires scons, verson 2.3.4 can be installed as follows:
-
-    wget http://prdownloads.sourceforge.net/scons/scons-2.3.4.tar.gz
-    tar -xzvf scons-2.3.4.tar.gz
-    cd scons-2.3.4
-    python setup.py install
-
-### Samtools
-
-[Samtools](http://www.htslib.org) is required and should be on the path.
-
-### Bowtie
-
-Destruct uses [Bowtie](http://bowtie-bio.sourceforge.net/index.html) for one of the alignment steps.  The `bowtie` and `bowtie-build` executables should be on the path.  Note that destruct does not use bowtie 2.
-
-## Install
-
-### Clone Source Code
+#### Clone Source Code
 
 To install the code, first clone from bitbucket.  A recursive clone is preferred to pull in all submodules.
 
     git clone --recursive git@bitbucket.org:dranew/destruct.git
 
-The following steps will assume you are in the `destruct` directory.
+#### Dependencies
 
-    cd destruct
+To install from source you will need several dependencies.  A list of dependencies can be found in the `conda` `yaml` file in the repo at `conda/destruct/meta.yaml`.
 
-### Build Executables
+#### Build executables and install
 
-Destruct requires compilation of a number of executables using scons.
+To build executables and install the destruct code as a python package run the following command in the destruct repo:
 
-    cd src
-    scons install
-
-You will also need to build the `pygenes` python library.
-
-    cd pygenes
-    python setup.py --boost_source ../src/external/boost_1_55_0/ \
-        install --prefix pygenes/ --install-purelib=. --install-platlib=.
-
-### Install Python Libraries
-
-There are two options for installing the python libraries.
-
-#### Option 1:
-
-A temporary solution is to modify the python path to point to the location of the source code on your system.  If you use bash, the following command will correctly modify your environment.
-
-    source pythonpath.sh
-
-#### Option 2:
-
-A more permanent solution is to install the libraries into your python site packages.  Note that if you are using python installed on your system, you may need admin privileges.
-
-To install pypeliner, a pipeline management system:
-
-    cd pypeliner
     python setup.py install
-
-To install pygenes, a gene annotation helper library:
-
-    cd pygenes
-    python setup.py --boost_source ../src/external/boost_1_55_0/ install
 
 ## Setup
 
@@ -88,7 +35,7 @@ Download and setup of the reference genome is automated.  Select a directory on 
 
 Download the reference data and build the required indexes:
 
-    python create_ref_data.py $ref_data_dir
+    destruct_create_ref_data.py $ref_data_dir
 
 ## Run
 
@@ -98,16 +45,16 @@ Destruct takes multiple bam files as input.  Bam files can be multiple samples f
 
 ### Running Destruct
 
-Running destruct involves invoking a single script, `destruct.py`.  The result of destruct is several tables and a tar of plots.  Suppose we would like to run destruct on tumour bam file `$tumour_bam` and normal bam file `$normal_bam`.  The following command will predict breakpoints jointly on these bam files:
+Running destruct involves invoking a single script, `destruct_run.py`.  The result of destruct is a set of tables in TSV format.  Suppose we would like to run destruct on tumour bam file `$tumour_bam` and normal bam file `$normal_bam`.  The following command will predict breakpoints jointly on these bam files:
 
-    python destruct.py $ref_data_dir \
-        $breakpoint_table $breakpoint_library_table $plots_tar \
+    destruct_run.py $ref_data_dir \
+        $breakpoint_table $breakpoint_library_table \
         --breakpoint_read_table $breakpoint_read_table \
         --bam_files $tumour_bam $normal_bam \
         --lib_ids tumour normal \
         --tmpdir $tmp
 
-where `$breakpoint_table`, `$breakpoint_library_table`, `$plots_tar`, and `$breakpoint_read_table ` are output tables and plots, and `$tmp` is a unique temporary directory.  If you need to stop and restart the script, using the same temporary directory will allow the scripts to restart where it left off.
+where `$breakpoint_table`, `$breakpoint_library_table`, and `$breakpoint_read_table ` are output tables, and `$tmp` is a unique temporary directory.  If you need to stop and restart the script, using the same temporary directory will allow the scripts to restart where it left off.
 
 For parallelism options see the section [Parallelism using pypeliner](#markdown-header-parallelism-using-pypeliner).
 
@@ -154,10 +101,6 @@ The breakpoint library table contains information per breakpoint per input datas
 * `library_id`: ID of the dataset as given on the command line or in the input dataset table
 * `num_reads`: Number of reads for this dataset
 * `num_unique_reads`: Number of reads for this dataset, potential PCR duplicates removed
-
-#### Plots Tar
-
-The plots tar file contains pdfs of the score likelihoods per alignment length and fragment length distribution.
 
 #### Breakpoint Read Table
 
