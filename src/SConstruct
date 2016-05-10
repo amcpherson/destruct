@@ -195,5 +195,12 @@ sources = """
 env.Program(target='destruct_bammixture', source=common_sources+bamtools_sources+sources)
 env.Install(install_dir, 'destruct_bammixture')
 
+sources = """
+    filterpairdups.cpp
+    ReadStream.cpp
+""".split()
+env.Program(target='destruct_filterpairdups', source=common_sources+sources)
+env.Install(install_dir, 'destruct_filterpairdups')
+
 env.Alias('install', [install_dir])
 
