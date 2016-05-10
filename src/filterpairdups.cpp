@@ -7,12 +7,7 @@
 #include "ReadStream.h"
 
 #include <fstream>
-// #include <iostream>
-// #include <string>
-// #include <map>
-// #include <set>
 #include <tclap/CmdLine.h>
-// #include <boost/algorithm/string.hpp>
 
 using namespace boost;
 using namespace std;
@@ -63,7 +58,7 @@ int main(int argc, char* argv[])
 	RawRead read2;
 	while (inReads1Stream.GetNextRead(read1) && inReads2Stream.GetNextRead(read2))
 	{
-		if (read1.sequence != read2.sequence)
+		if (read1.sequence == read2.sequence)
 		{
 			outReads1File << read1.fragment << "/" << read1.readEnd << endl;
 			outReads1File << "+" << endl;
