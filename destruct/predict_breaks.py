@@ -288,6 +288,10 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
                     on=index_fields,
                     suffixes=('_1', '_2'))
 
+    # For foldbacks and similar, a read could conceivable align to both sides of the breakpoint
+    # remove situations in which one read end is aligned to both cluster ends
+    data = data[data['read_end_1'] != data['read_end_2']]
+
     # Merge insert length from breakpoint predictions
     data = data.merge(breakpoints[['cluster_id', 'breakpoint_id', 'inslen']],
                       on=['cluster_id', 'breakpoint_id'])
