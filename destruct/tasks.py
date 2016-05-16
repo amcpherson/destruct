@@ -199,11 +199,9 @@ def tabulate_reads(clusters_filename, library_ids, reads1_filenames, reads2_file
                         assert name[-2] == '/'
                         fragment_id = int(name[1:-2])
                         read_end = name[-1]
-                        try:
-                            cluster_ids = clusters.loc[(lib_id, fragment_id):(lib_id, fragment_id)]
-                        except KeyError:
-                            continue
-                        for cluster_id in cluster_ids:
+                        if (lib_id, fragment_id) in clusters.index:
+                            cluster_id = clusters.loc[(lib_id, fragment_id)]
+                            assert np.issubdtype(type(cluster_id), np.integer)
                             reads_table_file.write('\t'.join([str(cluster_id), str(lib_id), str(fragment_id), read_end, seq, qual, comment]) + '\n')
 
 
