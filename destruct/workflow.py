@@ -46,7 +46,7 @@ def create_destruct_workflow(
     workflow.commandline(
         name='bamdisc',
         axes=('bylibrary',),
-        ctx=medmem,
+        ctx={'io': 1, 'mem': 8},
         args=(
             'destruct_bamdiscordantfastq',
             '-r',
@@ -63,7 +63,7 @@ def create_destruct_workflow(
     workflow.commandline(
         name='bamsample',
         axes=('bylibrary',),
-        ctx=medmem,
+        ctx={'io': 1, 'mem': 8},
         args=(
             'destruct_bamsamplefastq',
             '-r',
