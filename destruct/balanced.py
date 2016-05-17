@@ -25,6 +25,16 @@ def detect_balanced_rearrangements(
 ):
     G = networkx.Graph()
 
+    breakpoints = breakpoints.copy()
+
+    # Algorithm cannot handle loops created by perfect foldbacks
+    # for these events, move one breakpoint by one nucleotide
+    is_perfect_foldback = (
+        (breakpoints['chromosome_1'] == breakpoints['chromosome_2']) &
+        (breakpoints['position_1'] == breakpoints['position_2']) &
+        (breakpoints['strand_1'] == breakpoints['strand_2']))
+    breakpoints.loc[is_perfect_foldback, 'position_2'] += 1
+
     break_ends = pd.DataFrame(
         {
             'chromosome': np.concatenate([breakpoints['chromosome_1'].values, breakpoints['chromosome_2'].values]),
@@ -150,6 +160,8 @@ def detect_balanced_rearrangements(
     # Min cost perfect matching
     edges = networkx.get_edge_attributes(M1, 'cost')
     for edge in edges.keys():
+        if edge[0] == edge[1]:
+            raise Exception('self loop {}'.format(M1[edge[0]][edge[1]]))
         edges[edge] = int(edges[edge] * cost_resolution)
     min_cost_edges = remixt.blossomv.min_weight_perfect_matching(edges)
 
