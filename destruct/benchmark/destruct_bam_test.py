@@ -1,38 +1,26 @@
-import csv
-import sys
-import logging
 import os
-import ConfigParser
-import re
-import itertools
-import collections
-import subprocess
 import argparse
-import string
+import yaml
 
 import pypeliner
 import pypeliner.workflow
 import pypeliner.managed as mgd
 
-
-destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
-if destruct_directory is None:
-    raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
-
-bin_directory = os.path.join(destruct_directory, 'bin')
-default_config_filename = os.path.join(destruct_directory, 'defaultconfig.py')
+import destruct.benchmark.align.bwa.workflow
+import destruct.benchmark.destruct_test
+import destruct.benchmark.create_breakpoint_simulation
 
 
 if __name__ == '__main__':
 
-    import destruct_test
-    import destruct_bam_test
-    import create_breakpoint_simulation
-
     argparser = argparse.ArgumentParser()
     pypeliner.app.add_arguments(argparser)
-    argparser.add_argument('simconfig',
+
+    argparser.add_argument('sim_config',
                            help='Simulation configuration filename')
+
+    argparser.add_argument('ref_data_dir',
+                           help='Reference genomes directory')
 
     argparser.add_argument('bam',
                            help='Source bam filename')
@@ -40,33 +28,28 @@ if __name__ == '__main__':
     argparser.add_argument('ref',
                            help='Reference genome for source bam')
 
-    argparser.add_argument('installdir',
-                           help='Tool installations directory')
-
-    argparser.add_argument('outdir',
+    argparser.add_argument('results_dir',
                            help='Output directory')
 
-    argparser.add_argument('--config',
-                           help='Configuration filename')
+    argparser.add_argument('tool_defs',
+                           help='Tool Definition Filename')
 
-    argparser.add_argument('--tool_names', nargs='+',
-                           help='Tools to benchmark')
+    argparser.add_argument('--chromosomes', nargs='*', type=str, default=['20'],
+                           help='Reference chromosomes')
 
     args = vars(argparser.parse_args())
 
-    config = {}
-
-    if args['config'] is not None:
-        execfile(args['config'], {}, config)
-
-    config.update(args)
-
-    pyp = pypeliner.app.Pypeline([destruct_test, destruct_bam_test, create_breakpoint_simulation], config)
-
     try:
-        os.makedirs(args['outdir'])
+        os.makedirs(args['results_dir'])
     except OSError:
         pass
+
+    args['tmpdir'] = os.path.join(args['results_dir'], 'tmp')
+
+    pyp = pypeliner.app.Pypeline(config=args)
+
+    yaml_text = open(args['tool_defs']).read().format(ref_data_dir=args['ref_data_dir'])
+    tool_defs = yaml.load(yaml_text)
 
     ctx = {'mem':4}
 
@@ -74,111 +57,141 @@ if __name__ == '__main__':
 
     workflow.transform(
         name='read_params',
-        func=destruct_test.read_simulation_params,
+        func=destruct.benchmark.destruct_test.read_simulation_params,
         ret=mgd.TempOutputObj('simulation.params'),
-        args=(mgd.InputFile(args['simconfig']),),
+        args=(mgd.InputFile(args['sim_config']),),
+    )
+
+    workflow.setobj(mgd.TempOutputObj('chromosomes'), args['chromosomes'])
+
+    genome_fasta = os.path.join(args['results_dir'], 'genome.fa')
+    source_bam = os.path.join(args['results_dir'], 'source.bam')
+
+    workflow.transform(
+        name='create_ref_bam',
+        func=destruct.benchmark.destruct_test.create_ref_bam,
+        args=(
+            mgd.InputFile(args['ref']),
+            mgd.InputFile(args['bam']),
+            mgd.OutputFile(genome_fasta),
+            mgd.OutputFile(source_bam),
+            mgd.TempInputObj('chromosomes'),
+        ),
     )
 
     workflow.transform(
         name='create_sim',
-        func=create_breakpoint_simulation.create_breakpoints,
+        func=destruct.benchmark.create_breakpoint_simulation.create_breakpoints,
         args=(
             mgd.TempInputObj('simulation.params'),
-            mgd.InputFile(args['ref']),
-            mgd.OutputFile(os.path.join(args['outdir'], 'simulated.fasta')),
-            mgd.OutputFile(os.path.join(args['outdir'], 'simulated.tsv')),
+            mgd.InputFile(genome_fasta),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.fa')),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.tsv')),
         ),
     )
 
     workflow.transform(
         name='partition',
-        func=destruct_test.partition_bam,
+        func=destruct.benchmark.destruct_test.partition_bam,
         args=(
-            mgd.InputFile(args['bam']),
-            mgd.OutputFile(os.path.join(args['outdir'], 'normal.bam')),
+            mgd.InputFile(source_bam),
+            mgd.TempOutputFile('normal.raw.bam'),
             mgd.TempOutputFile('tumour.unspiked.bam'),
             0.5,
         ),
-    )        
+    )
 
     workflow.commandline(
         name='simulate',
         args=(
-            os.path.join(bin_directory, 'bamextractsimreads'),
-            '-b', mgd.InputFile(args['bam']),
-            '-r', mgd.InputFile(args['ref']),
-            '-s', mgd.InputFile(os.path.join(args['outdir'], 'simulated.fasta')),
+            'destruct_bamextractsimreads',
+            '-b', mgd.InputFile(source_bam),
+            '-r', mgd.InputFile(genome_fasta),
+            '-s', mgd.InputFile(os.path.join(args['results_dir'], 'simulated.fa')),
             '-f', mgd.TempInputObj('simulation.params').extract(lambda a: a['coverage_fraction']),
-            '-1', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
-            '-2', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
+            '-1', mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.1.fastq')),
+            '-2', mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.2.fastq')),
         ),
-    )        
+    )
 
-    bwaalign_script = os.path.join(destruct_directory, 'scripts', 'bwaalign.py')
-
-    workflow.commandline(
+    workflow.subworkflow(
         name='bwa_align',
+        func=destruct.benchmark.align.bwa.workflow.bwa_align_workflow,
         args=(
-            sys.executable,
-            bwaalign_script,
-            mgd.InputFile(args['ref']),
-            mgd.InputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
-            mgd.InputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
+            mgd.InputFile(genome_fasta),
+            mgd.InputFile(os.path.join(args['results_dir'], 'simulated.1.fastq')),
+            mgd.InputFile(os.path.join(args['results_dir'], 'simulated.2.fastq')),
             mgd.TempOutputFile('simulated.unsorted.bam'),
-            '--tmp', mgd.TempSpace('bwa_tmp'),
         ),
-    )        
+    )
 
     workflow.transform(
         name='samtools_merge_sort_index',
-        func=destruct_test.samtools_merge_sort_index,
+        func=destruct.benchmark.destruct_test.samtools_merge_sort_index,
         args=(
-            mgd.OutputFile(os.path.join(args['outdir'], 'tumour.bam')),
+            mgd.TempOutputFile('tumour_raw.bam'),
             mgd.TempInputFile('tumour.unspiked.bam'),
             mgd.TempInputFile('simulated.unsorted.bam'),
         ),
-    )        
+    )
 
     workflow.transform(
-        name='create_tool_wrappers',
-        func=destruct_test.create_tool_wrappers,
-        ret=mgd.TempOutputObj('tool_wrapper', 'bytool'),
+        name='samtools_reheader_tumour',
+        func=destruct.benchmark.destruct_test.samtools_sample_reheader,
         args=(
-            args['installdir'],
-            args['tool_names'],
+            mgd.OutputFile(os.path.join(args['results_dir'], 'tumour.bam')),
+            mgd.TempInputFile('tumour_raw.bam'),
+            'tumour',
         ),
-    )        
+    )
 
     workflow.transform(
-        name='run_tool',
-        axes=('bytool',),
-        func=destruct_test.run_tool,
+        name='samtools_reheader_normal',
+        func=destruct.benchmark.destruct_test.samtools_sample_reheader,
         args=(
-            mgd.TempInputObj('tool_wrapper', 'bytool'),
-            mgd.TempSpace('tool_tmp', 'bytool'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'normal.bam')),
+            mgd.TempInputFile('normal.raw.bam'),
+            'normal',
+        ),
+    )
+
+    workflow.setobj(
+        obj=mgd.TempOutputObj('tool_defs', 'tool_name'),
+        value=tool_defs,
+    )
+
+    workflow.subworkflow(
+        name='run_tool',
+        axes=('tool_name',),
+        func=destruct.benchmark.destruct_test.create_tool_workflow,
+        args=(
+            mgd.TempInputObj('tool_defs', 'tool_name'),
+            {
+                'tumour': mgd.InputFile(os.path.join(args['results_dir'], 'tumour.bam')),
+                'normal': mgd.InputFile(os.path.join(args['results_dir'], 'normal.bam')),
+            },
+            mgd.OutputFile(os.path.join(args['results_dir'], 'results_{tool_name}.tsv'), 'tool_name'),
+            mgd.TempSpace('tool_raw_data', 'tool_name'),
         ),
         kwargs={
             'control_id': 'normal',
-            'tumour': mgd.InputFile(os.path.join(args['outdir'], 'tumour.bam')),
-            'normal': mgd.InputFile(os.path.join(args['outdir'], 'normal.bam')),
         },
-    )           
+    )
 
     workflow.transform(
         name='plot',
-        axes=('bytool',),
-        func=destruct_test.create_roc_plot,
+        axes=('tool_name',),
+        func=destruct.benchmark.destruct_test.create_roc_plot,
         args=(
             mgd.TempInputObj('simulation.params'),
-            mgd.TempInputObj('tool_wrapper', 'bytool'),
-            mgd.InputFile(os.path.join(args['outdir'], 'simulated.tsv')),
-            mgd.InputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'annotated_{bytool}.tsv'), 'bytool'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'identified_{bytool}.tsv'), 'bytool'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'plots_{bytool}.pdf'), 'bytool'),
+            mgd.TempInputObj('tool_defs', 'tool_name'),
+            mgd.InputFile(os.path.join(args['results_dir'], 'simulated.tsv')),
+            mgd.InputFile(os.path.join(args['results_dir'], 'results_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'annotated_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'identified_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'plots_{tool_name}.pdf'), 'tool_name'),
         ),
-    )        
+    )
 
     pyp.run(workflow)
 

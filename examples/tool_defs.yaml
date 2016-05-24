@@ -1,0 +1,40 @@
+
+destruct:
+  name: destruct
+  workflow:
+    module: destruct.benchmark.wrappers.destruct.workflow
+    run_function: create_destruct_wrapper_workflow
+    setup_function: setup_destruct
+  kwargs:
+    ref_data_dir: {ref_data_dir}/destruct
+    config:
+      chromosomes: ['20']
+  features:
+    - num_reads
+    - num_unique_reads
+    - num_split
+    - log_likelihood
+
+delly:
+  name: delly
+  workflow:
+    module: destruct.benchmark.wrappers.delly.workflow
+    run_function: create_delly_wrapper_workflow
+    setup_function: setup_delly
+  kwargs:
+    ref_genome_fasta_file: {ref_data_dir}/delly/genome.fasta
+    delly_excl_chrom: {ref_data_dir}/delly/human.hg19.excl.tsv
+  features:
+    - num_spanning
+    - num_split
+
+lumpysv:
+  name: lumpysv
+  workflow:
+    module: destruct.benchmark.wrappers.lumpysv.workflow
+    run_function: create_lumpysv_wrapper_workflow
+    setup_function: setup_lumpysv
+  features:
+    - num_spanning
+    - num_split
+

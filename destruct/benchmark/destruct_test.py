@@ -1,4 +1,5 @@
 import os
+import subprocess
 import shutil
 import collections
 import bisect
@@ -6,21 +7,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from sklearn.metrics import roc_curve, auc
 import seaborn
 
-import pygenes
 import pypeliner
 
 import destruct.benchmark.wrappers
 import destruct.utils.download
-
-
-destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
-if destruct_directory is None:
-    raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
-
-bin_directory = os.path.join(destruct_directory, 'bin')
 
 
 def read_simulation_params(sim_config_filename):
@@ -67,26 +59,32 @@ class BreakpointDatabase(object):
         return sorted(matched_ids_bypos)[0][1]
 
 
-def create_tool_wrappers(install_directory, tool_names=None):
+def create_tool_workflow(tool_info, bam_filenames, output_filename, raw_data_dir, **kwargs):
+    workflow_module = __import__(tool_info['workflow']['module'], fromlist=[''])
+    workflow_function = getattr(workflow_module, tool_info['workflow']['run_function'])
 
-    if tool_names is None:
-        tool_names = destruct.benchmark.wrappers.catalog.keys()
+    if 'kwargs' in tool_info:
+        kwargs.update(tool_info['kwargs'])
 
-    tool_wrappers = dict()
+    try:
+        os.makedirs(raw_data_dir)
+    except OSError:
+        pass
 
-    for tool_name in tool_names:
-        ToolWrapper = destruct.benchmark.wrappers.catalog[tool_name]
-        tool_wrappers[tool_name] = ToolWrapper(os.path.join(install_directory, tool_name))
-
-    return tool_wrappers
+    return workflow_function(bam_filenames, output_filename, raw_data_dir, **kwargs)
 
 
-def run_tool(tool_wrapper, temp_directory, results_filename, control_id=None, **bam_filenames):
+def run_setup_function(tool_info, test_config, **kwargs):
+    workflow_module = __import__(tool_info['workflow']['module'], fromlist=[''])
+    setup_function = getattr(workflow_module, tool_info['workflow']['setup_function'])
 
-    tool_wrapper.run(bam_filenames, results_filename, temp_directory, control_id=control_id)
-    
+    if 'kwargs' in tool_info:
+        kwargs.update(tool_info['kwargs'])
 
-def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
+    setup_function(test_config, **kwargs)
+
+
+def create_roc_plot(sim_info, tool_defs, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
 
     with PdfPages(plot_filename) as pdf:
 
@@ -111,7 +109,7 @@ def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filena
 
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
-        features = tool_wrapper.features
+        features = tool_defs['features']
         invalid_value = -1e9
 
         identified = breakpoints[['break_id']]
@@ -172,6 +170,8 @@ def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filena
 
 
 def create_genome(chromosomes, include_nonchromosomal, genome_fasta):
+    """ Download and index a genome
+    """
 
     destruct.utils.download.download_genome_fasta(genome_fasta,
                                                   chromosomes,
@@ -184,9 +184,82 @@ def create_genome(chromosomes, include_nonchromosomal, genome_fasta):
         os.rename(genome_fasta+extension, genome_fasta[:-4]+extension)
 
 
+def create_ref_bam(in_ref_filename, in_bam_filename, out_ref_filename, out_bam_filename, chromosomes):
+    """ Subset reference genome and bam by chromosomes
+    """
+
+    # Subset the chromosomes in the input reference genome
+    samtools_faidx_cmd = [
+        'samtools',
+        'faidx',
+        in_ref_filename,
+    ]
+    samtools_faidx_cmd += chromosomes
+    samtools_faidx_cmd += ['>', out_ref_filename]
+    pypeliner.commandline.execute(*samtools_faidx_cmd)
+
+    # Fasta index of output reference
+    out_ref_fai_filename = out_ref_filename + '.fai'
+    pypeliner.commandline.execute('samtools', 'faidx', out_ref_filename)
+
+    # Remove .tmp suffix if necessary
+    if out_ref_filename.endswith('.tmp'):
+        os.rename(out_ref_fai_filename, out_ref_filename[:-len('.tmp')] + '.fai')
+        out_ref_fai_filename = out_ref_filename[:-len('.tmp')] + '.fai'
+
+    # Create a new header
+    original_header_filename = out_bam_filename + '.original_header.sam'
+    new_header_filename = out_bam_filename + '.new_header.sam'
+    pypeliner.commandline.execute('samtools', 'view', '-H', in_bam_filename, '>', original_header_filename)
+    with open(original_header_filename, 'r') as in_f, open(new_header_filename, 'w') as out_f:
+        for line in in_f:
+            if line.startswith('@SQ'):
+                keep = False
+                for field in line.rstrip().split('\t'):
+                    if field.startswith('SN:'):
+                        chromosome = field[len('SN:'):]
+                        if chromosome in chromosomes:
+                            keep = True
+                        break
+                if keep:
+                    out_f.write(line)
+            else:
+                out_f.write(line)
+
+    # Create the chromosome subsetted bam file
+    p = subprocess.Popen(['samtools', 'view', '-', '-b', '-t', out_ref_fai_filename, '-o', out_bam_filename], stdin=subprocess.PIPE)
+
+    with open(new_header_filename, 'r') as f:
+        shutil.copyfileobj(f, p.stdin)
+
+    p2 = subprocess.Popen(['samtools', 'view', in_bam_filename] + chromosomes, stdout=p.stdin)
+
+    if p2.wait() != 0:
+        raise Exception('samtools view returned {}'.format(p2.returncode))
+
+    p.stdin.close()
+    if p.wait() != 0:
+        raise Exception('samtools view returned {}'.format(p.returncode))
+
+    # Samtools index the new bam
+    pypeliner.commandline.execute('samtools', 'index', out_bam_filename)
+
+    # Remove .tmp suffix if necessary
+    if out_bam_filename.endswith('.tmp'):
+        os.rename(out_bam_filename + '.bai', out_bam_filename[:-len('.tmp')] + '.bai')
+
+    # Index for bwa alignment
+    pypeliner.commandline.execute('bwa', 'index', out_ref_filename)
+
+    # Remove .tmp suffix if necessary
+    if out_ref_filename.endswith('.tmp'):
+       for ext in ('.amb', '.ann', '.bwt', '.pac', '.sa'):
+           os.rename(out_ref_filename + ext, out_ref_filename[:-len('.tmp')] + ext)
+
+
 def partition_bam(original_filename, output_a_filename, output_b_filename, fraction_a):
 
-    pypeliner.commandline.execute(os.path.join(bin_directory, 'bampartition'),
+    pypeliner.commandline.execute('destruct_bampartition',
                                   '-i', original_filename,
                                   '-a', output_a_filename,
                                   '-b', output_b_filename,
@@ -198,9 +271,7 @@ def partition_bam(original_filename, output_a_filename, output_b_filename, fract
 
 def samtools_sort_index(input_filename, output_filename):
 
-    pypeliner.commandline.execute('samtools', 'sort', input_filename, output_filename)
-
-    os.rename(output_filename + '.bam', output_filename)
+    pypeliner.commandline.execute('samtools', 'sort', input_filename, '-o', output_filename)
 
     assert output_filename.endswith('.tmp')
     index_filename = output_filename[:-4] + '.bai'
@@ -214,7 +285,7 @@ def samtools_merge_sort_index(output_filename, *input_filenames):
     sorted_filenames = list()
 
     for input_filename in input_filenames:
-        pypeliner.commandline.execute('samtools', 'sort', input_filename, input_filename+'.sorted')
+        pypeliner.commandline.execute('samtools', 'sort', input_filename, '-o', input_filename+'.sorted.bam')
         sorted_filenames.append(input_filename+'.sorted.bam')
 
     pypeliner.commandline.execute('samtools', 'merge', output_filename, *sorted_filenames)
@@ -228,6 +299,25 @@ def samtools_merge_sort_index(output_filename, *input_filenames):
     pypeliner.commandline.execute('samtools', 'index', output_filename, index_filename)
 
 
+def samtools_sample_reheader(output_filename, input_filename, sample_name):
+    header_filename = input_filename + '.header.sam'
+    pypeliner.commandline.execute('samtools', 'view', '-H', input_filename, '>', header_filename)
 
+    reheader_filename = input_filename + '.reheader.sam'
+    with open(header_filename, 'r') as f_in, open(reheader_filename, 'w') as f_out:
+        for line in f_in:
+            fields = line.rstrip().split('\t')
+            if fields[0] == '@RG':
+                for idx in xrange(len(fields)):
+                    if fields[idx].startswith('SM:'):
+                        fields[idx] = 'SM:' + sample_name
+                line = '\t'.join(fields) + '\n'
+            f_out.write(line)
 
+    pypeliner.commandline.execute('samtools', 'reheader', reheader_filename, input_filename, '>', output_filename)
+
+    assert output_filename.endswith('.tmp')
+    index_filename = output_filename[:-4] + '.bai'
+
+    pypeliner.commandline.execute('samtools', 'index', output_filename, index_filename)
 
