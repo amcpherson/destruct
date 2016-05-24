@@ -75,8 +75,6 @@ int main(int argc, char* argv[])
 	BamAlignment alignment;
 	while (bamInput.GetNextAlignment(alignment))
 	{
-		alignment.RemoveTag("RG");
-
 		unordered_map<string,bool>::const_iterator readIsAIter = readIsA.find(alignment.Name);
 
 		bool firstInPair = false;

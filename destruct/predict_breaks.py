@@ -112,6 +112,10 @@ def predict_breaks_split(clusters, split, max_predictions_per_cluster=10):
     data['position_1'] = data['position_1'].astype(int)
     data['position_2'] = data['position_2'].astype(int)
 
+    # Check for empty split alignments
+    if len(data.index) == 0:
+      return pd.DataFrame()
+
     # Flip columns to make them consistent across clusters
     utils.misc.column_flip(data, data['flip'], 'chromosome_1', 'chromosome_2')
     utils.misc.column_flip(data, data['flip'], 'strand_1', 'strand_2')

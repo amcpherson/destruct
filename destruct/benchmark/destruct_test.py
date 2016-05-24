@@ -6,21 +6,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from sklearn.metrics import roc_curve, auc
 import seaborn
 
-import pygenes
 import pypeliner
 
 import destruct.benchmark.wrappers
 import destruct.utils.download
-
-
-destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
-if destruct_directory is None:
-    raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
-
-bin_directory = os.path.join(destruct_directory, 'bin')
 
 
 def read_simulation_params(sim_config_filename):
@@ -67,26 +58,22 @@ class BreakpointDatabase(object):
         return sorted(matched_ids_bypos)[0][1]
 
 
-def create_tool_wrappers(install_directory, tool_names=None):
+def create_tool_workflow(tool_info, bam_filenames, output_filename, raw_data_dir, **kwargs):
+    workflow_module = __import__(tool_info['workflow']['module'], fromlist=[''])
+    workflow_function = getattr(workflow_module, tool_info['workflow']['function'])
 
-    if tool_names is None:
-        tool_names = destruct.benchmark.wrappers.catalog.keys()
+    if 'kwargs' in tool_info:
+        kwargs.update(tool_info['kwargs'])
 
-    tool_wrappers = dict()
+    try:
+        os.makedirs(raw_data_dir)
+    except OSError:
+        pass
 
-    for tool_name in tool_names:
-        ToolWrapper = destruct.benchmark.wrappers.catalog[tool_name]
-        tool_wrappers[tool_name] = ToolWrapper(os.path.join(install_directory, tool_name))
-
-    return tool_wrappers
+    return workflow_function(bam_filenames, output_filename, raw_data_dir, **kwargs)
 
 
-def run_tool(tool_wrapper, temp_directory, results_filename, control_id=None, **bam_filenames):
-
-    tool_wrapper.run(bam_filenames, results_filename, temp_directory, control_id=control_id)
-    
-
-def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
+def create_roc_plot(sim_info, tool_defs, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
 
     with PdfPages(plot_filename) as pdf:
 
@@ -111,7 +98,7 @@ def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filena
 
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
-        features = tool_wrapper.features
+        features = tool_defs['features']
         invalid_value = -1e9
 
         identified = breakpoints[['break_id']]
@@ -172,6 +159,8 @@ def create_roc_plot(sim_info, tool_wrapper, simulated_filename, predicted_filena
 
 
 def create_genome(chromosomes, include_nonchromosomal, genome_fasta):
+    """ Download and index a genome
+    """
 
     destruct.utils.download.download_genome_fasta(genome_fasta,
                                                   chromosomes,
@@ -186,7 +175,7 @@ def create_genome(chromosomes, include_nonchromosomal, genome_fasta):
 
 def partition_bam(original_filename, output_a_filename, output_b_filename, fraction_a):
 
-    pypeliner.commandline.execute(os.path.join(bin_directory, 'bampartition'),
+    pypeliner.commandline.execute('destruct_bampartition',
                                   '-i', original_filename,
                                   '-a', output_a_filename,
                                   '-b', output_b_filename,
@@ -198,9 +187,7 @@ def partition_bam(original_filename, output_a_filename, output_b_filename, fract
 
 def samtools_sort_index(input_filename, output_filename):
 
-    pypeliner.commandline.execute('samtools', 'sort', input_filename, output_filename)
-
-    os.rename(output_filename + '.bam', output_filename)
+    pypeliner.commandline.execute('samtools', 'sort', input_filename, '-o', output_filename)
 
     assert output_filename.endswith('.tmp')
     index_filename = output_filename[:-4] + '.bai'
@@ -214,7 +201,7 @@ def samtools_merge_sort_index(output_filename, *input_filenames):
     sorted_filenames = list()
 
     for input_filename in input_filenames:
-        pypeliner.commandline.execute('samtools', 'sort', input_filename, input_filename+'.sorted')
+        pypeliner.commandline.execute('samtools', 'sort', input_filename, '-o', input_filename+'.sorted.bam')
         sorted_filenames.append(input_filename+'.sorted.bam')
 
     pypeliner.commandline.execute('samtools', 'merge', output_filename, *sorted_filenames)
@@ -228,6 +215,20 @@ def samtools_merge_sort_index(output_filename, *input_filenames):
     pypeliner.commandline.execute('samtools', 'index', output_filename, index_filename)
 
 
+def samtools_sample_reheader(output_filename, input_filename, sample_name):
+    header_filename = input_filename + '.header.sam'
+    pypeliner.commandline.execute('samtools', 'view', '-H', input_filename, '>', header_filename)
 
+    reheader_filename = input_filename + '.reheader.sam'
+    with open(header_filename, 'r') as f_in, open(reheader_filename, 'w') as f_out:
+        for line in f_in:
+            fields = line.rstrip().split('\t')
+            if fields[0] == '@RG':
+                for idx in xrange(len(fields)):
+                    if fields[idx].startswith('SM:'):
+                        fields[idx] = 'SM:' + sample_name
+                line = '\t'.join(fields) + '\n'
+            f_out.write(line)
 
+    pypeliner.commandline.execute('samtools', 'reheader', reheader_filename, input_filename, '>', output_filename)
 

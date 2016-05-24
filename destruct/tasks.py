@@ -312,6 +312,24 @@ def query_dgv(row, dgv):
     return ', '.join(variants)
 
 
+def calculate_expected_size(likelihoods):
+    probs = np.exp(likelihoods.values)
+    n = len(probs)
+    size_elem_mat = np.zeros((n+1, n))
+
+    size_elem_mat[0, :] = 1.
+    size_elem_mat[1, 0] = probs[0]
+
+    for sz in xrange(1, n+1):
+        for idx in xrange(1, n):
+            size_elem_mat[sz, idx] = probs[idx] * size_elem_mat[sz - 1, idx - 1] + 1. * size_elem_mat[sz, idx - 1]
+
+    size_prob = size_elem_mat[:, -1] * 1. / (n - np.arange(n + 1) + 1)
+    size_prob /= size_prob.sum()
+
+    return (np.arange(n + 1) * size_prob).sum()
+
+
 def tabulate_results(breakpoints_filename, likelihoods_filename, library_ids,
                      genome_fasta, gtf_filename, dgv_filename,
                      breakpoint_table, breakpoint_library_table):
@@ -366,6 +384,13 @@ def tabulate_results(breakpoints_filename, likelihoods_filename, library_ids,
         .reset_index()
     )
 
+    expected_size = (
+        likelihoods.groupby('cluster_id')['log_likelihood']
+        .agg(calculate_expected_size)
+        .reset_index()
+    )
+    expected_size.colums = ['prediction_id', 'expected_num_reads']
+
     breakpoint_stats['template_length_min'] = breakpoint_stats[['template_length_1', 'template_length_2']].min(axis=1)
 
     breakpoint_counts = (
@@ -384,8 +409,8 @@ def tabulate_results(breakpoints_filename, likelihoods_filename, library_ids,
     breakpoint_unique_counts.columns = ['cluster_id', 'num_unique_reads']
 
     breakpoints = breakpoints.merge(breakpoint_stats, on='cluster_id', how='left')
-
     breakpoints = breakpoints.merge(breakpoint_counts, on='cluster_id', how='left')
+    breakpoints = breakpoints.merge(breakpoint_unique_counts, on='cluster_id', how='left')
 
     # Calculate breakpoint type
     def breakpoint_type(row):

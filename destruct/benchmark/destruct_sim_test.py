@@ -1,32 +1,17 @@
-import csv
-import sys
-import logging
 import os
-import ConfigParser
-import re
-import itertools
-import collections
-import subprocess
 import argparse
-import string
+import yaml
 
 import pypeliner
 import pypeliner.workflow
 import pypeliner.managed as mgd
 
-
-destruct_directory = os.environ.get('DESTRUCT_PACKAGE_DIRECTORY', None)
-if destruct_directory is None:
-    raise Exception('please set the $DESTRUCT_PACKAGE_DIRECTORY environment variable to the root of the destruct package')
-
-default_config_filename = os.path.join(destruct_directory, 'defaultconfig.py')
+import destruct.benchmark.align.bwa.workflow
+import destruct.benchmark.destruct_test
+import destruct.benchmark.create_breakpoint_simulation
 
 
 if __name__ == '__main__':
-
-    import destruct_test
-    import destruct_sim_test
-    import create_breakpoint_simulation
 
     argparser = argparse.ArgumentParser()
     pypeliner.app.add_arguments(argparser)
@@ -34,17 +19,14 @@ if __name__ == '__main__':
     argparser.add_argument('simconfig',
                            help='Simulation configuration filename')
 
-    argparser.add_argument('installdir',
-                           help='Tool installations directory')
-
     argparser.add_argument('outdir',
                            help='Output directory')
 
+    argparser.add_argument('tool_defs',
+                           help='Tool Definition Filename')
+
     argparser.add_argument('--config',
                            help='Configuration filename')
-
-    argparser.add_argument('--tool_names', nargs='+',
-                           help='Tools to benchmark')
 
     argparser.add_argument('--chromosomes', nargs='*', type=str, default=['20'],
                            help='Reference chromosomes')
@@ -61,7 +43,10 @@ if __name__ == '__main__':
 
     config.update(args)
 
-    pyp = pypeliner.app.Pypeline([destruct_test, destruct_sim_test, create_breakpoint_simulation], config)
+    pyp = pypeliner.app.Pypeline(config=config)
+
+    tool_defs = yaml.load(open(args['tool_defs']))
+    del tool_defs['databases']
 
     try:
         os.makedirs(args['outdir'])
@@ -74,7 +59,7 @@ if __name__ == '__main__':
 
     workflow.transform(
         name='read_params',
-        func=destruct_test.read_simulation_params,
+        func=destruct.benchmark.destruct_test.read_simulation_params,
         ret=mgd.TempOutputObj('simulation.params'),
         args=(mgd.InputFile(args['simconfig']),),
     )
@@ -84,7 +69,7 @@ if __name__ == '__main__':
 
     workflow.transform(
         name='create_genome',
-        func=destruct_test.create_genome,
+        func=destruct.benchmark.destruct_test.create_genome,
         args=(
             mgd.TempInputObj('chromosomes'),
             mgd.TempInputObj('include_nonchromosomal'),
@@ -94,7 +79,7 @@ if __name__ == '__main__':
 
     workflow.transform(
         name='create_sim',
-        func=create_breakpoint_simulation.create,
+        func=destruct.benchmark.create_breakpoint_simulation.create,
         args=(
             mgd.TempInputObj('simulation.params'),
             mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
@@ -127,66 +112,55 @@ if __name__ == '__main__':
         ),
     )
 
-    bwaalign_script = os.path.join(destruct_directory, 'scripts', 'bwaalign.py')
-
-    workflow.commandline(
+    workflow.subworkflow(
         name='bwa_align',
+        func=destruct.benchmark.align.bwa.workflow.bwa_align_workflow,
         args=(
-            sys.executable,
-            bwaalign_script,
             mgd.InputFile(os.path.join(args['outdir'], 'genome.fasta')),
             mgd.InputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
             mgd.InputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
             mgd.TempOutputFile('simulated.unsorted.bam'),
-            '--tmp', mgd.TempSpace('bwa_tmp'),
         ),
     )
 
     workflow.transform(
         name='samtools_sort_index',
-        func=destruct_test.samtools_sort_index,
+        func=destruct.benchmark.destruct_test.samtools_sort_index,
         args=(
             mgd.TempInputFile('simulated.unsorted.bam'),
             mgd.OutputFile(os.path.join(args['outdir'], 'simulated.bam')),
         ),
     )
 
-    workflow.transform(
-        name='create_tool_wrappers',
-        func=destruct_test.create_tool_wrappers,
-        ret=mgd.TempOutputObj('tool_wrapper', 'bytool'),
-        args=(
-            args['installdir'],
-            args['tool_names'],
-        ),
+    workflow.setobj(
+        obj=mgd.TempOutputObj('tool_defs', 'tool_name'),
+        value=tool_defs,
     )
 
-    workflow.transform(
+    workflow.subworkflow(
         name='run_tool',
-        axes=('bytool',),
-        func=destruct_test.run_tool,
+        axes=('tool_name',),
+        func=destruct.benchmark.destruct_test.create_tool_workflow,
         args=(
-            mgd.TempInputObj('tool_wrapper', 'bytool'),
-            mgd.TempSpace('tool_tmp', 'bytool'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
+            mgd.TempInputObj('tool_defs', 'tool_name'),
+            {'simulated': mgd.InputFile(os.path.join(args['outdir'], 'simulated.bam')),},
+            mgd.OutputFile(os.path.join(args['outdir'], 'results_{tool_name}.tsv'), 'tool_name'),
+            mgd.TempSpace('tool_raw_data', 'tool_name'),
         ),
-        kwargs={
-            'simulated': mgd.InputFile(os.path.join(args['outdir'], 'simulated.bam')),
-        },
     )
 
     workflow.transform(
         name='plot',
-        axes=('bytool',),
-        func=destruct_test.create_roc_plot,
+        axes=('tool_name',),
+        func=destruct.benchmark.destruct_test.create_roc_plot,
         args=(
             mgd.TempInputObj('simulation.params'),
-            mgd.TempInputObj('tool_wrapper', 'bytool'),
+            mgd.TempInputObj('tool_defs', 'tool_name'),
             mgd.InputFile(os.path.join(args['outdir'], 'simulated.tsv')),
-            mgd.InputFile(os.path.join(args['outdir'], 'results_{bytool}.tsv'), 'bytool'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'annotated_{bytool}.tsv'), 'bytool'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'identified_{bytool}.tsv'), 'bytool'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'plots_{bytool}.pdf'), 'bytool'),
+            mgd.InputFile(os.path.join(args['outdir'], 'results_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['outdir'], 'annotated_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['outdir'], 'identified_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['outdir'], 'plots_{tool_name}.pdf'), 'tool_name'),
         ),
     )
 
