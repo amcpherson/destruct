@@ -49,7 +49,6 @@ if __name__ == '__main__':
     pyp = pypeliner.app.Pypeline(config=config)
 
     tool_defs = yaml.load(open(args['tool_defs']))
-    del tool_defs['databases']
 
     try:
         os.makedirs(args['outdir'])
