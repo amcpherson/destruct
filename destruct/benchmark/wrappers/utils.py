@@ -23,7 +23,7 @@ class Sentinal(object):
         return self
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type is None:
-            with open(self.sentinal_filename, 'w') as sentinal_file:
+            with open(self.sentinal_filename, 'w'):
                 pass
 
 
