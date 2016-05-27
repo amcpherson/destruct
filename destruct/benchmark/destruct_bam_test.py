@@ -16,8 +16,11 @@ if __name__ == '__main__':
     argparser = argparse.ArgumentParser()
     pypeliner.app.add_arguments(argparser)
 
-    argparser.add_argument('simconfig',
+    argparser.add_argument('sim_config',
                            help='Simulation configuration filename')
+
+    argparser.add_argument('ref_data_dir',
+                           help='Reference genomes directory')
 
     argparser.add_argument('bam',
                            help='Source bam filename')
@@ -25,33 +28,21 @@ if __name__ == '__main__':
     argparser.add_argument('ref',
                            help='Reference genome for source bam')
 
-    argparser.add_argument('outdir',
+    argparser.add_argument('results_dir',
                            help='Output directory')
 
     argparser.add_argument('tool_defs',
                            help='Tool Definition Filename')
 
-    argparser.add_argument('--config',
-                           help='Configuration filename')
-
-    argparser.add_argument('--tool_names', nargs='+',
-                           help='Tools to benchmark')
-
     args = vars(argparser.parse_args())
 
-    config = {}
+    pyp = pypeliner.app.Pypeline(config=args)
 
-    if args['config'] is not None:
-        execfile(args['config'], {}, config)
-
-    config.update(args)
-
-    pyp = pypeliner.app.Pypeline(config=config)
-
-    tool_defs = yaml.load(open(args['tool_defs']))
+    yaml_text = open(args['tool_defs']).read().format(ref_data_dir=args['ref_data_dir'])
+    tool_defs = yaml.load(yaml_text)
 
     try:
-        os.makedirs(args['outdir'])
+        os.makedirs(args['results_dir'])
     except OSError:
         pass
 
@@ -63,7 +54,7 @@ if __name__ == '__main__':
         name='read_params',
         func=destruct.benchmark.destruct_test.read_simulation_params,
         ret=mgd.TempOutputObj('simulation.params'),
-        args=(mgd.InputFile(args['simconfig']),),
+        args=(mgd.InputFile(args['sim_config']),),
     )
 
     workflow.transform(
@@ -72,8 +63,8 @@ if __name__ == '__main__':
         args=(
             mgd.TempInputObj('simulation.params'),
             mgd.InputFile(args['ref']),
-            mgd.OutputFile(os.path.join(args['outdir'], 'simulated.fasta')),
-            mgd.OutputFile(os.path.join(args['outdir'], 'simulated.tsv')),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.fasta')),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.tsv')),
         ),
     )
 
@@ -94,10 +85,10 @@ if __name__ == '__main__':
             'destruct_bamextractsimreads',
             '-b', mgd.InputFile(args['bam']),
             '-r', mgd.InputFile(args['ref']),
-            '-s', mgd.InputFile(os.path.join(args['outdir'], 'simulated.fasta')),
+            '-s', mgd.InputFile(os.path.join(args['results_dir'], 'simulated.fasta')),
             '-f', mgd.TempInputObj('simulation.params').extract(lambda a: a['coverage_fraction']),
-            '-1', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
-            '-2', mgd.OutputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
+            '-1', mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.1.fastq')),
+            '-2', mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.2.fastq')),
         ),
     )
 
@@ -106,8 +97,8 @@ if __name__ == '__main__':
         func=destruct.benchmark.align.bwa.workflow.bwa_align_workflow,
         args=(
             mgd.InputFile(args['ref']),
-            mgd.InputFile(os.path.join(args['outdir'], 'simulated.1.fastq')),
-            mgd.InputFile(os.path.join(args['outdir'], 'simulated.2.fastq')),
+            mgd.InputFile(os.path.join(args['results_dir'], 'simulated.1.fastq')),
+            mgd.InputFile(os.path.join(args['results_dir'], 'simulated.2.fastq')),
             mgd.TempOutputFile('simulated.unsorted.bam'),
         ),
     )
@@ -126,7 +117,7 @@ if __name__ == '__main__':
         name='samtools_reheader_tumour',
         func=destruct.benchmark.destruct_test.samtools_sample_reheader,
         args=(
-            mgd.OutputFile(os.path.join(args['outdir'], 'tumour.bam')),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'tumour.bam')),
             mgd.TempInputFile('tumour_raw.bam'),
             'tumour',
         ),
@@ -136,7 +127,7 @@ if __name__ == '__main__':
         name='samtools_reheader_normal',
         func=destruct.benchmark.destruct_test.samtools_sample_reheader,
         args=(
-            mgd.OutputFile(os.path.join(args['outdir'], 'normal.bam')),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'normal.bam')),
             mgd.TempInputFile('normal.raw.bam'),
             'normal',
         ),
@@ -154,10 +145,10 @@ if __name__ == '__main__':
         args=(
             mgd.TempInputObj('tool_defs', 'tool_name'),
             {
-                'tumour': mgd.InputFile(os.path.join(args['outdir'], 'tumour.bam')),
-                'normal': mgd.InputFile(os.path.join(args['outdir'], 'normal.bam')),
+                'tumour': mgd.InputFile(os.path.join(args['results_dir'], 'tumour.bam')),
+                'normal': mgd.InputFile(os.path.join(args['results_dir'], 'normal.bam')),
             },
-            mgd.OutputFile(os.path.join(args['outdir'], 'results_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'results_{tool_name}.tsv'), 'tool_name'),
             mgd.TempSpace('tool_raw_data', 'tool_name'),
         ),
         kwargs={
@@ -172,11 +163,11 @@ if __name__ == '__main__':
         args=(
             mgd.TempInputObj('simulation.params'),
             mgd.TempInputObj('tool_defs', 'tool_name'),
-            mgd.InputFile(os.path.join(args['outdir'], 'simulated.tsv')),
-            mgd.InputFile(os.path.join(args['outdir'], 'results_{tool_name}.tsv'), 'tool_name'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'annotated_{tool_name}.tsv'), 'tool_name'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'identified_{tool_name}.tsv'), 'tool_name'),
-            mgd.OutputFile(os.path.join(args['outdir'], 'plots_{tool_name}.pdf'), 'tool_name'),
+            mgd.InputFile(os.path.join(args['results_dir'], 'simulated.tsv')),
+            mgd.InputFile(os.path.join(args['results_dir'], 'results_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'annotated_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'identified_{tool_name}.tsv'), 'tool_name'),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'plots_{tool_name}.pdf'), 'tool_name'),
         ),
     )
 

@@ -60,7 +60,7 @@ class BreakpointDatabase(object):
 
 def create_tool_workflow(tool_info, bam_filenames, output_filename, raw_data_dir, **kwargs):
     workflow_module = __import__(tool_info['workflow']['module'], fromlist=[''])
-    workflow_function = getattr(workflow_module, tool_info['workflow']['function'])
+    workflow_function = getattr(workflow_module, tool_info['workflow']['run_function'])
 
     if 'kwargs' in tool_info:
         kwargs.update(tool_info['kwargs'])
@@ -71,6 +71,16 @@ def create_tool_workflow(tool_info, bam_filenames, output_filename, raw_data_dir
         pass
 
     return workflow_function(bam_filenames, output_filename, raw_data_dir, **kwargs)
+
+
+def run_setup_function(tool_info, test_config, **kwargs):
+    workflow_module = __import__(tool_info['workflow']['module'], fromlist=[''])
+    setup_function = getattr(workflow_module, tool_info['workflow']['setup_function'])
+
+    if 'kwargs' in tool_info:
+        kwargs.update(tool_info['kwargs'])
+
+    setup_function(test_config, **kwargs)
 
 
 def create_roc_plot(sim_info, tool_defs, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):

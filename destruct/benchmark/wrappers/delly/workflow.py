@@ -1,3 +1,6 @@
+import os
+import shutil
+
 import pypeliner
 import pypeliner.managed as mgd
 
@@ -84,3 +87,37 @@ def create_delly_wrapper_workflow(bam_filenames, output_filename, raw_data_dir, 
 
     return workflow
 
+
+def setup_delly(test_config, **kwargs):
+    ensembl_version = kwargs.get('ensembl_version', '70')
+    ensembl_genome_version = kwargs.get('ensembl_genome_version', 'GRCh37')
+
+    primary_assembly_url = 'ftp://ftp.ensembl.org/pub/release-'+ensembl_version+'/fasta/homo_sapiens/dna/Homo_sapiens.'+ensembl_genome_version+'.'+ensembl_version+'.dna.primary_assembly.fa.gz'
+    chromosome_url = 'ftp://ftp.ensembl.org/pub/release-'+ensembl_version+'/fasta/homo_sapiens/dna/Homo_sapiens.'+ensembl_genome_version+'.'+ensembl_version+'.dna.chromosome.{0}.fa.gz'
+    hg19_excl_url = 'https://github.com/tobiasrausch/delly/blob/master/excludeTemplates/human.hg19.excl.tsv'
+
+    if ensembl_genome_version != 'GRCh37':
+        raise Exception('Only hg19 supported')
+    
+    genome_fasta = kwargs['ref_genome_fasta_file']
+    delly_excl_chrom = kwargs['delly_excl_chrom']
+
+    destruct.benchmark.wrappers.utils.makedirs(os.path.dirname(genome_fasta))
+    destruct.benchmark.wrappers.utils.makedirs(os.path.dirname(delly_excl_chrom))
+
+    if test_config.get('chromosomes', None) is None:
+        destruct.benchmark.wrappers.utils.wget_file_gunzip(primary_assembly_url, genome_fasta)
+
+    else:
+        with open(genome_fasta, 'w') as genome_file:
+            for chromosome in test_config['chromosomes']:
+                chromosome_filename = './chromosome_{0}.fa'.format(chromosome)
+
+                destruct.benchmark.wrappers.utils.wget_file_gunzip(chromosome_url.format(chromosome), chromosome_filename)
+
+                with open(chromosome_filename, 'r') as chromosome_file:
+                    shutil.copyfileobj(chromosome_file, genome_file)
+
+                os.remove(chromosome_filename)
+
+    destruct.benchmark.wrappers.utils.wget_file(hg19_excl_url, delly_excl_chrom)

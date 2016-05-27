@@ -101,3 +101,7 @@ def create_lumpysv_wrapper_workflow(bam_filenames, output_filename, raw_data_dir
     )
 
     return workflow
+
+
+def setup_lumpysv(test_config, **kwargs):
+    pass

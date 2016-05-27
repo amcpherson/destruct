@@ -2,6 +2,7 @@ import pypeliner
 import pypeliner.managed as mgd
 
 import destruct.workflow
+import destruct.create_ref_data
 import destruct.benchmark.wrappers.destruct.tasks
 
 
@@ -39,3 +40,14 @@ def create_destruct_wrapper_workflow(bam_filenames, output_filename, raw_data_di
     )
 
     return workflow
+
+
+def setup_destruct(test_config, **kwargs):
+    if test_config.get('chromosomes', None) is not None:
+        config = {
+            'chromosomes': test_config['chromosomes'],
+            'ensembl_assemblies': ['chromosome.{}'.format(c) for c in test_config['chromosomes']],
+        }
+
+    destruct.create_ref_data.create_ref_data(config, kwargs['ref_data_dir'])
+
