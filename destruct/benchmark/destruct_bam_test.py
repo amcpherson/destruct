@@ -39,15 +39,17 @@ if __name__ == '__main__':
 
     args = vars(argparser.parse_args())
 
-    pyp = pypeliner.app.Pypeline(config=args)
-
-    yaml_text = open(args['tool_defs']).read().format(ref_data_dir=args['ref_data_dir'])
-    tool_defs = yaml.load(yaml_text)
-
     try:
         os.makedirs(args['results_dir'])
     except OSError:
         pass
+
+    args['tmpdir'] = os.path.join(args['results_dir'], 'tmp')
+
+    pyp = pypeliner.app.Pypeline(config=args)
+
+    yaml_text = open(args['tool_defs']).read().format(ref_data_dir=args['ref_data_dir'])
+    tool_defs = yaml.load(yaml_text)
 
     ctx = {'mem':4}
 
