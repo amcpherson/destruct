@@ -1,4 +1,5 @@
 import os
+import subprocess
 import shutil
 import collections
 import bisect
@@ -183,6 +184,79 @@ def create_genome(chromosomes, include_nonchromosomal, genome_fasta):
         os.rename(genome_fasta+extension, genome_fasta[:-4]+extension)
 
 
+def create_ref_bam(in_ref_filename, in_bam_filename, out_ref_filename, out_bam_filename, chromosomes):
+    """ Subset reference genome and bam by chromosomes
+    """
+
+    # Subset the chromosomes in the input reference genome
+    samtools_faidx_cmd = [
+        'samtools',
+        'faidx',
+        in_ref_filename,
+    ]
+    samtools_faidx_cmd += chromosomes
+    samtools_faidx_cmd += ['>', out_ref_filename]
+    pypeliner.commandline.execute(*samtools_faidx_cmd)
+
+    # Fasta index of output reference
+    out_ref_fai_filename = out_ref_filename + '.fai'
+    pypeliner.commandline.execute('samtools', 'faidx', out_ref_filename)
+
+    # Remove .tmp suffix if necessary
+    if out_ref_filename.endswith('.tmp'):
+        os.rename(out_ref_fai_filename, out_ref_filename[:-len('.tmp')] + '.fai')
+        out_ref_fai_filename = out_ref_filename[:-len('.tmp')] + '.fai'
+
+    # Create a new header
+    original_header_filename = out_bam_filename + '.original_header.sam'
+    new_header_filename = out_bam_filename + '.new_header.sam'
+    pypeliner.commandline.execute('samtools', 'view', '-H', in_bam_filename, '>', original_header_filename)
+    with open(original_header_filename, 'r') as in_f, open(new_header_filename, 'w') as out_f:
+        for line in in_f:
+            if line.startswith('@SQ'):
+                keep = False
+                for field in line.rstrip().split('\t'):
+                    if field.startswith('SN:'):
+                        chromosome = field[len('SN:'):]
+                        if chromosome in chromosomes:
+                            keep = True
+                        break
+                if keep:
+                    out_f.write(line)
+            else:
+                out_f.write(line)
+
+    # Create the chromosome subsetted bam file
+    p = subprocess.Popen(['samtools', 'view', '-', '-b', '-t', out_ref_fai_filename, '-o', out_bam_filename], stdin=subprocess.PIPE)
+
+    with open(new_header_filename, 'r') as f:
+        shutil.copyfileobj(f, p.stdin)
+
+    p2 = subprocess.Popen(['samtools', 'view', in_bam_filename] + chromosomes, stdout=p.stdin)
+
+    if p2.wait() != 0:
+        raise Exception('samtools view returned {}'.format(p2.returncode))
+
+    p.stdin.close()
+    if p.wait() != 0:
+        raise Exception('samtools view returned {}'.format(p.returncode))
+
+    # Samtools index the new bam
+    pypeliner.commandline.execute('samtools', 'index', out_bam_filename)
+
+    # Remove .tmp suffix if necessary
+    if out_bam_filename.endswith('.tmp'):
+        os.rename(out_bam_filename + '.bai', out_bam_filename[:-len('.tmp')] + '.bai')
+
+    # Index for bwa alignment
+    pypeliner.commandline.execute('bwa', 'index', out_ref_filename)
+
+    # Remove .tmp suffix if necessary
+    if out_ref_filename.endswith('.tmp'):
+       for ext in ('.amb', '.ann', '.bwt', '.pac', '.sa'):
+           os.rename(out_ref_filename + ext, out_ref_filename[:-len('.tmp')] + ext)
+
+
 def partition_bam(original_filename, output_a_filename, output_b_filename, fraction_a):
 
     pypeliner.commandline.execute('destruct_bampartition',
@@ -241,4 +315,9 @@ def samtools_sample_reheader(output_filename, input_filename, sample_name):
             f_out.write(line)
 
     pypeliner.commandline.execute('samtools', 'reheader', reheader_filename, input_filename, '>', output_filename)
+
+    assert output_filename.endswith('.tmp')
+    index_filename = output_filename[:-4] + '.bai'
+
+    pypeliner.commandline.execute('samtools', 'index', output_filename, index_filename)
 

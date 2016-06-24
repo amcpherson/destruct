@@ -141,6 +141,9 @@ def convert_vcf(bcf_filename, output_filename, control_id=None):
         ]
     )
 
+    if len(breakpoint_table.index) == 0:
+        raise Exception('No variants')
+
     spanning_read_counts = breakpoint_library_table.groupby('prediction_id')['num_spanning'].sum().reset_index()
     split_read_counts = breakpoint_library_table.groupby('prediction_id')['num_split'].sum().reset_index()
 
@@ -154,7 +157,7 @@ def convert_vcf(bcf_filename, output_filename, control_id=None):
 
     # Filter based on evidence in control dataset
     if control_id is not None:
-         breakpoint_table = breakpoint_table[breakpoint_table['{0}_count'.format(control_id)] == 0]          
+         breakpoint_table = breakpoint_table[breakpoint_table['{0}_count'.format(control_id)] == 0]
 
     breakpoint_table.to_csv(output_filename, sep='\t', index=False)
 

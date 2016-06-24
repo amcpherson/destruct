@@ -34,6 +34,9 @@ if __name__ == '__main__':
     argparser.add_argument('tool_defs',
                            help='Tool Definition Filename')
 
+    argparser.add_argument('--chromosomes', nargs='*', type=str, default=['20'],
+                           help='Reference chromosomes')
+
     args = vars(argparser.parse_args())
 
     pyp = pypeliner.app.Pypeline(config=args)
@@ -57,13 +60,30 @@ if __name__ == '__main__':
         args=(mgd.InputFile(args['sim_config']),),
     )
 
+    workflow.setobj(mgd.TempOutputObj('chromosomes'), args['chromosomes'])
+
+    genome_fasta = os.path.join(args['results_dir'], 'genome.fa')
+    source_bam = os.path.join(args['results_dir'], 'source.bam')
+
+    workflow.transform(
+        name='create_ref_bam',
+        func=destruct.benchmark.destruct_test.create_ref_bam,
+        args=(
+            mgd.InputFile(args['ref']),
+            mgd.InputFile(args['bam']),
+            mgd.OutputFile(genome_fasta),
+            mgd.OutputFile(source_bam),
+            mgd.TempInputObj('chromosomes'),
+        ),
+    )
+
     workflow.transform(
         name='create_sim',
         func=destruct.benchmark.create_breakpoint_simulation.create_breakpoints,
         args=(
             mgd.TempInputObj('simulation.params'),
-            mgd.InputFile(args['ref']),
-            mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.fasta')),
+            mgd.InputFile(genome_fasta),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.fa')),
             mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.tsv')),
         ),
     )
@@ -72,7 +92,7 @@ if __name__ == '__main__':
         name='partition',
         func=destruct.benchmark.destruct_test.partition_bam,
         args=(
-            mgd.InputFile(args['bam']),
+            mgd.InputFile(source_bam),
             mgd.TempOutputFile('normal.raw.bam'),
             mgd.TempOutputFile('tumour.unspiked.bam'),
             0.5,
@@ -83,9 +103,9 @@ if __name__ == '__main__':
         name='simulate',
         args=(
             'destruct_bamextractsimreads',
-            '-b', mgd.InputFile(args['bam']),
-            '-r', mgd.InputFile(args['ref']),
-            '-s', mgd.InputFile(os.path.join(args['results_dir'], 'simulated.fasta')),
+            '-b', mgd.InputFile(source_bam),
+            '-r', mgd.InputFile(genome_fasta),
+            '-s', mgd.InputFile(os.path.join(args['results_dir'], 'simulated.fa')),
             '-f', mgd.TempInputObj('simulation.params').extract(lambda a: a['coverage_fraction']),
             '-1', mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.1.fastq')),
             '-2', mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.2.fastq')),
@@ -96,7 +116,7 @@ if __name__ == '__main__':
         name='bwa_align',
         func=destruct.benchmark.align.bwa.workflow.bwa_align_workflow,
         args=(
-            mgd.InputFile(args['ref']),
+            mgd.InputFile(genome_fasta),
             mgd.InputFile(os.path.join(args['results_dir'], 'simulated.1.fastq')),
             mgd.InputFile(os.path.join(args['results_dir'], 'simulated.2.fastq')),
             mgd.TempOutputFile('simulated.unsorted.bam'),
