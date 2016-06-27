@@ -23,9 +23,9 @@ def create_destruct_workflow(
     bam_filenames,
     breakpoint_table,
     breakpoint_library_table,
+    breakpoint_read_table,
     config,
     ref_data_dir,
-    breakpoint_read_table=None,
 ):
     config = destruct.defaultconfig.get_config(ref_data_dir, config)
 
@@ -462,30 +462,28 @@ def create_destruct_workflow(
 
     # Optionally tabulate supporting reads
 
-    if breakpoint_read_table is not None:
+    workflow.transform(
+        name='tabreads',
+        ctx=medmem,
+        func=destruct.tasks.tabulate_reads,
+        args=(
+            mgd.TempInputFile('clusters_setcover'),
+            mgd.TempInputObj('library_id', 'bylibrary'),
+            mgd.TempInputFile('reads1', 'bylibrary'),
+            mgd.TempInputFile('reads2', 'bylibrary'),
+            mgd.TempOutputFile('breakreads.table.unsorted'),
+        ),
+    )
 
-        workflow.transform(
-            name='tabreads',
-            ctx=medmem,
-            func=destruct.tasks.tabulate_reads,
-            args=(
-                mgd.TempInputFile('clusters_setcover'),
-                mgd.TempInputObj('library_id', 'bylibrary'),
-                mgd.TempInputFile('reads1', 'bylibrary'),
-                mgd.TempInputFile('reads2', 'bylibrary'),
-                mgd.TempOutputFile('breakreads.table.unsorted'),
-            ),
-        )
-
-        workflow.commandline(
-            name='sortreads',
-            ctx=medmem,
-            args=(
-                'sort', '-n',
-                mgd.TempInputFile('breakreads.table.unsorted'),
-                '>', mgd.OutputFile(breakpoint_read_table),
-            ),
-        )
+    workflow.commandline(
+        name='sortreads',
+        ctx=medmem,
+        args=(
+            'sort', '-n',
+            mgd.TempInputFile('breakreads.table.unsorted'),
+            '>', mgd.OutputFile(breakpoint_read_table),
+        ),
+    )
 
 
     # Tabulate results

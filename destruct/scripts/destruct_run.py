@@ -21,7 +21,7 @@ if __name__ == '__main__':
     argparser.add_argument('breakpoint_library_table',
                            help='Output table of library specific breakpoint information in TSV format')
 
-    argparser.add_argument('--breakpoint_read_table', required=False, default=None,
+    argparser.add_argument('breakpoint_read_table',
                            help='Output table of breakpoint read information in TSV format')
 
     argparser.add_argument('--bam_files', nargs='+',
@@ -50,9 +50,9 @@ if __name__ == '__main__':
         bam_filenames,
         args['breakpoint_table'],
         args['breakpoint_library_table'],
+        args['breakpoint_read_table'],
         config,
         args['ref_data_dir'],
-        breakpoint_read_table=args['breakpoint_read_table'],
     )
 
     pyp.run(workflow)

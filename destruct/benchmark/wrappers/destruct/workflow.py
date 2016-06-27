@@ -21,6 +21,7 @@ def create_destruct_wrapper_workflow(bam_filenames, output_filename, raw_data_di
             mgd.InputFile('bam', 'sample_id', fnames=bam_filenames),
             mgd.TempOutputFile('breakpoint_table'),
             mgd.TempOutputFile('breakpoint_library_table'),
+            mgd.TempOutputFile('breakpoint_read_table'),
             config,
             ref_data_dir,
         ),
