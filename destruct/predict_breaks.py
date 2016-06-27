@@ -112,6 +112,10 @@ def predict_breaks_split(clusters, split, max_predictions_per_cluster=10):
     data['position_1'] = data['position_1'].astype(int)
     data['position_2'] = data['position_2'].astype(int)
 
+    # Check for empty split alignments
+    if len(data.index) == 0:
+      return pd.DataFrame()
+
     # Flip columns to make them consistent across clusters
     utils.misc.column_flip(data, data['flip'], 'chromosome_1', 'chromosome_2')
     utils.misc.column_flip(data, data['flip'], 'strand_1', 'strand_2')
@@ -248,7 +252,8 @@ def calculate_cluster_weights(breakpoints_filename, weights_filename):
 
 
 def calculate_realignment_likelihoods(breakpoints_filename, realignments_filename, score_stats_filename,
-                                      likelihoods_filename, match_score, fragment_mean, fragment_stddev):
+                                      likelihoods_filename, match_score, fragment_mean, fragment_stddev,
+                                      min_alignment_log_likelihood):
 
     match_score = float(match_score)
     fragment_mean = float(fragment_mean)
@@ -318,6 +323,8 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
                .reset_index()
 
     data = data[likelihoods_fields]
+
+    data = data[data['log_likelihood'] >= min_alignment_log_likelihood]
 
     data.to_csv(likelihoods_filename, sep='\t', index=False, header=False)
 

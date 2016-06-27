@@ -377,6 +377,7 @@ def create_destruct_workflow(
             config['match_score'],
             mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_mean'),
             mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_stddev'),
+            config['min_alignment_log_likelihood'],
         ),
     )
 
