@@ -108,6 +108,9 @@ def get_config(ref_data_dir, user_config):
     mismatch_score                              = -3
     gap_score                                   = -4
 
+    # Min alignment likelihood
+    min_alignment_log_likelihood                = -5.0
+
     # Minimum score for a complex rearrangement cycle
     cycles_scoremax                             = 4
 
