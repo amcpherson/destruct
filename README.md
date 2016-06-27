@@ -35,7 +35,7 @@ Download and setup of the reference genome is automated.  Select a directory on 
 
 Download the reference data and build the required indexes:
 
-    destruct_create_ref_data.py $ref_data_dir
+    destruct create_ref_data $ref_data_dir
 
 ## Run
 
@@ -45,11 +45,11 @@ Destruct takes multiple bam files as input.  Bam files can be multiple samples f
 
 ### Running Destruct
 
-Running destruct involves invoking a single script, `destruct_run.py`.  The result of destruct is a set of tables in TSV format.  Suppose we would like to run destruct on tumour bam file `$tumour_bam` and normal bam file `$normal_bam`.  The following command will predict breakpoints jointly on these bam files:
+Running destruct involves invoking a single command, `destruct run`.  The result of destruct is a set of tables in TSV format.  Suppose we would like to run destruct on tumour bam file `$tumour_bam` and normal bam file `$normal_bam`.  The following command will predict breakpoints jointly on these bam files:
 
-    destruct_run.py $ref_data_dir \
+    destruct run $ref_data_dir \
         $breakpoint_table $breakpoint_library_table \
-        --breakpoint_read_table $breakpoint_read_table \
+        $breakpoint_read_table \
         --bam_files $tumour_bam $normal_bam \
         --lib_ids tumour normal \
         --tmpdir $tmp

@@ -13,10 +13,7 @@ setup(
     download_url='https://bitbucket.org/dranew/destruct/get/v{}.tar.gz'.format(versioneer.get_version()),
     keywords=['scientific', 'sequence analysis', 'cancer'],
     classifiers=[],
-    scripts=[
-        'destruct/scripts/destruct_run.py',
-        'destruct/scripts/destruct_create_ref_data.py',
-    ],
+    entry_points={'console_scripts': ['destruct = destruct.api.main:main']},
     package_data={'destruct': ['data/*_chr_map.tsv']},
 )
 

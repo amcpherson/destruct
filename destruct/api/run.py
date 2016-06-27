@@ -6,35 +6,7 @@ import destruct
 import destruct.workflow
 
 
-if __name__ == '__main__':
-
-    argparser = argparse.ArgumentParser()
-
-    pypeliner.app.add_arguments(argparser)
-
-    argparser.add_argument('ref_data_dir',
-                           help='Reference dataset directory')
-
-    argparser.add_argument('breakpoint_table',
-                           help='Output table of breakpoint information in TSV format')
-
-    argparser.add_argument('breakpoint_library_table',
-                           help='Output table of library specific breakpoint information in TSV format')
-
-    argparser.add_argument('breakpoint_read_table',
-                           help='Output table of breakpoint read information in TSV format')
-
-    argparser.add_argument('--bam_files', nargs='+',
-                           help='Input bam filenames')
-
-    argparser.add_argument('--lib_ids', nargs='+',
-                           help='Input ids for respective bam filenames')
-
-    argparser.add_argument('--config', required=False,
-                           help='Configuration filename')
-
-    args = vars(argparser.parse_args())
-
+def run(**args):
     if len(args['bam_files']) != len(args['lib_ids']):
         raise Exception('--lib_ids must correspond one to one with --bam_files')
 
@@ -58,3 +30,38 @@ if __name__ == '__main__':
     pyp.run(workflow)
 
 
+def add_arguments(argparser):
+    pypeliner.app.add_arguments(argparser)
+
+    argparser.add_argument('ref_data_dir',
+                           help='Reference dataset directory')
+
+    argparser.add_argument('breakpoint_table',
+                           help='Output table of breakpoint information in TSV format')
+
+    argparser.add_argument('breakpoint_library_table',
+                           help='Output table of library specific breakpoint information in TSV format')
+
+    argparser.add_argument('breakpoint_read_table',
+                           help='Output table of breakpoint read information in TSV format')
+
+    argparser.add_argument('--bam_files', nargs='+',
+                           help='Input bam filenames')
+
+    argparser.add_argument('--lib_ids', nargs='+',
+                           help='Input ids for respective bam filenames')
+
+    argparser.add_argument('--config', required=False,
+                           help='Configuration filename')
+
+    argparser.set_defaults(func=run)
+
+
+if __name__ == '__main__':
+    argparser = argparse.ArgumentParser()
+
+    add_arguments(argparser)
+
+    args = vars(argparser.parse_args())
+    func = args.pop('func')
+    func(**args)
