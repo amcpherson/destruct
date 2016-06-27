@@ -384,8 +384,8 @@ def tabulate_results(breakpoints_filename, likelihoods_filename, library_ids,
     breakpoint_unique_counts.columns = ['cluster_id', 'num_unique_reads']
 
     breakpoints = breakpoints.merge(breakpoint_stats, on='cluster_id', how='left')
-
     breakpoints = breakpoints.merge(breakpoint_counts, on='cluster_id', how='left')
+    breakpoints = breakpoints.merge(breakpoint_unique_counts, on='cluster_id', how='left')
 
     # Calculate breakpoint type
     def breakpoint_type(row):
