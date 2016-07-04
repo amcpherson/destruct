@@ -33,12 +33,9 @@ def create_destruct_workflow(
 
     # Set the library ids
     
-    workflow.transform(
-        name='create_library_ids',
-        ctx=locally,
-        func=destruct.tasks.create_library_ids,
-        ret=mgd.TempOutputObj('library_id', 'bylibrary'),
-        args=(bam_filenames.keys(),),
+    workflow.setobj(
+        obj=mgd.TempOutputObj('library_id', 'bylibrary'),
+        value=destruct.tasks.create_library_ids(bam_filenames.keys()),
     )
 
     # Retrieve discordant reads and stats from bam files
@@ -276,14 +273,9 @@ def create_destruct_workflow(
 
     # Cluster spanning reads
 
-    workflow.transform(
-        name='chromosome_args',
-        ctx=locally,
-        func=destruct.tasks.generate_chromosome_args,
-        ret=mgd.TempOutputObj('chrom.args', 'bychromarg'),
-        args=(
-            config['chromosomes'],
-        ),
+    workflow.setobj(
+        obj=mgd.TempOutputObj('chrom.args', 'bychromarg'),
+        value=destruct.tasks.generate_chromosome_args(config['chromosomes']),
     )
 
     workflow.transform(
