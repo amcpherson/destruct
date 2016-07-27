@@ -6,9 +6,10 @@ Destruct is a tool for joint prediction of rearrangement breakpoints from single
 
 ### Installing from conda
 
-The recommended method of installation for destruct is using `conda`.  First install [anaconda python](https://store.continuum.io/cshop/anaconda/) from the continuum website.  Then add my channel, and install destruct as follows.
+The recommended method of installation for destruct is using `conda`.  First install [anaconda python](https://store.continuum.io/cshop/anaconda/) from the continuum website.  Then add my channel, and the bioconda channel, and install destruct as follows.
 
     conda config --add channels https://conda.anaconda.org/dranew
+    conda config --add channels 'bioconda'
     conda install destruct
 
 ### Installing from source
