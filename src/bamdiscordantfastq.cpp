@@ -25,6 +25,11 @@
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
 
 using namespace boost;
 using namespace std;
@@ -286,12 +291,21 @@ int main(int argc, char* argv[])
 
 	PairedBamReader pairedReader(bamReader, tempsPrefix);
 
-	ofstream fastq1File(fastq1Filename.c_str());
-	ofstream fastq2File(fastq2Filename.c_str());
-	
+	ofstream fastq1File(fastq1Filename.c_str(), std::ios_base::out | std::ios_base::binary);
+	ofstream fastq2File(fastq2Filename.c_str(), std::ios_base::out | std::ios_base::binary);
+
 	CheckFile(fastq1File, fastq1Filename);
 	CheckFile(fastq2File, fastq2Filename);
 	
+	iostreams::filtering_ostream fastq1Stream;
+	iostreams::filtering_ostream fastq2Stream;
+
+	fastq1Stream.push(iostreams::gzip_compressor());
+	fastq2Stream.push(iostreams::gzip_compressor());
+
+	fastq1Stream.push(fastq1File);
+	fastq2Stream.push(fastq2File);
+
 	int fragmentIndex = 0;
 
 	BamAlignment alignment1;
@@ -328,15 +342,15 @@ int main(int argc, char* argv[])
 
 			// Write fastq
 			
-			fastq1File << "@" << fragment << "/1" << endl;
-			fastq1File << GetSequence(alignment1) << endl;
-			fastq1File << "+" << alignment1.Name << endl;
-			fastq1File << GetQualities(alignment1) << endl;
+			fastq1Stream << "@" << fragment << "/1" << endl;
+			fastq1Stream << GetSequence(alignment1) << endl;
+			fastq1Stream << "+" << alignment1.Name << endl;
+			fastq1Stream << GetQualities(alignment1) << endl;
 			
-			fastq2File << "@" << fragment << "/2" << endl;
-			fastq2File << GetSequence(alignment2) << endl;
-			fastq2File << "+" << alignment2.Name << endl;
-			fastq2File << GetQualities(alignment2) << endl;
+			fastq2Stream << "@" << fragment << "/2" << endl;
+			fastq2Stream << GetSequence(alignment2) << endl;
+			fastq2Stream << "+" << alignment2.Name << endl;
+			fastq2Stream << GetQualities(alignment2) << endl;
 			
 			fragmentIndex++;
 		}
@@ -369,15 +383,15 @@ int main(int argc, char* argv[])
 
 		// Write fastq
 		
-		fastq1File << "@" << fragment << "/1" << endl;
-		fastq1File << discordantRead1.Sequence << endl;
-		fastq1File << "+" << discordantRead1.Name << endl;
-		fastq1File << discordantRead1.Qualities << endl;
+		fastq1Stream << "@" << fragment << "/1" << endl;
+		fastq1Stream << discordantRead1.Sequence << endl;
+		fastq1Stream << "+" << discordantRead1.Name << endl;
+		fastq1Stream << discordantRead1.Qualities << endl;
 		
-		fastq2File << "@" << fragment << "/2" << endl;
-		fastq2File << discordantRead2.Sequence << endl;
-		fastq2File << "+" << discordantRead2.Name << endl;
-		fastq2File << discordantRead2.Qualities << endl;
+		fastq2Stream << "@" << fragment << "/2" << endl;
+		fastq2Stream << discordantRead2.Sequence << endl;
+		fastq2Stream << "+" << discordantRead2.Name << endl;
+		fastq2Stream << discordantRead2.Qualities << endl;
 		
 		fragmentIndex++;
 	}

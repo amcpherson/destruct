@@ -3,7 +3,8 @@
 # Build and install executables
 cd src
 export CPLUS_INCLUDE_PATH=$PREFIX/include
-scons install --prefix $PREFIX --boost_source $PREFIX/src/boost/
+export LIBRARY_PATH=$PREFIX/lib
+scons install --prefix $PREFIX
 cd ..
 
 # Build and install python package

@@ -25,6 +25,7 @@ def run(**args):
         args['breakpoint_read_table'],
         config,
         args['ref_data_dir'],
+        args['raw_data_dir'],
     )
 
     pyp.run(workflow)
@@ -53,6 +54,9 @@ def add_arguments(argparser):
 
     argparser.add_argument('--config', required=False,
                            help='Configuration filename')
+
+    argparser.add_argument('--raw_data_dir', required=False,
+                           help='Raw data directory')
 
     argparser.set_defaults(func=run)
 

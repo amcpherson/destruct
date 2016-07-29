@@ -15,19 +15,8 @@ AddOption(
 	default=default_install_dir,
 )
 
-AddOption(
-	'--boost_source',
-	dest='boost_source',
-	type='string',
-	nargs=1,
-	action='store',
-	metavar='DIR',
-	help='boost source directory',
-)
-
 external_dir = os.path.abspath('external')
 install_dir = os.path.abspath(os.path.join(GetOption('prefix'), 'bin'))
-boost_dir = GetOption('boost_source')
 
 env = Environment(ENV=os.environ)
 
@@ -52,13 +41,10 @@ bamtools_sources += list(find_files(bamtools_api_dir, '*.cpp'))
 bamtools_sources += list(find_files(bamtools_utils_dir, '*.cpp'))
 bamtools_sources = filter(lambda a: not a.endswith('win_p.cpp'), bamtools_sources)
 
-boost_iostreams_sources = list(find_files(os.path.join(boost_dir, 'libs/iostreams/src'), '*.cpp'))
-boost_serialization_sources = list(find_files(os.path.join(boost_dir, 'libs/serialization/src'), '*.cpp'))
-
 tclap_dir = os.path.join(external_dir, 'tclap', 'include')
 
-env.Append(CPPPATH=[external_dir, bamtools_dir, boost_dir, tclap_dir])
-env.Append(LIBS=['z', 'bz2'])
+env.Append(CPPPATH=[external_dir, bamtools_dir, tclap_dir])
+env.Append(LIBS=['z', 'bz2', 'boost_iostreams', 'boost_serialization'])
 env.Append(CCFLAGS='-O3')
 env.Append(CCFLAGS='-g')
 
@@ -153,8 +139,7 @@ env.Install(install_dir, 'destruct_samplefastq')
 sources = """
     bamdiscordantfastq.cpp
 """.split()
-env.Program(target='destruct_bamdiscordantfastq', source=common_sources+bamtools_sources+sources+
-    boost_iostreams_sources+boost_serialization_sources)
+env.Program(target='destruct_bamdiscordantfastq', source=common_sources+bamtools_sources+sources)
 env.Install(install_dir, 'destruct_bamdiscordantfastq')
 
 sources = """

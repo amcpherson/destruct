@@ -4,6 +4,7 @@ import errno
 import itertools
 import os
 import tarfile
+import gzip
 import numpy as np
 import pandas as pd
 import pypeliner
@@ -92,7 +93,7 @@ def split_file_byline(in_filename, lines_per_file, out_filename_callback):
 
 
 def split_fastq(in_filename, num_reads_per_file, out_filename_callback):
-    with open(in_filename, 'r') as in_file:
+    with gzip.open(in_filename, 'r') as in_file:
         file_number = 0
         out_file = None
         out_file_read_count = None
@@ -192,7 +193,7 @@ def tabulate_reads(clusters_filename, library_ids, reads1_filenames, reads2_file
         for lib_name in set(reads1_filenames.keys()).union(set(reads2_filenames.keys())):
             lib_id = library_ids[lib_name]
             for reads_filename in [reads1_filenames[lib_name], reads2_filenames[lib_name]]:
-                with open(reads_filename, 'r') as reads_file:
+                with gzip.open(reads_filename, 'r') as reads_file:
                     for name, seq, comment, qual in itertools.izip_longest(*[(a.rstrip() for a in reads_file)]*4):
                         assert name[0] == '@'
                         assert name[-1] == '1' or name[-1] == '2'

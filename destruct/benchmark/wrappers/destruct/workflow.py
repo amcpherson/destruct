@@ -25,6 +25,9 @@ def create_destruct_wrapper_workflow(bam_filenames, output_filename, raw_data_di
             config,
             ref_data_dir,
         ),
+        kwargs={
+            'raw_data_dir': raw_data_dir,
+        },
     )
 
     workflow.transform(

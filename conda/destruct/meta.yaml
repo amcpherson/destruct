@@ -10,11 +10,12 @@ requirements:
   build:
     - python
     - scons
-    - boost_source ==1.60.0
+    - boost_lib ==1.60.0
     - tclap ==1.2.1
 
   run:
     - python
+    - boost_lib ==1.60.0
     - pandas >=0.17.1
     - pypeliner >=0.4.1
     - pygenes >=0.0.4
