@@ -71,13 +71,8 @@ int main(int argc, char* argv[])
 	
 	cerr << "Reading fastq sequences" << endl;
 	
-	ifstream reads1File(reads1Filename.c_str());
-	CheckFile(reads1File, reads1Filename);
-	FastqReadStream reads1Stream(reads1File);
-	
-	ifstream reads2File(reads2Filename.c_str());
-	CheckFile(reads2File, reads2Filename);
-	FastqReadStream reads2Stream(reads2File);
+	FastqReadStream reads1Stream(reads1Filename);
+	FastqReadStream reads2Stream(reads2Filename);
 	
 	PreppedReads preppedReads;
 	preppedReads.Prep(reads1Stream);

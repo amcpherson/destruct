@@ -33,15 +33,15 @@ def create_destruct_workflow(
         mgd_stats = mgd.File(os.path.join(raw_data_dir, '{bylibrary}_stats.txt'), 'bylibrary')
         mgd_reads_1 = mgd.File(os.path.join(raw_data_dir, '{bylibrary}_reads1.fq.gz'), 'bylibrary')
         mgd_reads_2 = mgd.File(os.path.join(raw_data_dir, '{bylibrary}_reads2.fq.gz'), 'bylibrary')
-        mgd_sample_1 = mgd.File(os.path.join(raw_data_dir, '{bylibrary}_sample1.fq'), 'bylibrary')
-        mgd_sample_2 = mgd.File(os.path.join(raw_data_dir, '{bylibrary}_sample2.fq'), 'bylibrary')
+        mgd_sample_1 = mgd.File(os.path.join(raw_data_dir, '{bylibrary}_sample1.fq.gz'), 'bylibrary')
+        mgd_sample_2 = mgd.File(os.path.join(raw_data_dir, '{bylibrary}_sample2.fq.gz'), 'bylibrary')
 
     else:
         mgd_stats = mgd.TempFile('stats.txt', 'bylibrary')
         mgd_reads_1 = mgd.TempFile('reads1.fq.gz', 'bylibrary')
         mgd_reads_2 = mgd.TempFile('reads2.fq.gz', 'bylibrary')
-        mgd_sample_1 = mgd.TempFile('sample1.fq', 'bylibrary')
-        mgd_sample_2 = mgd.TempFile('sample2.fq', 'bylibrary')
+        mgd_sample_1 = mgd.TempFile('sample1.fq.gz', 'bylibrary')
+        mgd_sample_2 = mgd.TempFile('sample2.fq.gz', 'bylibrary')
 
     config = destruct.defaultconfig.get_config(ref_data_dir, config)
 
@@ -385,7 +385,6 @@ def create_destruct_workflow(
             config['match_score'],
             mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_mean'),
             mgd.TempInputObj('stats', 'bylibrary').prop('fragment_length_stddev'),
-            config['min_alignment_log_likelihood'],
         ),
     )
 
@@ -465,6 +464,7 @@ def create_destruct_workflow(
             mgd.TempOutputFile('likelihoods'),
             config['mate_score_threshold'],
             config['template_length_min_threshold'],
+            config['min_alignment_log_likelihood'],
         ),
     )
 

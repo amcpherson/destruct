@@ -243,8 +243,7 @@ def calculate_cluster_weights(breakpoints_filename, weights_filename):
 
 
 def calculate_realignment_likelihoods(breakpoints_filename, realignments_filename, score_stats_filename,
-                                      likelihoods_filename, match_score, fragment_mean, fragment_stddev,
-                                      min_alignment_log_likelihood):
+                                      likelihoods_filename, match_score, fragment_mean, fragment_stddev):
 
     match_score = float(match_score)
     fragment_mean = float(fragment_mean)
@@ -315,9 +314,6 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
 
     data = data[likelihoods_fields]
 
-    # TODO, figure out how to do something better here
-    # data = data[data['log_likelihood'] >= min_alignment_log_likelihood]
-
     data.to_csv(likelihoods_filename, sep='\t', index=False, header=False)
 
 
@@ -380,7 +376,8 @@ def select_breakpoint_prediction(likelihoods, template_length_min_threshold):
 
 def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                        likelihoods_filename, selected_likelihoods_filename,
-                       mate_score_threshold, template_length_min_threshold):
+                       mate_score_threshold, template_length_min_threshold,
+                       min_alignment_log_likelihood):
 
     read_likelihoods_iter = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
         usecols=['cluster_id', 'breakpoint_id', 'log_likelihood', 'template_length_1', 'template_length_2'],
@@ -410,6 +407,11 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
     likelihoods_iter = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
                                    iterator=True, chunksize=1000000)
 
-    destruct.utils.streaming.read_select_write(likelihoods_iter, selected, selected_likelihoods_filename)
+    def likelihoods_filter(chunk):
+        chunk = chunk.merge(selected, how='inner')
+        chunk = chunk[chunk['log_likelihood'] >= min_alignment_log_likelihood]
+        return chunk
+
+    destruct.utils.streaming.read_filter_write(likelihoods_iter, likelihoods_filter, selected_likelihoods_filename)
 
 

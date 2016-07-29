@@ -24,6 +24,11 @@
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/iostreams/filtering_stream.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
 
 using namespace boost;
 using namespace std;
@@ -157,9 +162,18 @@ int main(int argc, char* argv[])
 	CheckFile(fastq1File, fastq1Filename);
 	CheckFile(fastq2File, fastq2Filename);
 	
-	ofstream* fastqFiles[2];
-	fastqFiles[0] = &fastq1File;
-	fastqFiles[1] = &fastq2File;
+	iostreams::filtering_ostream fastq1Stream;
+	iostreams::filtering_ostream fastq2Stream;
+
+	fastq1Stream.push(iostreams::gzip_compressor());
+	fastq2Stream.push(iostreams::gzip_compressor());
+
+	fastq1Stream.push(fastq1File);
+	fastq2Stream.push(fastq2File);
+
+	iostreams::filtering_ostream* fastqStreams[2];
+	fastqStreams[0] = &fastq1Stream;
+	fastqStreams[1] = &fastq2Stream;
 	
 	unordered_map<string,ReadData> readBuffer[2];
 	
@@ -199,15 +213,15 @@ int main(int argc, char* argv[])
 					fragment = fragmentStream.str();
 				}
 				
-				*fastqFiles[readEnd] << "@" << fragment << "/" << readEnd + 1 << endl;
-				*fastqFiles[readEnd] << readData.sequence << endl;
-				*fastqFiles[readEnd] << "+" << alignment.Name << endl;
-				*fastqFiles[readEnd] << readData.qualities << endl;
+				*fastqStreams[readEnd] << "@" << fragment << "/" << readEnd + 1 << endl;
+				*fastqStreams[readEnd] << readData.sequence << endl;
+				*fastqStreams[readEnd] << "+" << alignment.Name << endl;
+				*fastqStreams[readEnd] << readData.qualities << endl;
 				
-				*fastqFiles[otherReadEnd] << "@" << fragment << "/" << otherReadEnd + 1 << endl;
-				*fastqFiles[otherReadEnd] << otherEndIter->second.sequence << endl;
-				*fastqFiles[otherReadEnd] << "+" << alignment.Name << endl;
-				*fastqFiles[otherReadEnd] << otherEndIter->second.qualities << endl;
+				*fastqStreams[otherReadEnd] << "@" << fragment << "/" << otherReadEnd + 1 << endl;
+				*fastqStreams[otherReadEnd] << otherEndIter->second.sequence << endl;
+				*fastqStreams[otherReadEnd] << "+" << alignment.Name << endl;
+				*fastqStreams[otherReadEnd] << otherEndIter->second.qualities << endl;
 				
 				fragmentIndex++;
 			}

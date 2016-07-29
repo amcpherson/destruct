@@ -16,7 +16,9 @@ import destruct.predict_breaks
 
 
 def prepare_seed_fastq(reads_1_fastq, reads_2_fastq, seed_length, seed_fastq):
-    with open(reads_1_fastq, 'r') as reads_1, open(reads_2_fastq, 'r') as reads_2, open(seed_fastq, 'w') as seed:
+    opener_1 = (open, gzip.open)[reads_1_fastq.endswith('.gz')]
+    opener_2 = (open, gzip.open)[reads_2_fastq.endswith('.gz')]
+    with opener_1(reads_1_fastq, 'r') as reads_1, opener_2(reads_2_fastq, 'r') as reads_2, open(seed_fastq, 'w') as seed:
         fastq_lines = [[], []]
         for fastq_1_line, fastq_2_line in zip(reads_1, reads_2):
             fastq_lines[0].append(fastq_1_line.rstrip())
@@ -382,9 +384,9 @@ def tabulate_results(breakpoints_filename, likelihoods_filename, library_ids,
     )
     breakpoint_unique_counts.columns = ['cluster_id', 'num_unique_reads']
 
-    breakpoints = breakpoints.merge(breakpoint_stats, on='cluster_id', how='left')
-    breakpoints = breakpoints.merge(breakpoint_counts, on='cluster_id', how='left')
-    breakpoints = breakpoints.merge(breakpoint_unique_counts, on='cluster_id', how='left')
+    breakpoints = breakpoints.merge(breakpoint_stats, on='cluster_id', how='inner')
+    breakpoints = breakpoints.merge(breakpoint_counts, on='cluster_id', how='inner')
+    breakpoints = breakpoints.merge(breakpoint_unique_counts, on='cluster_id', how='inner')
 
     # Calculate breakpoint type
     def breakpoint_type(row):

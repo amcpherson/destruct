@@ -9,24 +9,41 @@
 
 #include <fstream>
 #include <boost/algorithm/string.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/copy.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
 
+using namespace std;
 using namespace boost;
 
-FastqReadStream::FastqReadStream(istream& in) : mStream(in)
+FastqReadStream::FastqReadStream(const string& filename)
 {
+	if (boost::algorithm::ends_with(filename, ".gz"))
+	{
+		mFile = boost::shared_ptr<ifstream>(new ifstream(filename.c_str(), ios::in|ios::binary));
+		CheckFile(*mFile, filename);
+		mStreamBuf = boost::shared_ptr<iostreams::filtering_streambuf<iostreams::input> >(new iostreams::filtering_streambuf<iostreams::input>());
+		mStreamBuf->push(iostreams::gzip_decompressor());
+		mStreamBuf->push(*mFile);
+		mStream = boost::shared_ptr<istream>(new istream(&*mStreamBuf));
+	}
+	else
+	{
+		mStream = boost::shared_ptr<istream>(new ifstream(filename.c_str()));
+	}
 }
 
 bool FastqReadStream::Good()
 {
-	return mStream.good();
+	return mFile->good();
 }
 
 bool FastqReadStream::GetNextRead(RawRead& read)
 {
 	string line[4];
 	int lineIndex = 0;
-	
-	while (lineIndex < 4 && getline(mStream, line[lineIndex]))
+
+	while (lineIndex < 4 && getline(*mStream, line[lineIndex]))
 	{
 		lineIndex++;
 	}

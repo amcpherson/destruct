@@ -164,7 +164,7 @@ if __name__ == '__main__':
                 'normal': mgd.InputFile(os.path.join(args['results_dir'], 'normal.bam')),
             },
             mgd.OutputFile(os.path.join(args['results_dir'], 'results_{tool_name}.tsv'), 'tool_name'),
-            mgd.TempSpace('tool_raw_data', 'tool_name'),
+            mgd.TempSpace('tool_raw_data', 'tool_name', cleanup='none'),
         ),
         kwargs={
             'control_id': 'normal',

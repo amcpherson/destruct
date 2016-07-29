@@ -130,7 +130,7 @@ if __name__ == '__main__':
             mgd.TempInputObj('tool_defs', 'tool_name'),
             {'simulated': mgd.InputFile(os.path.join(args['results_dir'], 'simulated.bam')),},
             mgd.OutputFile(os.path.join(args['results_dir'], 'results_{tool_name}.tsv'), 'tool_name'),
-            mgd.TempSpace('tool_raw_data', 'tool_name'),
+            mgd.TempSpace('tool_raw_data', 'tool_name', cleanup='none'),
         ),
     )
 

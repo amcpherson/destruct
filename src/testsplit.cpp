@@ -519,10 +519,7 @@ int main(int argc, char* argv[])
 	
 	cerr << "Reading fastq sequences" << endl;
 	
-	ifstream readSeqsFile(readSeqsFilename.c_str());
-	CheckFile(readSeqsFile, readSeqsFilename);
-	
-	FastqReadStream readSeqsStream(readSeqsFile);
+	FastqReadStream readSeqsStream(readSeqsFilename);
 	
 	unordered_map<ReadID,string> readSequences[2];
 	unordered_map<ReadID,string> rawReadSeqs;

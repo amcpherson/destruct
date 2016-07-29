@@ -16,6 +16,22 @@ def read_select_write(df_iter, select, out_filename):
             chunk.to_csv(out_file, sep='\t', header=False, index=False)
 
 
+def read_filter_write(df_iter, f_filter, out_filename):
+    """ Write filtered set of streamed data.
+
+    Args:
+        df_iter (iter of pandas.DataFrame): streamed data
+        f_filter (callable): filtering function
+        out_filename (str): output tsv filename
+
+    """
+
+    with open(out_filename, 'w') as out_file:
+        for chunk in df_iter:
+            chunk = f_filter(chunk)
+            chunk.to_csv(out_file, sep='\t', header=False, index=False)
+
+
 def group_aware_iter(df_iter, group_cols):
     """ Stream data on group boundaries.
 

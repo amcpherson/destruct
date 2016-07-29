@@ -14,8 +14,12 @@
 
 #include <iostream>
 #include <fstream>
+#include <boost/shared_ptr.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
 
 using namespace std;
+using namespace boost;
 
 struct RawRead
 {
@@ -37,11 +41,13 @@ public:
 class FastqReadStream : public IReadStream
 {
 public:
-	explicit FastqReadStream(istream& in);	
+	explicit FastqReadStream(const string& filename);
 	bool Good();
 	bool GetNextRead(RawRead& read);
 private:
-	istream& mStream;
+	boost::shared_ptr<ifstream> mFile;
+	boost::shared_ptr<iostreams::filtering_streambuf<iostreams::input> > mStreamBuf;
+	boost::shared_ptr<istream> mStream;
 };
 
 #endif
