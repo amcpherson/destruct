@@ -28,12 +28,6 @@ if __name__ == '__main__':
     argparser.add_argument('tool_defs',
                            help='Tool Definition Filename')
 
-    argparser.add_argument('--chromosomes', nargs='*', type=str, default=['20'],
-                           help='Reference chromosomes')
-
-    argparser.add_argument('--include_nonchromosomal',  action='store_true',
-                           help='Include non chromosomal reference sequences')
-
     args = vars(argparser.parse_args())
 
     try:
@@ -48,19 +42,15 @@ if __name__ == '__main__':
     yaml_text = open(args['tool_defs']).read().format(ref_data_dir=args['ref_data_dir'])
     tool_defs = yaml.load(yaml_text)
 
+    sim_config = yaml.load(open(args['sim_config']))
+
     ctx = {'mem':4}
 
     workflow = pypeliner.workflow.Workflow(default_ctx=ctx)
 
-    workflow.transform(
-        name='read_params',
-        func=destruct.benchmark.destruct_test.read_simulation_params,
-        ret=mgd.TempOutputObj('simulation.params'),
-        args=(mgd.InputFile(args['sim_config']),),
-    )
-
-    workflow.setobj(mgd.TempOutputObj('chromosomes'), args['chromosomes'])
-    workflow.setobj(mgd.TempOutputObj('include_nonchromosomal'), args['include_nonchromosomal'])
+    workflow.setobj(mgd.TempOutputObj('simulation.params'), sim_config['simulation'])
+    workflow.setobj(mgd.TempOutputObj('chromosomes'), sim_config['reference']['chromosomes'])
+    workflow.setobj(mgd.TempOutputObj('include_nonchromosomal'), sim_config['reference']['include_nonchromosomal'])
 
     workflow.transform(
         name='create_genome',
@@ -151,6 +141,7 @@ if __name__ == '__main__':
         args=(
             mgd.TempInputObj('simulation.params'),
             mgd.TempInputObj('tool_defs', 'tool_name'),
+            mgd.InputFile(os.path.join(args['results_dir'], 'genome.fasta')),
             mgd.InputFile(os.path.join(args['results_dir'], 'simulated.tsv')),
             mgd.InputFile(os.path.join(args['results_dir'], 'results_{tool_name}.tsv'), 'tool_name'),
             mgd.OutputFile(os.path.join(args['results_dir'], 'annotated_{tool_name}.tsv'), 'tool_name'),

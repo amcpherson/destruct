@@ -170,12 +170,32 @@ void HomologyConsistentBreakpoint(const Sequences& sequences,
                                   int& homology,
                                   int maxOffset)
 {
-	int maxOffset1 = CalculateForwardHomology(sequences, chromosome, strand, position, maxOffset, false);
-	int maxOffset2 = CalculateForwardHomology(sequences, chromosome, strand, position, maxOffset, true);
+	int maxOffsetA = CalculateForwardHomology(sequences, chromosome, strand, position, maxOffset, false);
+	int maxOffsetB = CalculateForwardHomology(sequences, chromosome, strand, position, maxOffset, true);
 
-	position[0] += CalculateOffset(strand[0], -maxOffset2);
-	position[1] += CalculateOffset(strand[1], maxOffset2);
-	homology = maxOffset1 + maxOffset2;
+	// Ensure that the same breakpoint is selected among the multiple
+	// breakpoints possible when there is breakpoint homology.  Always
+	// select the breakpoint for which the minimum of the two breakend
+	// positions is minimal
+
+	int positionA1 = position[0] + CalculateOffset(strand[0], maxOffsetA);
+	int positionA2 = position[1] + CalculateOffset(strand[1], -maxOffsetA);
+
+	int positionB1 = position[0] + CalculateOffset(strand[0], -maxOffsetB);
+	int positionB2 = position[1] + CalculateOffset(strand[1], maxOffsetB);
+
+	if (min(positionA1, positionA2) < min(positionB1, positionB2))
+	{
+		position[0] = positionA1;
+		position[1] = positionA2;
+	}
+	else
+	{
+		position[0] = positionB1;
+		position[1] = positionB2;
+	}
+
+	homology = maxOffsetA + maxOffsetB;
 }
 
 

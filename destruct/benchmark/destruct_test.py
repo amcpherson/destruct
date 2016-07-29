@@ -13,24 +13,18 @@ import pypeliner
 
 import destruct.benchmark.wrappers
 import destruct.utils.download
-
-
-def read_simulation_params(sim_config_filename):
-
-    sim_info = {}
-    execfile(sim_config_filename, {}, sim_info)
-
-    return sim_info
+import destruct.utils.misc
+import destruct.utils.seq
 
 
 class BreakpointDatabase(object):
-    def __init__(self, breakpoints):
+    def __init__(self, breakpoints, id_col='breakpoint_id'):
         self.positions = collections.defaultdict(list)
         self.break_ids = collections.defaultdict(set)
         for idx, row in breakpoints.iterrows():
             for side in ('1', '2'):
                 self.positions[(row['chromosome_'+side], row['strand_'+side])].append(row['position_'+side])
-                self.break_ids[(row['chromosome_'+side], row['strand_'+side], row['position_'+side])].add((row['break_id'], side))
+                self.break_ids[(row['chromosome_'+side], row['strand_'+side], row['position_'+side])].add((row[id_col], side))
         for key in self.positions.iterkeys():
             self.positions[key] = sorted(self.positions[key])
     def query(self, row, extend=0):
@@ -84,36 +78,98 @@ def run_setup_function(tool_info, test_config, **kwargs):
     setup_function(test_config, **kwargs)
 
 
-def create_roc_plot(sim_info, tool_defs, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
+def create_roc_plot(sim_info, tool_defs, genome_fasta, simulated_filename, predicted_filename, annotated_filename, identified_filename, plot_filename):
 
     with PdfPages(plot_filename) as pdf:
 
-        breakpoints = pd.read_csv(simulated_filename, sep='\t', header=None,
-                          converters={'break_id':str, 'chromosome_1':str, 'chromosome_2':str},
-                          names=['break_id',
-                                 'chromosome_1', 'strand_1', 'position_1',
-                                 'chromosome_2', 'strand_2', 'position_2',
-                                 'inserted', 'homology'])
+        breakpoints = pd.read_csv(
+            simulated_filename, sep='\t',
+            converters={'breakpoint_id':str, 'chromosome_1':str, 'chromosome_2':str})
+        breakpoints['inserted'] = breakpoints['inserted'].fillna('')
 
         breakpoints_db = BreakpointDatabase(breakpoints)
 
-        results = pd.read_csv(predicted_filename, sep='\t',
-                              converters={'prediction_id':str, 'chromosome_1':str, 'chromosome_2':str})
+        results = pd.read_csv(
+            predicted_filename, sep='\t',
+            converters={'prediction_id':str, 'chromosome_1':str, 'chromosome_2':str})
+
+        if 'inserted' not in results:
+            results['inserted'] = ''
+        results['inserted'] = results['inserted'].fillna('')
+
+        def normalize_breakpoint(row, genome):
+            norm_pos_1, norm_pos_2, homology = destruct.utils.misc.normalize_breakpoint(
+                row['chromosome_1'], row['strand_1'], row['position_1'],
+                row['chromosome_2'], row['strand_2'], row['position_2'], genome)
+
+            row['normalized_position_1'] = norm_pos_1
+            row['normalized_position_2'] = norm_pos_2
+            row['homology'] = homology
+
+            return row
+
+        genome = dict(destruct.utils.seq.read_sequences(open(genome_fasta, 'r')))
+        results = results.apply(normalize_breakpoint, axis=1, args=(genome,))
+        del genome
 
         min_dist = 200
-
         def identify_true_positive(row):
             return breakpoints_db.query(row, min_dist)
 
         results['true_pos_id'] = results.apply(identify_true_positive, axis=1)
+
+        results = results.merge(
+            breakpoints,
+            left_on='true_pos_id', right_on='breakpoint_id',
+            suffixes=('', '_true'), how='left')
+
+        def identify_exact_match(row):
+            if ((row['chromosome_1'] == row['chromosome_1_true']) &
+                (row['strand_1'] == row['strand_1_true']) &
+                (row['normalized_position_1'] == row['position_1_true']) &
+                (row['chromosome_2'] == row['chromosome_2_true']) &
+                (row['strand_2'] == row['strand_2_true']) &
+                (row['normalized_position_2'] == row['position_2_true'])):
+                return True
+            if ((row['chromosome_1'] == row['chromosome_2_true']) &
+                (row['strand_1'] == row['strand_2_true']) &
+                (row['normalized_position_1'] == row['position_2_true']) &
+                (row['chromosome_2'] == row['chromosome_1_true']) &
+                (row['strand_2'] == row['strand_1_true']) &
+                (row['normalized_position_2'] == row['position_1_true'])):
+                return True
+            return False
+
+        results['is_breakpoint_correct'] = results.apply(identify_exact_match, axis=1)
+        results['is_homology_correct'] = (results['homology'] == results['homology_true'])
+        results['is_inserted_correct'] = (results['inserted'] == results['inserted_true'])
+
+        plot_cols = ['is_breakpoint_correct', 'is_homology_correct', 'is_inserted_correct']
+
+        # Select the most correct breakpoint among multiple matching predictions
+        data = (
+            results.sort_values(['is_breakpoint_correct', 'is_inserted_correct'])
+            .groupby('true_pos_id').first().sort_index().reset_index())
+
+        data = data.set_index('true_pos_id')[plot_cols]
+        data = data.reindex(breakpoints['breakpoint_id'].values)
+        data = data.replace(True, 'correct').replace(False, 'incorrect').fillna('missing')
+        data.columns = 'breakpoint', 'homology', 'inserted'
+        data = data.stack()
+        data.name = 'value'
+        data.index.names = 'breakpoint_id', 'check'
+        data = data.reset_index()
+
+        g = seaborn.factorplot(col='check', x='value', kind='count', data=data)
+        pdf.savefig(g.fig)
 
         results.to_csv(annotated_filename, sep='\t', index=False, na_rep='NA')
 
         features = tool_defs['features']
         invalid_value = -1e9
 
-        identified = breakpoints[['break_id']]
-        identified = identified.merge(results[['prediction_id', 'true_pos_id'] + features], left_on='break_id', right_on='true_pos_id', how='outer')
+        identified = breakpoints[['breakpoint_id']]
+        identified = identified.merge(results[['prediction_id', 'true_pos_id'] + features], left_on='breakpoint_id', right_on='true_pos_id', how='outer')
         identified = identified.drop('true_pos_id', axis=1)
 
         identified.to_csv(identified_filename, sep='\t', index=False, na_rep='NA')

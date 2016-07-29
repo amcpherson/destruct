@@ -1,5 +1,5 @@
 
-chromosomes                      = ['20']
+chromosomes                      = ['20', '21']
 include_nonchromosomal           = False
 
 read_length                      = 100
@@ -8,7 +8,7 @@ fragment_stddev                  = 30
 coverage                         = 10
 coverage_fraction                = 0.25
 num_inserted                     = 0
-homology                         = 0
+homology                         = 3
 
 # read_length_list                 = [100]
 # fragment_mean_list               = [300]

@@ -5,8 +5,8 @@ import numpy as np
 import scipy
 import scipy.stats
 
-import utils.misc
-import utils.streaming
+import destruct.utils.misc
+import destruct.utils.streaming
 
 
 cluster_fields = ['cluster_id', 'cluster_end',
@@ -117,18 +117,9 @@ def predict_breaks_split(clusters, split, max_predictions_per_cluster=10):
       return pd.DataFrame()
 
     # Flip columns to make them consistent across clusters
-    utils.misc.column_flip(data, data['flip'], 'chromosome_1', 'chromosome_2')
-    utils.misc.column_flip(data, data['flip'], 'strand_1', 'strand_2')
-    utils.misc.column_flip(data, data['flip'], 'position_1', 'position_2')
-
-    # Calculate advancement due to homology based on strand
-    data['advance_1'] = np.where(data['strand_1'] == "+", data['homology'], -data['homology'])
-    data['advance_2'] = np.where(data['strand_2'] == "+", data['homology'], -data['homology'])
-
-    # Positions have already been flipped, thus we have to
-    # add to the second and subtract from the first
-    data.loc[data['flip'], 'position_1'] -= data.loc[data['flip'], 'advance_1']
-    data.loc[data['flip'], 'position_2'] += data.loc[data['flip'], 'advance_2']
+    destruct.utils.misc.column_flip(data, data['flip'], 'chromosome_1', 'chromosome_2')
+    destruct.utils.misc.column_flip(data, data['flip'], 'strand_1', 'strand_2')
+    destruct.utils.misc.column_flip(data, data['flip'], 'position_1', 'position_2')
 
     # Track which end of the cluster was the seed end for this read
     data['seed_end'] = np.where(data['flip'], 1-data['read_end'], data['read_end'])
@@ -137,7 +128,7 @@ def predict_breaks_split(clusters, split, max_predictions_per_cluster=10):
         if row['seed_end'] == 0:
             return row['inserted']
         else:
-            return utils.misc.reverse_complement(row['inserted'])
+            return destruct.utils.misc.reverse_complement(row['inserted'])
 
     data['inserted'] = data.apply(revcomp_inserted, axis=1)
 
@@ -324,7 +315,8 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
 
     data = data[likelihoods_fields]
 
-    data = data[data['log_likelihood'] >= min_alignment_log_likelihood]
+    # TODO, figure out how to do something better here
+    # data = data[data['log_likelihood'] >= min_alignment_log_likelihood]
 
     data.to_csv(likelihoods_filename, sep='\t', index=False, header=False)
 
@@ -343,12 +335,12 @@ def select_clusters(clusters_filename,
 
     cluster_ids = clusters[['cluster_id']].drop_duplicates()
 
-    utils.streaming.read_select_write(breakpoints_iter, cluster_ids, selected_breakpoints_filename)
+    destruct.utils.streaming.read_select_write(breakpoints_iter, cluster_ids, selected_breakpoints_filename)
 
     likelihoods_iter = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
                                    iterator=True, chunksize=1000000)
 
-    utils.streaming.read_select_write(likelihoods_iter, clusters, selected_likelihoods_filename)
+    destruct.utils.streaming.read_select_write(likelihoods_iter, clusters, selected_likelihoods_filename)
 
 
 def select_breakpoint_prediction(likelihoods, template_length_min_threshold):
@@ -394,7 +386,7 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
         usecols=['cluster_id', 'breakpoint_id', 'log_likelihood', 'template_length_1', 'template_length_2'],
         chunksize=int(1e7))
 
-    read_likelihoods_iter = utils.streaming.group_aware_iter(read_likelihoods_iter, ['cluster_id'])
+    read_likelihoods_iter = destruct.utils.streaming.group_aware_iter(read_likelihoods_iter, ['cluster_id'])
 
     selected = pd.concat([
         select_breakpoint_prediction(df, template_length_min_threshold)
@@ -413,11 +405,11 @@ def select_predictions(breakpoints_filename, selected_breakpoints_filename,
                                    converters={'chromosome_1':str, 'chromosome_2':str, 'inserted':str},
                                    iterator=True, chunksize=1000000)
 
-    utils.streaming.read_select_write(breakpoints_iter, selected, selected_breakpoints_filename)
+    destruct.utils.streaming.read_select_write(breakpoints_iter, selected, selected_breakpoints_filename)
 
     likelihoods_iter = pd.read_csv(likelihoods_filename, sep='\t', names=likelihoods_fields,
                                    iterator=True, chunksize=1000000)
 
-    utils.streaming.read_select_write(likelihoods_iter, selected, selected_likelihoods_filename)
+    destruct.utils.streaming.read_select_write(likelihoods_iter, selected, selected_likelihoods_filename)
 
 

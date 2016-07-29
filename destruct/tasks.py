@@ -325,8 +325,6 @@ def tabulate_results(breakpoints_filename, likelihoods_filename, library_ids,
     breakpoints = breakpoints.rename(columns={'count':'num_split'})
     breakpoints.loc[breakpoints['inserted'] == '.', 'inserted'] = ''
 
-    breakpoints = destruct.utils.misc.normalize_breakpoints(breakpoints)
-
     likelihoods = pd.read_csv(likelihoods_filename, sep='\t',
                               names=destruct.predict_breaks.likelihoods_fields,
                               converters=converters)
