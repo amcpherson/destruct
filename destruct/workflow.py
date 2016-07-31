@@ -67,23 +67,12 @@ def create_destruct_workflow(
             '-f', config['bam_max_fragment_length'],
             '-b', mgd.InputFile('bam', 'bylibrary', fnames=bam_filenames),
             '-s', mgd_stats.as_output(),
-            '-1', mgd_reads_1.as_output(),
-            '-2', mgd_reads_2.as_output(),
+            '--fastq1', mgd_reads_1.as_output(),
+            '--fastq2', mgd_reads_2.as_output(),
             '-t', mgd.TempSpace('bamdisc.tempspace', 'bylibrary'),
-        ),
-    )
-
-    workflow.commandline(
-        name='bamsample',
-        axes=('bylibrary',),
-        ctx={'io': 1, 'mem': 8},
-        args=(
-            'destruct_bamsamplefastq',
-            '-r',
-            '-b', mgd.InputFile('bam', 'bylibrary', fnames=bam_filenames),
             '-n', config['num_read_samples'],
-            '-1', mgd_sample_1.as_output(),
-            '-2', mgd_sample_2.as_output(),
+            '--sample1', mgd_sample_1.as_output(),
+            '--sample2', mgd_sample_2.as_output(),
         ),
     )
 

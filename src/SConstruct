@@ -143,12 +143,6 @@ env.Program(target='destruct_bamdiscordantfastq', source=common_sources+bamtools
 env.Install(install_dir, 'destruct_bamdiscordantfastq')
 
 sources = """
-    bamsamplefastq.cpp
-""".split()
-env.Program(target='destruct_bamsamplefastq', source=common_sources+bamtools_sources+sources)
-env.Install(install_dir, 'destruct_bamsamplefastq')
-
-sources = """
     bamfastq.cpp
 """.split()
 env.Program(target='destruct_bamfastq', source=common_sources+bamtools_sources+sources)

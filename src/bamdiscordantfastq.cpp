@@ -238,6 +238,35 @@ private:
 	DiskPriorityQueue<ReadInfo> mDiscordantReadQueue2;
 };
 
+template<typename T>
+struct ReservoirSampler
+{
+	ReservoirSampler(int numSamples) : mNumSamples(numSamples), mNumValues(0) {}
+
+	void AddSample(const T& value)
+	{
+		mNumValues++;
+
+		if (mSamples.size() < mNumSamples)
+		{
+			mSamples.push_back(value);
+		}
+		else
+		{
+			int sampleIndex = mRNG.Next(0, mNumValues - 1);
+			if (sampleIndex < mNumSamples)
+			{
+				mSamples[sampleIndex] = value;
+			}
+		}
+	}
+
+	int mNumSamples;
+	int mNumValues;
+	vector<T> mSamples;
+	RandomNumberGenerator mRNG;	
+};
+
 int main(int argc, char* argv[])
 {
 	string bamFilename;
@@ -247,18 +276,24 @@ int main(int argc, char* argv[])
 	int maxFragmentLength;
 	string statsFilename;
 	string tempsPrefix;
+	string sample1Filename;
+	string sample2Filename;
+	int numSamples;
 	bool renameReads;
 	
 	try
 	{
 		TCLAP::CmdLine cmd("Bam to Fastq Tool");
 		TCLAP::ValueArg<string> bamFilenameArg("b","bam","Bam Filename",true,"","string",cmd);
-		TCLAP::ValueArg<string> fastq1FilenameArg("1","fastq1","Fastq End 1 Filename",true,"","string",cmd);
-		TCLAP::ValueArg<string> fastq2FilenameArg("2","fastq2","Fastq End 2 Filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> fastq1FilenameArg("","fastq1","Fastq End 1 Filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> fastq2FilenameArg("","fastq2","Fastq End 2 Filename",true,"","string",cmd);
 		TCLAP::ValueArg<int> maxSoftClippedArg("c","clipmax","Maximum Allowable Soft Clipped",true,0,"integer",cmd);
 		TCLAP::ValueArg<int> maxFragmentLengthArg("f","flen","Maximum Fragment Length",true,0,"integer",cmd);
 		TCLAP::ValueArg<string> statsFilenameArg("s","stats","Concordant Stats Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> tempsPrefixArg("t","temp","Filename Prefix for Temporary Files",true,"","string",cmd);
+		TCLAP::ValueArg<string> sample1FilenameArg("","sample1","Sample Fastq End 1 Filename",true,"","string",cmd);
+		TCLAP::ValueArg<string> sample2FilenameArg("","sample2","Sample Fastq End 2 Filename",true,"","string",cmd);
+		TCLAP::ValueArg<int> numSamplesArg("n","num","Number of Samples",true,0,"integer",cmd);
 		TCLAP::SwitchArg renameReadsArg("r","rename","Rename With Integer IDs",cmd);
 		cmd.parse(argc,argv);
 		
@@ -269,6 +304,9 @@ int main(int argc, char* argv[])
 		maxFragmentLength = maxFragmentLengthArg.getValue();
 		statsFilename = statsFilenameArg.getValue();
 		tempsPrefix = tempsPrefixArg.getValue();
+		sample1Filename = sample1FilenameArg.getValue();
+		sample2Filename = sample2FilenameArg.getValue();
+		numSamples = numSamplesArg.getValue();
 		renameReads = renameReadsArg.getValue();
 	}
 	catch (TCLAP::ArgException &e)
@@ -306,6 +344,8 @@ int main(int argc, char* argv[])
 	fastq1Stream.push(fastq1File);
 	fastq2Stream.push(fastq2File);
 
+	ReservoirSampler<pair<ReadInfo,ReadInfo> > sampledReads(numSamples);
+
 	int fragmentIndex = 0;
 
 	BamAlignment alignment1;
@@ -319,6 +359,8 @@ int main(int argc, char* argv[])
 		}
 
 		concordantReadCount++;
+
+		sampledReads.AddSample(make_pair(ReadInfo(alignment1), ReadInfo(alignment2)));
 
 		// Update read length histogram for all reads
 		readLengthHist.insert(make_pair(alignment1.Length, 0)).first->second++;
@@ -367,6 +409,8 @@ int main(int argc, char* argv[])
 		}
 
 		discordantReadCount++;
+
+		sampledReads.AddSample(make_pair(discordantRead1, discordantRead2));
 
 		// Update read length histogram for all reads
 		readLengthHist.insert(make_pair(alignment1.Length, 0)).first->second++;
@@ -437,6 +481,38 @@ int main(int argc, char* argv[])
 	for (unordered_map<int,int>::const_iterator iter = fragmentLengthHist.begin(); iter != fragmentLengthHist.end(); iter++)
 	{
 		statsFile << "fragment_length\t" << iter->first << "\t" << iter->second << endl;
+	}
+
+	// Write out sampled reads
+	ofstream sample1File(sample1Filename.c_str(), std::ios_base::out | std::ios_base::binary);
+	ofstream sample2File(sample2Filename.c_str(), std::ios_base::out | std::ios_base::binary);
+
+	CheckFile(sample1File, sample1Filename);
+	CheckFile(sample2File, sample2Filename);
+	
+	iostreams::filtering_ostream sample1Stream;
+	iostreams::filtering_ostream sample2Stream;
+
+	sample1Stream.push(iostreams::gzip_compressor());
+	sample2Stream.push(iostreams::gzip_compressor());
+
+	sample1Stream.push(sample1File);
+	sample2Stream.push(sample2File);
+
+	for (int sampleIndex = 0; sampleIndex < sampledReads.mSamples.size(); sampleIndex++)
+	{
+		const ReadInfo& read1 = sampledReads.mSamples[sampleIndex].first;
+		const ReadInfo& read2 = sampledReads.mSamples[sampleIndex].second;
+
+		sample1Stream << "@" << sampleIndex << "/1" << endl;
+		sample1Stream << read1.Sequence << endl;
+		sample1Stream << "+" << read1.Name << endl;
+		sample1Stream << read1.Qualities << endl;
+		
+		sample2Stream << "@" << sampleIndex << "/2" << endl;
+		sample2Stream << read2.Sequence << endl;
+		sample2Stream << "+" << read2.Name << endl;
+		sample2Stream << read2.Qualities << endl;
 	}
 }
 
