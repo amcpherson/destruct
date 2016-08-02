@@ -47,7 +47,7 @@ env.Append(CPPPATH=[external_dir, bamtools_dir, tclap_dir])
 env.Append(LIBS=['z', 'bz2', 'boost_iostreams', 'boost_serialization'])
 env.Append(CCFLAGS='-O3')
 env.Append(CCFLAGS='-g')
-env.Append(CCFLAGS='-stdlib=libc++')
+env.Append(CCFLAGS='-stdlib=libc++  -mmacosx-version-min=10.7')
 
 sources = """
     AlignmentRecord.cpp
