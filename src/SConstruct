@@ -1,6 +1,6 @@
 import os
+import sys
 import fnmatch
-import subprocess
 
 default_install_dir = os.path.abspath(os.path.join(os.pardir, 'bin'))
 
@@ -47,8 +47,9 @@ env.Append(CPPPATH=[external_dir, bamtools_dir, tclap_dir])
 env.Append(LIBS=['z', 'bz2', 'boost_iostreams', 'boost_serialization'])
 env.Append(CCFLAGS='-O3')
 env.Append(CCFLAGS='-g')
-env.Append(CCFLAGS='-stdlib=libc++  -mmacosx-version-min=10.7')
-env.Append(LINKFLAGS='-stdlib=libc++  -mmacosx-version-min=10.7')
+if sys.platform == "darwin":
+    env.Append(CCFLAGS='-stdlib=libc++ -mmacosx-version-min=10.7')
+    env.Append(LINKFLAGS='-stdlib=libc++ -mmacosx-version-min=10.7')
 
 sources = """
     AlignmentRecord.cpp
