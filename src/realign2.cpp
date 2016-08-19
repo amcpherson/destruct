@@ -385,7 +385,7 @@ int main(int argc, char* argv[])
 		}
 
 		// Check for very poor alignments
-                if (min(alignedLength[0], alignedLength[1]) < minAlignedLength)
+		if (min(alignedLength[0], alignedLength[1]) < minAlignedLength)
 		{
 			continue;
 		}
