@@ -33,6 +33,8 @@ public:
 	double Likelihood(int alignedLength, int score) const;
 	bool AboveThreshold(int alignedLength, int score) const;
 
+	int GetMinAlignedLength() const;
+
 private:
 	int mMatchScore;
 	unordered_map<int,ScoreLikelihoodCalculator> mScoreLikelihoods;

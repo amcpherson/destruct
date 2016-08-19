@@ -280,6 +280,7 @@ int main(int argc, char* argv[])
 	
 	AlignmentProbability alignProbability(matchScore);
 	alignProbability.ReadDistributions(statsFilename, validReadThreshold);
+	int minAlignedLength = alignProbability.GetMinAlignedLength();
 	
 	cerr << "Reading reference fasta" << endl;
 	
@@ -381,6 +382,12 @@ int main(int argc, char* argv[])
 		for (int readEnd = 0; readEnd <= 1; readEnd++)
 		{
 			alignedLength[readEnd] = bestAlignment[readEnd].second - cBreakEndAdjust;
+		}
+
+		// Check for very poor alignments
+                if (min(alignedLength[0], alignedLength[1]) < minAlignedLength)
+		{
+			continue;
 		}
 		
 		//

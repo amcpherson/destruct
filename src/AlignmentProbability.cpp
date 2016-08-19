@@ -72,6 +72,11 @@ bool AlignmentProbability::AboveThreshold(int alignedLength, int score) const
 	return score >= mScoreThresholds.find(alignedLength)->second;
 }
 
+int AlignmentProbability::GetMinAlignedLength() const
+{
+	return min_element(mScoreThresholds.begin(), mScoreThresholds.end())->first;
+}
+
 void AlignmentPosterior::AppendAlignment(int readEnd, int score)
 {
 	double readLikelihood = mAlignmentProbability.Likelihood(mAlignedLengths[readEnd], score);
