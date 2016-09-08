@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 import networkx
-import remixt.blossomv
+import blossomv.blossomv
 
 
 BalancedRearrangment = collections.namedtuple(
@@ -163,7 +163,7 @@ def detect_balanced_rearrangements(
         if edge[0] == edge[1]:
             raise Exception('self loop {}'.format(M1[edge[0]][edge[1]]))
         edges[edge] = int(edges[edge] * cost_resolution)
-    min_cost_edges = remixt.blossomv.min_weight_perfect_matching(edges)
+    min_cost_edges = blossomv.blossomv.min_weight_perfect_matching(edges)
 
     # Remove unselected edges
     assert set(min_cost_edges).issubset(edges.keys())
