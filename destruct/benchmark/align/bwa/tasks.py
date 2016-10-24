@@ -64,4 +64,4 @@ def merge_bam(input_bams, output_bam):
     elif len(input_bams) == 1:
         pypeliner.commandline.execute('cp', input_bams.values()[0], output_bam)
     else:
-        pypeliner.commandline.execute('samtools', 'merge', output_bam, *input_bams.values())
+        pypeliner.commandline.execute('samtools', 'merge', '-c', output_bam, *input_bams.values())

@@ -344,7 +344,7 @@ def samtools_merge_sort_index(output_filename, *input_filenames):
         pypeliner.commandline.execute('samtools', 'sort', input_filename, '-o', input_filename+'.sorted.bam')
         sorted_filenames.append(input_filename+'.sorted.bam')
 
-    pypeliner.commandline.execute('samtools', 'merge', output_filename, *sorted_filenames)
+    pypeliner.commandline.execute('samtools', 'merge', '-c', output_filename, *sorted_filenames)
 
     for sorted_filename in sorted_filenames:
         os.remove(sorted_filename)
