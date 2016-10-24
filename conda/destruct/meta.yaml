@@ -20,6 +20,10 @@ requirements:
     - pypeliner >=0.4.1
     - pygenes >=0.0.4
     - bowtie
+    - pyyaml
+    - matplotlib
+    - seaborn
+    - pysam
 
 about:
   home: http://bitbucket.org/dranew/destruct
