@@ -48,61 +48,22 @@ def bwa_align_workflow(
     )
 
     workflow.commandline(
-        name='aln1',
+        name='align',
         axes=('byread',),
         ctx=himem,
         args=(
-            'bwa', 'aln',
+            'bwa', 'mem',
+            '-R', read_group_str,
             genome_fasta_filename,
             mgd.TempInputFile('fastq1', 'byread'),
-            '>',
-            mgd.TempOutputFile('sai1', 'byread'),
-        ),
-    )
-
-    workflow.commandline(
-        name='aln2',
-        axes=('byread',),
-        ctx=himem,
-        args=(
-            'bwa', 'aln',
-            genome_fasta_filename,
             mgd.TempInputFile('fastq2', 'byread'),
-            '>',
-            mgd.TempOutputFile('sai2', 'byread'),
-        ),
-    )
-
-    workflow.commandline(
-        name='sampe',
-        axes=('byread',),
-        ctx=himem,
-        args=(
-            'bwa', 'sampe',
-            '-r', read_group_str,
-            genome_fasta_filename,
-            mgd.TempInputFile('sai1', 'byread'),
-            mgd.TempInputFile('sai2', 'byread'),
-            mgd.TempInputFile('fastq1', 'byread'),
-            mgd.TempInputFile('fastq2', 'byread'),
-            '>',
-            mgd.TempOutputFile('sam', 'byread'),
-        ),
-    )
-
-    workflow.commandline(
-        name='create_bam',
-        axes=('byread',),
-        ctx=lowmem,
-        args=(
+            '|',
             'samtools', 'view', '-bt',
             genome_fasta_filename+'.fai',
-            mgd.TempInputFile('sam', 'byread'),
-            '>',
-            mgd.TempOutputFile('bam', 'byread'),
+            '-',
+            '-o', mgd.TempOutputFile('bam', 'byread'),
         ),
     )
-
 
     workflow.transform(
         name='merge_bams',
