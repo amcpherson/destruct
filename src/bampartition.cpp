@@ -56,15 +56,30 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 	
+	SamHeader samHeaderA(bamInput.GetHeader());
+	SamHeader samHeaderB(bamInput.GetHeader());
+	
+	string readGroupAID = "A";
+	string readGroupBID = "B";
+	
+	SamReadGroup readGroupA(readGroupAID);
+	SamReadGroup readGroupB(readGroupBID);
+	
+	samHeaderA.ReadGroups.Clear();
+	samHeaderB.ReadGroups.Clear();
+	
+	samHeaderA.ReadGroups.Add(readGroupA);
+	samHeaderB.ReadGroups.Add(readGroupB);
+
 	BamWriter bamOutputA;
-	if (!bamOutputA.Open(bamOutputAFilename, bamInput.GetHeader(), bamInput.GetReferenceData()))
+	if (!bamOutputA.Open(bamOutputAFilename, samHeaderA, bamInput.GetReferenceData()))
 	{
 		cerr << "Error: Unable to write to bam file " << bamOutputAFilename << endl;
 		exit(1);
 	}
 	
 	BamWriter bamOutputB;
-	if (!bamOutputB.Open(bamOutputBFilename, bamInput.GetHeader(), bamInput.GetReferenceData()))
+	if (!bamOutputB.Open(bamOutputBFilename, samHeaderB, bamInput.GetReferenceData()))
 	{
 		cerr << "Error: Unable to write to bam file " << bamOutputBFilename << endl;
 		exit(1);
@@ -98,10 +113,12 @@ int main(int argc, char* argv[])
 		// Add to correct bam
 		if (readIsAIter->second)
 		{
+			alignment.AddTag("RG", "Z", readGroupAID);
 			bamOutputA.SaveAlignment(alignment);
 		}
 		else
 		{
+			alignment.AddTag("RG", "Z", readGroupBID);
 			bamOutputB.SaveAlignment(alignment);
 		}
 
