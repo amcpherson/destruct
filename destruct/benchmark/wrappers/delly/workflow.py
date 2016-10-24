@@ -94,7 +94,7 @@ def setup_delly(test_config, **kwargs):
 
     primary_assembly_url = 'ftp://ftp.ensembl.org/pub/release-'+ensembl_version+'/fasta/homo_sapiens/dna/Homo_sapiens.'+ensembl_genome_version+'.'+ensembl_version+'.dna.primary_assembly.fa.gz'
     chromosome_url = 'ftp://ftp.ensembl.org/pub/release-'+ensembl_version+'/fasta/homo_sapiens/dna/Homo_sapiens.'+ensembl_genome_version+'.'+ensembl_version+'.dna.chromosome.{0}.fa.gz'
-    hg19_excl_url = 'https://github.com/tobiasrausch/delly/blob/master/excludeTemplates/human.hg19.excl.tsv'
+    hg19_excl_url = 'http://raw.githubusercontent.com/tobiasrausch/delly/master/excludeTemplates/human.hg19.excl.tsv'
 
     if ensembl_genome_version != 'GRCh37':
         raise Exception('Only hg19 supported')
