@@ -116,13 +116,16 @@ if __name__ == '__main__':
             mgd.InputFile(os.path.join(args['results_dir'], 'simulated.2.fastq')),
             mgd.TempOutputFile('simulated.unsorted.bam'),
         ),
+        kwargs={
+            'read_group_str': '@RG\\tID:B',
+        },
     )
 
     workflow.transform(
         name='samtools_merge_sort_index',
         func=destruct.benchmark.destruct_test.samtools_merge_sort_index,
         args=(
-            mgd.TempOutputFile('tumour_raw.bam'),
+            mgd.TempOutputFile('tumour.raw.bam'),
             mgd.TempInputFile('tumour.unspiked.bam'),
             mgd.TempInputFile('simulated.unsorted.bam'),
         ),
@@ -133,7 +136,7 @@ if __name__ == '__main__':
         func=destruct.benchmark.destruct_test.samtools_sample_reheader,
         args=(
             mgd.OutputFile(os.path.join(args['results_dir'], 'tumour.bam')),
-            mgd.TempInputFile('tumour_raw.bam'),
+            mgd.TempInputFile('tumour.raw.bam'),
             'tumour',
         ),
     )
