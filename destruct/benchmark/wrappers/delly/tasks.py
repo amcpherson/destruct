@@ -43,9 +43,9 @@ def get_sv_types(ref_genome_fasta_file):
 
     # Translocations only for genomes with multiple chromosomes
     if num_chromosomes > 1:
-        return ('DEL', 'DUP', 'INV', 'INS')
-    else:
         return ('DEL', 'DUP', 'INV', 'TRA', 'INS')
+    else:
+        return ('DEL', 'DUP', 'INV', 'INS')
 
 
 def run_delly_call(sv_type, delly_excl_chrom, ref_genome_fasta_file, bam_files, out_file):
