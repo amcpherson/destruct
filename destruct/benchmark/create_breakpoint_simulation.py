@@ -86,7 +86,7 @@ def max_similar(seq1, seq2):
     return similar
 
 
-def create_random_breakpoint(genome, num_inserted, adjacent_length, required_homology=None):
+def create_random_breakpoint(genome, adjacent_length, num_inserted, required_homology=None):
     """ Create a random breakpoint with the required parameters
     """
 
@@ -171,8 +171,18 @@ def create_breakpoints(sim_info, genome_fasta, breakpoints_fasta, breakpoints_in
     info_table = []
     with open(breakpoints_fasta, 'w') as fasta:
         for idx in range(int(sim_info['num_breakpoints'])):
+            adjacent_length = int(sim_info['adjacent_length'])
+            if sim_info['random_break_features']:
+                homology = np.random.randint(int(sim_info['homology']) + 1)
+                if homology == 0 and np.random.random() < 0.1:
+                    num_inserted = np.random.randint(int(sim_info['num_inserted']) + 1)
+                else:
+                    num_inserted = 0
+            else:
+                num_inserted = int(sim_info['num_inserted'])
+                homology = int(sim_info['homology'])
             chr1, str1, pos1, chr2, str2, pos2, inserted, sequence, homology = create_random_breakpoint(
-                genome, int(sim_info['num_inserted']), int(sim_info['adjacent_length']), int(sim_info['homology']))
+                genome, adjacent_length, num_inserted, homology)
             fasta.write('>{0}\n{1}\n'.format(idx, sequence))
             info_table.append(
                 {
@@ -199,4 +209,3 @@ def create(sim_info, genome_fasta, breakpoints_fasta, breakpoints_info, concorda
     read_count = int(float(sim_info['coverage']) * sequences_size / float(sim_info['fragment_mean']))
     simulate(sim_info, read_count, breakpoints_fasta, discordant1, discordant2, False)
     simulate(sim_info, sim_info['num_concordant'], genome_fasta, concordant1, concordant2)
-
