@@ -364,9 +364,13 @@ def samtools_sample_reheader(output_filename, input_filename, sample_name):
         for line in f_in:
             fields = line.rstrip().split('\t')
             if fields[0] == '@RG':
+                replaced = False
                 for idx in xrange(len(fields)):
                     if fields[idx].startswith('SM:'):
                         fields[idx] = 'SM:' + sample_name
+                        replaced = True
+                if not replaced:
+                    fields.append('SM:' + sample_name)
                 line = '\t'.join(fields) + '\n'
             f_out.write(line)
 
@@ -376,4 +380,3 @@ def samtools_sample_reheader(output_filename, input_filename, sample_name):
     index_filename = output_filename[:-4] + '.bai'
 
     pypeliner.commandline.execute('samtools', 'index', output_filename, index_filename)
-
