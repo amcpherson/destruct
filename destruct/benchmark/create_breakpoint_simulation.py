@@ -173,9 +173,9 @@ def create_breakpoints(sim_info, genome_fasta, breakpoints_fasta, breakpoints_in
         for idx in range(int(sim_info['num_breakpoints'])):
             adjacent_length = int(sim_info['adjacent_length'])
             if sim_info['random_break_features']:
-                homology = np.random.randint(int(sim_info['homology']) + 1)
-                if homology == 0 and np.random.random() < 0.1:
-                    num_inserted = np.random.randint(int(sim_info['num_inserted']) + 1)
+                homology = random.randint(0, int(sim_info['homology']))
+                if homology == 0 and random.random() < 0.1:
+                    num_inserted = random.randint(0, int(sim_info['num_inserted']))
                 else:
                     num_inserted = 0
             else:
