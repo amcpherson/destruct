@@ -72,7 +72,8 @@ def convert_bcf(bcf_filename, output_filename, control_id=None):
             assert coord_1 < coord_2
 
         breakpoint_ids = []
-        for strand_info, breakpoint_id in zip(row.info['STRANDS'].split(','), 'AB'):
+        assert isinstance(row.info['STRANDS'], tuple)
+        for strand_info, breakpoint_id in zip(row.info['STRANDS'], 'AB'):
             (strand_1, strand_2), breakpoint_read_count = strand_info.split(':')
 
             if row.info['SVTYPE'] == 'DEL':
