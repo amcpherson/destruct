@@ -16,7 +16,7 @@ if __name__ == '__main__':
     argparser.add_argument('tool_defs',
                            help='Tool Definition Filename')
 
-    argparser.add_argument('--chromosomes', nargs='*', type=str, default=['20'],
+    argparser.add_argument('--chromosomes', nargs='*', type=str, default=None,
                            help='Reference chromosomes')
 
     args = vars(argparser.parse_args())
@@ -26,9 +26,9 @@ if __name__ == '__main__':
 
     ctx = {'mem':4}
 
-    test_config = {
-        'chromosomes': args['chromosomes'],
-    }
+    test_config = {}
+    if args.get('chromosomes', None) is not None:
+        test_config['chromosomes'] = args['chromosomes']
 
     for tool_name, tool_info in tool_defs.iteritems():
         destruct.benchmark.destruct_test.run_setup_function(tool_info, test_config)

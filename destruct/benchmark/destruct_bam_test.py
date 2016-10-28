@@ -57,20 +57,27 @@ if __name__ == '__main__':
     workflow.setobj(mgd.TempOutputObj('simulation.params'), sim_config['simulation'])
     workflow.setobj(mgd.TempOutputObj('chromosomes'), sim_config['reference']['chromosomes'])
 
-    genome_fasta = os.path.join(args['results_dir'], 'genome.fa')
-    source_bam = os.path.join(args['results_dir'], 'source.bam')
+    if sim_config['reference'].get('chromosomes', None) is not None:
+        genome_fasta = os.path.join(args['results_dir'], 'genome.fa')
+        source_bam = os.path.join(args['results_dir'], 'source.bam')
 
-    workflow.transform(
-        name='create_ref_bam',
-        func=destruct.benchmark.destruct_test.create_ref_bam,
-        args=(
-            mgd.InputFile(args['ref']),
-            mgd.InputFile(args['bam']),
-            mgd.OutputFile(genome_fasta),
-            mgd.OutputFile(source_bam),
-            mgd.TempInputObj('chromosomes'),
-        ),
-    )
+        workflow.setobj(mgd.TempOutputObj('chromosomes'), sim_config['reference']['chromosomes'])
+
+        workflow.transform(
+            name='create_ref_bam',
+            func=destruct.benchmark.destruct_test.create_ref_bam,
+            args=(
+                mgd.InputFile(args['ref']),
+                mgd.InputFile(args['bam']),
+                mgd.OutputFile(genome_fasta),
+                mgd.OutputFile(source_bam),
+                mgd.TempInputObj('chromosomes'),
+            ),
+        )
+    
+    else:
+        genome_fasta = args['ref']
+        source_bam = args['bam']
 
     workflow.transform(
         name='create_sim',
