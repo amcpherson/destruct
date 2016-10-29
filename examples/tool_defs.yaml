@@ -7,8 +7,6 @@ destruct:
     setup_function: setup_destruct
   kwargs:
     ref_data_dir: {ref_data_dir}/destruct
-    config:
-      chromosomes: ['20']
   features:
     - num_reads
     - num_unique_reads
