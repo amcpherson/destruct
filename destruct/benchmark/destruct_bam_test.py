@@ -55,7 +55,6 @@ if __name__ == '__main__':
     workflow = pypeliner.workflow.Workflow(default_ctx=ctx)
 
     workflow.setobj(mgd.TempOutputObj('simulation.params'), sim_config['simulation'])
-    workflow.setobj(mgd.TempOutputObj('chromosomes'), sim_config['reference']['chromosomes'])
 
     if sim_config['reference'].get('chromosomes', None) is not None:
         genome_fasta = os.path.join(args['results_dir'], 'genome.fa')
