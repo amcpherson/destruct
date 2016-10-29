@@ -47,7 +47,7 @@ def create_destruct_wrapper_workflow(bam_filenames, output_filename, raw_data_di
 
 
 def setup_destruct(test_config, **kwargs):
-    config = {}
+    config = kwargs.get('config', {})
     
     if test_config.get('chromosomes', None) is not None:
         config = {
