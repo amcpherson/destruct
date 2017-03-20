@@ -253,7 +253,7 @@ struct ReservoirSampler
 		}
 		else
 		{
-			int sampleIndex = mRNG.Next(0, mNumValues - 1);
+			long sampleIndex = mRNG.Next((long)0, mNumValues - 1);
 			if (sampleIndex < mNumSamples)
 			{
 				mSamples[sampleIndex] = value;
@@ -262,7 +262,7 @@ struct ReservoirSampler
 	}
 
 	int mNumSamples;
-	int mNumValues;
+	long mNumValues;
 	vector<T> mSamples;
 	RandomNumberGenerator mRNG;	
 };
@@ -315,8 +315,8 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 	
-	int concordantReadCount = 0;
-	int discordantReadCount = 0;
+	long concordantReadCount = 0;
+	long discordantReadCount = 0;
 	unordered_map<int,int> readLengthHist;
 	unordered_map<int,int> fragmentLengthHist;
 	
@@ -346,7 +346,7 @@ int main(int argc, char* argv[])
 
 	ReservoirSampler<pair<ReadInfo,ReadInfo> > sampledReads(numSamples);
 
-	int fragmentIndex = 0;
+	long fragmentIndex = 0;
 
 	BamAlignment alignment1;
 	BamAlignment alignment2;
