@@ -12,6 +12,7 @@ requirements:
     - scons
     - boost_lib ==1.60.0
     - tclap ==1.2.1
+    - bzip2
 
   run:
     - python
