@@ -29,7 +29,7 @@ def get_config(ref_data_dir, user_config):
     dgv_genome_version                          = 'GRCh37_hg19'
 
     # Database of genomic variants release
-    dgv_version                                 = '2013-07-23'
+    dgv_version                                 = '2016-05-15'
 
     # Name of the mitochondrial chromosome in ensembl
     mitochondrial_chromosome                    = 'MT'
