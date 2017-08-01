@@ -1,10 +1,10 @@
 package:
   name: destruct
-  version: '0.4.8'
+  version: '0.4.9'
 
 source:
   git_url: https://dranew@bitbucket.org/dranew/destruct.git
-  git_rev: v0.4.8
+  git_rev: v0.4.9
 
 requirements:
   build:
