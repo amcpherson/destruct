@@ -153,7 +153,7 @@ def predict_breaks_split(clusters, split, max_predictions_per_cluster=10):
                      .rename(columns={'read_id':'count'})\
                      .reset_index()
 
-    split_data = split_data.sort(['cluster_id', 'score'])
+    split_data = split_data.sort_values(['cluster_id', 'score'])
 
     split_data['breakpoint_id'] = split_data.groupby('cluster_id').cumcount(ascending=False)
 
@@ -213,7 +213,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
     predictions_1 = predict_breaks_split(clusters, split)
 
     predictions = pd.concat([predictions_0, predictions_1], ignore_index=True)
-    predictions.sort('cluster_id', inplace=True)
+    predictions.sort_values('cluster_id', inplace=True)
 
     mate_scores = calculate_mate_score(clusters, spanning)
     predictions = predictions.merge(mate_scores, on='cluster_id')
@@ -238,7 +238,7 @@ def calculate_cluster_weights(breakpoints_filename, weights_filename):
     breakpoints.loc[breakpoints['chromosome_1'] != breakpoints['chromosome_2'], 'distance'] = itx_distance
     breakpoints['weight'] = 1.0 + epsilon * np.log(breakpoints['distance'])
 
-    breakpoints = breakpoints.sort('cluster_id')
+    breakpoints = breakpoints.sort_values('cluster_id')
     breakpoints[['cluster_id', 'weight']].to_csv(weights_filename, sep='\t', index=False, header=False)
 
 
@@ -307,7 +307,7 @@ def calculate_realignment_likelihoods(breakpoints_filename, realignments_filenam
                       data['length_log_cdf']
 
     index_fields = ['cluster_id', 'breakpoint_id', 'library_id', 'read_id']
-    data = data.sort(index_fields + ['log_likelihood'])\
+    data = data.sort_values(index_fields + ['log_likelihood'])\
                .groupby(index_fields)\
                .last()\
                .reset_index()
@@ -362,7 +362,7 @@ def select_breakpoint_prediction(likelihoods, template_length_min_threshold):
 
     # Select highest likelihood breakpoint predictions
     # Prefer a higher breakpoint id, thus preferring solutions with split reads
-    data.sort(['cluster_id', 'log_likelihood', 'breakpoint_id'],
+    data.sort_values(['cluster_id', 'log_likelihood', 'breakpoint_id'],
         ascending=[True, False, False], inplace=True)
     selected = data.groupby('cluster_id', sort=False).first().reset_index()
 

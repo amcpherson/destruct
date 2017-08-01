@@ -55,7 +55,7 @@ brkend = pd.concat([get_brkend(brk, '1', ['is_filtered']),
 
 def calculate_dist_filtered(data):
 
-    data = data.sort('position')
+    data = data.sort_values('position')
 
     data['nearest_left'] = None
     data['nearest_right'] = None
