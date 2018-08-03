@@ -9,6 +9,7 @@ import pypeliner.managed as mgd
 import destruct.benchmark.align.bwa.workflow
 import destruct.benchmark.destruct_test
 import destruct.benchmark.create_breakpoint_simulation
+import destruct.benchmark.generate_bam
 
 
 if __name__ == '__main__':
@@ -52,68 +53,17 @@ if __name__ == '__main__':
     workflow.setobj(mgd.TempOutputObj('chromosomes'), sim_config['reference']['chromosomes'])
     workflow.setobj(mgd.TempOutputObj('include_nonchromosomal'), sim_config['reference']['include_nonchromosomal'])
 
-    workflow.transform(
-        name='create_genome',
-        func=destruct.benchmark.destruct_test.create_genome,
-        args=(
-            mgd.TempInputObj('chromosomes'),
-            mgd.TempInputObj('include_nonchromosomal'),
-            mgd.OutputFile(os.path.join(args['results_dir'], 'genome.fasta')),
-        ),
-    )
-
-    workflow.transform(
-        name='create_sim',
-        func=destruct.benchmark.create_breakpoint_simulation.create,
+    workflow.subworkflow(
+        name='generate_bam_workflow',
+        func=destruct.benchmark.generate_bam.generate_bam,
         args=(
             mgd.TempInputObj('simulation.params'),
-            mgd.InputFile(os.path.join(args['results_dir'], 'genome.fasta')),
-            mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.fasta')),
-            mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.tsv')),
-            mgd.TempOutputFile('concordant.1.fastq'),
-            mgd.TempOutputFile('concordant.2.fastq'),
-            mgd.TempOutputFile('discordant.1.fastq'),
-            mgd.TempOutputFile('discordant.2.fastq'),
-        ),
-    )
-
-    workflow.commandline(
-        name='cat1',
-        args=(
-            'cat',
-            mgd.TempInputFile('concordant.1.fastq'),
-            mgd.TempInputFile('discordant.1.fastq'),
-            '>', mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.1.fastq')),
-        ),
-    )
-    
-    workflow.commandline(
-        name='cat2',
-        args=(
-            'cat',
-            mgd.TempInputFile('concordant.2.fastq'),
-            mgd.TempInputFile('discordant.2.fastq'),
-            '>', mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.2.fastq')),
-        ),
-    )
-
-    workflow.subworkflow(
-        name='bwa_align',
-        func=destruct.benchmark.align.bwa.workflow.bwa_align_workflow,
-        args=(
-            mgd.InputFile(os.path.join(args['results_dir'], 'genome.fasta')),
-            mgd.InputFile(os.path.join(args['results_dir'], 'simulated.1.fastq')),
-            mgd.InputFile(os.path.join(args['results_dir'], 'simulated.2.fastq')),
-            mgd.TempOutputFile('simulated.unsorted.bam'),
-        ),
-    )
-
-    workflow.transform(
-        name='samtools_sort_index',
-        func=destruct.benchmark.destruct_test.samtools_sort_index,
-        args=(
-            mgd.TempInputFile('simulated.unsorted.bam'),
+            mgd.TempInputObj('chromosomes'),
+            mgd.TempInputObj('include_nonchromosomal'),
             mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.bam')),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'genome.fasta')),
+            mgd.OutputFile(os.path.join(args['results_dir'], 'simulated.tsv')),
+            os.path.join(args['results_dir'], 'raw'),
         ),
     )
 
@@ -151,5 +101,3 @@ if __name__ == '__main__':
     )
 
     pyp.run(workflow)
-
-
