@@ -59,6 +59,45 @@ where `$breakpoint_table`, `$breakpoint_library_table`, and `$breakpoint_read_ta
 
 For parallelism options see the section [Parallelism using pypeliner](#markdown-header-parallelism-using-pypeliner).
 
+## Testing Your Installation
+
+To test your install, a script is provided to generate a bam.  First install dwgsim.
+
+    conda install dwgsim
+
+Clone the destruct repo to obtain additional scripts.  Change to the destruct repo directory.
+
+    git clone git@bitbucket.org:dranew/destruct.git
+    cd destruct
+
+Setup a chromosome 20, 21 specific reference dataset.
+
+    destruct create_ref_data \
+        -c examples/chromosome_20_user_config.py \
+        destruct_ref_data/
+
+Generate a bam file using the dwgsim read simulator.
+
+    python destruct/benchmark/generate_bam.py \
+        examples/breakpoint_simulation_config.yaml \
+        destruct_ref_data/ \
+        test_raw_data \
+        test.bam \
+        test.fasta \
+        test_breakpoints.tsv
+
+Run destruct on the simulated bam file.
+
+    destruct run \
+        --config examples/chromosome_20_user_config.py \
+        destruct_ref_data/ \
+        breaks.tsv break_libs.tsv break_reads.tsv \
+        --bam_files test.bam \
+        --lib_ids test_sample \
+        --raw_data_dir destruct_raw_data/ --submit local
+
+You can then compare the output breaks.tsv to test_breakpoints.tsv.
+
 ### Output File Formats
 
 #### Breakpoint Table
@@ -110,7 +149,7 @@ The breakpoint library table contains information per breakpoint per discordant 
 * `prediction_id`: Unique identifier of the breakpoint prediction
 * `library_id`: ID of the dataset as given on the command line or in the input dataset table
 * `fragment_id`: ID of the discordant read
-* `read_end`: End of the paired end read 
+* `read_end`: End of the paired end read
 * `seq`: Read sequence
 * `qual`: Read quality
 * `comment`: Read comment
@@ -130,4 +169,3 @@ To run a script on a cluster with qsub/qstat, add the following command line opt
 Often a call to qsub requires specific command line parameters to request the correct queue, and importantly to request the correct amount of memory.  To allow correct calls to qsub, use the `--nativespec` command line option, and use the placeholder `{mem}` which will be replaced by the amount of memory (in gigabytes) required for each job launched with qsub.  For example, to use qsub, and request queue `all.q` and set the `mem_free` to the required memory, add the following command line options:
 
     --submit asyncqsub --nativespec "-q all.q -l mem_free={mem}G"
-
