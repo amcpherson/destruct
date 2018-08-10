@@ -63,7 +63,7 @@ For parallelism options see the section [Parallelism using pypeliner](#markdown-
 
 To test your install, a script is provided to generate a bam.  First install dwgsim.
 
-    conda install dwgsim
+    conda install dwgsim bwa
 
 Clone the destruct repo to obtain additional scripts.  Change to the destruct repo directory.
 
@@ -84,7 +84,8 @@ Generate a bam file using the dwgsim read simulator.
         test_raw_data \
         test.bam \
         test.fasta \
-        test_breakpoints.tsv
+        test_breakpoints.tsv \
+        --submit local
 
 Run destruct on the simulated bam file.
 
@@ -94,7 +95,8 @@ Run destruct on the simulated bam file.
         breaks.tsv break_libs.tsv break_reads.tsv \
         --bam_files test.bam \
         --lib_ids test_sample \
-        --raw_data_dir destruct_raw_data/ --submit local
+        --raw_data_dir destruct_raw_data/ \
+        --submit local
 
 You can then compare the output breaks.tsv to test_breakpoints.tsv.
 

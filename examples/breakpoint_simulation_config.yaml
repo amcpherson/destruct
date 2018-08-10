@@ -1,5 +1,6 @@
 
 reference:
+  chromosomes: ['20', '21']
   include_nonchromosomal: False
 
 simulation:
