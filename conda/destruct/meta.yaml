@@ -3,7 +3,7 @@ package:
   version: '0.4.11'
 
 source:
-  git_url: https://dranew@bitbucket.org/dranew/destruct.git
+  git_url: git://github.com/amcpherson/remixt.git
   git_rev: v0.4.11
 
 build:
