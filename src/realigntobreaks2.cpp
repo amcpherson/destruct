@@ -27,7 +27,8 @@ int main(int argc, char* argv[])
 	string clustersFilename;
 	string breakpointsFilename;
 	string realignmentsFilename;
-	
+	int libID;
+
 	try
 	{
 		TCLAP::CmdLine cmd("Realignment to Breakpoints Tool");
@@ -42,6 +43,7 @@ int main(int argc, char* argv[])
 		TCLAP::ValueArg<string> clustersFilenameArg("c","clusters","Clusters Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> breakpointsFilenameArg("b","breakpoints","Breakpoints Filename",true,"","string",cmd);
 		TCLAP::ValueArg<string> realignmentsFilenameArg("","realignments","Realignment Scores Filename",true,"","string",cmd);
+		TCLAP::ValueArg<int> libIDArg("l","lib","Library ID",true,0,"int",cmd);
 		cmd.parse(argc,argv);
 		
 		matchScore = matchScoreArg.getValue();
@@ -55,6 +57,7 @@ int main(int argc, char* argv[])
 		clustersFilename = clustersFilenameArg.getValue();
 		breakpointsFilename = breakpointsFilenameArg.getValue();
 		realignmentsFilename = realignmentsFilenameArg.getValue();
+		libID = libIDArg.getValue();
 	}
 	catch (TCLAP::ArgException &e)
 	{
@@ -88,7 +91,10 @@ int main(int argc, char* argv[])
 		SpanningAlignmentRecord spanningRecord;
 		while (spanningFile >> spanningRecord)
 		{
-			spanningAlignments[spanningRecord.GetAlignmentKey()] = spanningRecord;
+			if ((spanningRecord.libID == libID) && (preppedReads.HasRead(spanningRecord.readID)))
+			{
+				spanningAlignments[spanningRecord.GetAlignmentKey()] = spanningRecord;
+			}
 		}
 	}
 
@@ -232,5 +238,3 @@ int main(int argc, char* argv[])
 		}
 	}
 }
-
-

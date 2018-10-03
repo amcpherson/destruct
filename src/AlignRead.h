@@ -51,7 +51,24 @@ public:
 		
 		mReadSequences += string(16,'X');
 	}
-	
+
+	bool HasRead(int fragmentIndex)
+	{
+		for (int readEnd = 0; readEnd <= 1; readEnd++)
+		{
+			ReadID readID;
+			readID.fragmentIndex = fragmentIndex;
+			readID.readEnd = readEnd;
+
+			if (mReadSeqInfo.find(readID) == mReadSeqInfo.end())
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
 	void SetCurrentRead(int fragmentIndex)
 	{
 		for (int readEnd = 0; readEnd <= 1; readEnd++)
