@@ -60,8 +60,12 @@ def read_stats(stats_filename, fragment_length_num_stddevs):
     flen_stats = stats.loc[stats['type'] == 'fragment_length'].drop('type', axis=1)
     flen_stats = flen_stats.astype(float)
     fragment_count = flen_stats['value'].sum()
-    fragment_mean = (flen_stats['key'] * flen_stats['value']).sum() / fragment_count
-    fragment_variance = ((flen_stats['key'] - fragment_mean) * (flen_stats['key'] - fragment_mean) * flen_stats['value']).sum() / (fragment_count - 1)
+    fragment_mean = 500.
+    fragment_variance = 50.
+    if fragment_count > 0:
+        fragment_mean = (flen_stats['key'] * flen_stats['value']).sum() / fragment_count
+    if fragment_count > 1:
+        fragment_variance = ((flen_stats['key'] - fragment_mean) * (flen_stats['key'] - fragment_mean) * flen_stats['value']).sum() / (fragment_count - 1)
     fragment_stddev = fragment_variance**0.5
     return ConcordantReadStats({'fragment_mean': fragment_mean, 'fragment_stddev': fragment_stddev}, fragment_length_num_stddevs)
 
