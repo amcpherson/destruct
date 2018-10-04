@@ -98,22 +98,22 @@ def detect_balanced_rearrangements(
     # Create graph with duplicated edges for each sign
     H = networkx.MultiGraph()
     H.add_nodes_from(G)
-    for edge in G.edges_iter():
+    for edge in G.edges():
         H.add_edge(*edge, attr_dict=G.get_edge_data(*edge), sign=1)
         H.add_edge(*edge, attr_dict=G.get_edge_data(*edge), sign=-1)
 
     # Color each edge, +1 for red, -1 for blue
     # add cost for each edge
-    for edge in H.edges_iter():
+    for edge in H.edges():
         for multi_edge_idx, edge_attr in H[edge[0]][edge[1]].iteritems():
-            edge_type = edge_attr['edge_type']
+            edge_type = edge_attr['attr_dict']['edge_type']
             edge_attr['cost'] = 0
             if edge_type == 'segment':
                 edge_attr['color'] = edge_attr['sign']
                 if edge_attr['sign'] == 1:
-                    edge_attr['cost'] = float(edge_attr['length'] / inc_nt_per_break)
+                    edge_attr['cost'] = float(edge_attr['attr_dict']['length'] / inc_nt_per_break)
                 elif edge_attr['sign'] == -1:
-                    edge_attr['cost'] = float(edge_attr['length'] / dec_nt_per_break)
+                    edge_attr['cost'] = float(edge_attr['attr_dict']['length'] / dec_nt_per_break)
             elif edge_type == 'breakpoint':
                 edge_attr['color'] = -edge_attr['sign']
                 if edge_attr['sign'] == 1:
@@ -137,7 +137,7 @@ def detect_balanced_rearrangements(
     transverse_edge_cost = 1. / cost_resolution
 
     M = networkx.Graph()
-    for node in H.nodes_iter():
+    for node in H.nodes():
         transverse_edge = []
         for color in (1, -1):
             colored_node = node + (color,)
@@ -145,7 +145,7 @@ def detect_balanced_rearrangements(
             transverse_edge.append(colored_node)
         M.add_edge(*transverse_edge, cost=transverse_edge_cost)
 
-    for edge in H.edges_iter():
+    for edge in H.edges():
         for multi_edge_idx, edge_attr in H[edge[0]][edge[1]].iteritems():
             cost = edge_attr['cost']
             if np.isinf(cost):
@@ -176,7 +176,7 @@ def detect_balanced_rearrangements(
 
     # Create subgraph of H with only selected edges
     H1 = networkx.Graph()
-    for edge in M3.edges_iter():
+    for edge in M3.edges():
         edge_attr = M3[edge[0]][edge[1]]
         node_1 = edge[0][:-1]
         node_2 = edge[1][:-1]
@@ -194,19 +194,19 @@ def detect_balanced_rearrangements(
         deleted_length = 0
         prediction_ids = []
 
-        for edge in C.edges_iter():
-            edge_type = C[edge[0]][edge[1]]['edge_type']
+        for edge in C.edges():
+            edge_type = C[edge[0]][edge[1]]['attr_dict']['attr_dict']['attr_dict']['edge_type']
 
             if edge_type == 'segment':
-                sign = C[edge[0]][edge[1]]['sign']
-                length = C[edge[0]][edge[1]]['length']
+                sign = C[edge[0]][edge[1]]['attr_dict']['attr_dict']['sign']
+                length = C[edge[0]][edge[1]]['attr_dict']['attr_dict']['attr_dict']['length']
                 if sign == 1:
                     duplicated_length += length
                 else:
                     deleted_length += length
 
             elif edge_type == 'breakpoint':
-                prediction_id = C[edge[0]][edge[1]]['prediction_id']
+                prediction_id = C[edge[0]][edge[1]]['attr_dict']['attr_dict']['attr_dict']['prediction_id']
                 prediction_ids.append(prediction_id)
 
         if len(prediction_ids) <= 1:
