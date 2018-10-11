@@ -181,7 +181,6 @@ def align(
 
     workflow.transform(
         name='merge_split_1',
-        axes=('bylibrary',),
         ctx=lowmem,
         func=destruct.tasks.merge_files_by_line,
         args=(
