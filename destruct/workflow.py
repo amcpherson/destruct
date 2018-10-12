@@ -192,76 +192,6 @@ def align(
     return workflow
 
 
-def cluster(
-    spanning_alignments_filename,
-    split_alignments_filename,
-    clusters_filename,
-    breakpoints_filename,
-):
-    workflow = pypeliner.workflow.Workflow()
-
-    # Cluster spanning reads
-    workflow.setobj(
-        obj=mgd.TempOutputObj('chrom.args', 'bychromarg'),
-        value=destruct.tasks.generate_chromosome_args(config['chromosomes']),
-    )
-
-    workflow.transform(
-        name='write_stats_table',
-        ctx=lowmem,
-        func=destruct.tasks.write_stats_table,
-        args=(
-            mgd.TempInputObj('library_id', 'bylibrary'),
-            mgd.TempInputObj('stats', 'bylibrary'),
-            mgd.TempOutputFile('libstats.tsv'),
-        ),
-    )
-
-    workflow.commandline(
-        name='cluster',
-        axes=('bychromarg',),
-        ctx=medmem,
-        args=(
-            'destruct_mclustermatepairs',
-            '-a', mgd.InputFile(spanning_alignments_filename),
-            '-s', mgd.TempInputFile('libstats.tsv'),
-            '-c', mgd.TempOutputFile('clusters', 'bychromarg'),
-            mgd.TempInputObj('chrom.args', 'bychromarg'),
-            '--clustmin', config['cluster_readcount_threshold'],
-            '--fragmax', config['fragment_length_max'],
-        ),
-    )
-
-    # Predict breakpoints from split reads
-    workflow.transform(
-        name='predict_breaks',
-        axes=('bychromarg',),
-        ctx=medmem,
-        func=destruct.predict_breaks.predict_breaks,
-        args=(
-            mgd.TempInputFile('clusters', 'bychromarg'),
-            mgd.TempInputFile(spanning_alignments_filename),
-            mgd.TempInputFile(split_alignments_filename),
-            mgd.TempOutputFile('breakpoints_2', 'bychromarg'),
-        ),
-    )
-
-    workflow.transform(
-        name='merge_clusters',
-        ctx=lowmem,
-        func=destruct.tasks.merge_clusters,
-        args=(
-            mgd.TempInputFile('clusters', 'bychromarg'),
-            mgd.TempInputFile('breakpoints_2', 'bychromarg'),
-            mgd.TempOutputFile(clusters_filename),
-            mgd.TempOutputFile(breakpoints_filename),
-            mgd.TempOutputFile('merge_clusters.debug'),
-        ),
-    )
-
-    return workflow
-
-
 def realign(
     reads1_filename,
     reads2_filename,
@@ -474,13 +404,63 @@ def create_destruct_workflow(
         ),
     )
 
-    workflow.subworkflow(
+    # Cluster spanning reads
+    workflow.setobj(
+        obj=mgd.TempOutputObj('chrom.args', 'bychromarg'),
+        value=destruct.tasks.generate_chromosome_args(config['chromosomes']),
+    )
 
-    spanning_alignments_filename,
-    split_alignments_filename,
-    clusters_filename,
-    breakpoints_filename,
-    
+    workflow.transform(
+        name='write_stats_table',
+        ctx=lowmem,
+        func=destruct.tasks.write_stats_table,
+        args=(
+            mgd.TempInputObj('library_id', 'bylibrary'),
+            mgd.TempInputObj('stats', 'bylibrary'),
+            mgd.TempOutputFile('libstats.tsv'),
+        ),
+    )
+
+    workflow.commandline(
+        name='cluster',
+        axes=('bychromarg',),
+        ctx=medmem,
+        args=(
+            'destruct_mclustermatepairs',
+            '-a', mgd.TempInputFile('spanning.alignments'),
+            '-s', mgd.TempInputFile('libstats.tsv'),
+            '-c', mgd.TempOutputFile('clusters', 'bychromarg'),
+            mgd.TempInputObj('chrom.args', 'bychromarg'),
+            '--clustmin', config['cluster_readcount_threshold'],
+            '--fragmax', config['fragment_length_max'],
+        ),
+    )
+
+    # Predict breakpoints from split reads
+    workflow.transform(
+        name='predict_breaks',
+        axes=('bychromarg',),
+        ctx=medmem,
+        func=destruct.predict_breaks.predict_breaks,
+        args=(
+            mgd.TempInputFile('clusters', 'bychromarg'),
+            mgd.TempInputFile('spanning.alignments'),
+            mgd.TempInputFile('split.alignments'),
+            mgd.TempOutputFile('breakpoints_2', 'bychromarg'),
+        ),
+    )
+
+    workflow.transform(
+        name='merge_clusters',
+        ctx=lowmem,
+        func=destruct.tasks.merge_clusters,
+        args=(
+            mgd.TempInputFile('clusters', 'bychromarg'),
+            mgd.TempInputFile('breakpoints_2', 'bychromarg'),
+            mgd.TempOutputFile('clusters'),
+            mgd.TempOutputFile('breakpoints_2'),
+            mgd.TempOutputFile('merge_clusters.debug'),
+        ),
     )
 
     workflow.subworkflow(

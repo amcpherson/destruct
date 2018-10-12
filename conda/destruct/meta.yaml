@@ -4,7 +4,7 @@ package:
 
 source:
   git_url: https://dranew@bitbucket.org/dranew/destruct.git
-  git_rev: parallelrefactor
+  git_rev: parallelrefactor2
 
 build:
   number: 1
