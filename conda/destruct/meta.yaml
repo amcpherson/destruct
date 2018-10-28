@@ -1,10 +1,10 @@
 package:
   name: destruct
-  version: '0.4.11'
+  version: '0.4.12'
 
 source:
   git_url: git://github.com/amcpherson/destruct.git
-  git_rev: v0.4.11
+  git_rev: v0.4.12
 
 build:
   number: 1
