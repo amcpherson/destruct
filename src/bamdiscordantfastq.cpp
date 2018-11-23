@@ -450,8 +450,7 @@ int main(int argc, char* argv[])
 	// Check for a bam file with no concordant reads (fail, somethings wrong)
 	if (concordantReadCount == 0)
 	{
-		cerr << "Error: No concordant reads" << endl;
-		exit(1);
+		cerr << "Warning: No concordant reads" << endl;
 	}
 	
 	// Check for a bam file with no discordant reads (usually somethings wrong)
