@@ -280,6 +280,13 @@ int main(int argc, char* argv[])
 	
 	AlignmentProbability alignProbability(matchScore);
 	alignProbability.ReadDistributions(statsFilename, validReadThreshold);
+
+	if (!alignProbability.Good())
+	{
+	        cerr << "Warning: empty stats" << endl;
+		exit(0);
+	}
+
 	int minAlignedLength = alignProbability.GetMinAlignedLength();
 	
 	cerr << "Reading reference fasta" << endl;

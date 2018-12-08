@@ -62,6 +62,11 @@ void AlignmentProbability::ReadDistributions(const string& filename, double cdfT
 	}
 }
 
+bool AlignmentProbability::Good() const
+{
+	return ((mScoreLikelihoods.size() > 0) && (mScoreThresholds.size() > 0));
+}
+
 double AlignmentProbability::Likelihood(int alignedLength, int score) const
 {
 	return mScoreLikelihoods.find(alignedLength)->second.Calculate(score);

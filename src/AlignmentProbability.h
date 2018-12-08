@@ -29,6 +29,8 @@ public:
 	AlignmentProbability(int matchScore) : mMatchScore(matchScore) {}
 	
 	void ReadDistributions(const string& filename, double cdfThreshold);
+
+	bool Good() const;
 	
 	double Likelihood(int alignedLength, int score) const;
 	bool AboveThreshold(int alignedLength, int score) const;
