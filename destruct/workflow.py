@@ -270,7 +270,6 @@ def realign(
 
     workflow.transform(
         name='merge_likelihoods_1',
-        axes=('',),
         ctx=lowmem,
         func=destruct.tasks.merge_sorted_files_by_line,
         args=(
