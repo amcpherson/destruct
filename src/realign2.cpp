@@ -284,6 +284,13 @@ int main(int argc, char* argv[])
 	if (!alignProbability.Good())
 	{
 	        cerr << "Warning: empty stats" << endl;
+
+		// Make sure we parse alignments from std
+		if (alignmentsFilename == "-")
+		{
+			for (string line; getline(cin, line);) {}
+		}
+
 		exit(0);
 	}
 
