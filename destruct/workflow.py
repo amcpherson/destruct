@@ -76,6 +76,51 @@ def create_destruct_workflow(
         ),
     )
 
+    workflow.subworkflow(
+        name='destruct_fastq',
+        func=create_destruct_fastq_workflow,
+        args=(
+            mgd_reads_1.as_input(),
+            mgd_reads_2.as_input(),
+            mgd_sample_1.as_input(),
+            mgd_sample_2.as_input(),
+            mgd_stats.as_input(),
+            mgd.OutputFile(breakpoint_table),
+            mgd.OutputFile(breakpoint_library_table),
+            mgd.OutputFile(breakpoint_read_table),
+            config,
+            ref_data_dir,
+        ),
+        kwargs={
+            'raw_data_dir': raw_data_dir,
+        },
+    )
+
+    return workflow
+
+
+def create_destruct_fastq_workflow(
+    fastq1_filenames,
+    fastq2_filenames,
+    sample1_filenames,
+    sample2_filenames,
+    stats_filenames,
+    breakpoint_table,
+    breakpoint_library_table,
+    breakpoint_read_table,
+    config,
+    ref_data_dir,
+    raw_data_dir=None,
+):
+    workflow = pypeliner.workflow.Workflow()
+
+    # Set the library ids
+    
+    workflow.setobj(
+        obj=mgd.TempOutputObj('library_id', 'bylibrary'),
+        value=destruct.tasks.create_library_ids(fastq1_filenames.keys()),
+    )
+
     workflow.transform(
         name='readstats',
         axes=('bylibrary',),
@@ -83,7 +128,7 @@ def create_destruct_workflow(
         func=destruct.tasks.read_stats,
         ret=mgd.TempOutputObj('stats', 'bylibrary'),
         args=(
-            mgd_stats.as_input(),
+            mgd.InputFile('stats.txt', 'bylibrary', fnames=stats_filenames),
             config['fragment_length_num_stddevs'],
         ),
     )
@@ -96,8 +141,8 @@ def create_destruct_workflow(
         ctx=medmem,
         func=destruct.tasks.prepare_seed_fastq,
         args=(
-            mgd_sample_1.as_input(),
-            mgd_sample_2.as_input(),
+            mgd.InputFile('sample1.fq.gz', 'bylibrary', fnames=sample1_filenames),
+            mgd.InputFile('sample2.fq.gz', 'bylibrary', fnames=sample2_filenames),
             36,
             mgd.TempOutputFile('sample.seed', 'bylibrary'),
         ),
@@ -120,8 +165,8 @@ def create_destruct_workflow(
             '|',
             'destruct_aligntrue',
             '-a', '-',
-            '-1', mgd_sample_1.as_input(),
-            '-2', mgd_sample_2.as_input(),
+            '-1', mgd.InputFile('sample1.fq.gz', 'bylibrary', fnames=sample1_filenames),
+            '-2', mgd.InputFile('sample2.fq.gz', 'bylibrary', fnames=sample2_filenames),
             '-r', config['genome_fasta'],
             '-g', config['gap_score'],
             '-x', config['mismatch_score'],
@@ -152,7 +197,7 @@ def create_destruct_workflow(
         ctx=lowmem,
         func=destruct.tasks.split_fastq,
         args=(
-            mgd_reads_1.as_input(),
+            mgd.InputFile('reads1.fq.gz', 'bylibrary', fnames=fastq1_filenames),
             int(config['reads_per_split']),
             mgd.TempOutputFile('reads1', 'bylibrary', 'byread'),
         ),
@@ -164,7 +209,7 @@ def create_destruct_workflow(
         ctx=lowmem,
         func=destruct.tasks.split_fastq,
         args=(
-            mgd_reads_2.as_input(),
+            mgd.InputFile('reads2.fq.gz', 'bylibrary', fnames=fastq2_filenames),
             int(config['reads_per_split']),
             mgd.TempOutputFile('reads2', 'bylibrary', 'byread', axes_origin=[]),
         ),
@@ -466,8 +511,8 @@ def create_destruct_workflow(
         args=(
             mgd.TempInputFile('clusters_setcover'),
             mgd.TempInputObj('library_id', 'bylibrary'),
-            mgd_reads_1.as_input(),
-            mgd_reads_2.as_input(),
+            mgd.InputFile('reads1.fq.gz', 'bylibrary', fnames=fastq1_filenames),
+            mgd.InputFile('reads2.fq.gz', 'bylibrary', fnames=fastq2_filenames),
             mgd.TempOutputFile('breakreads.table.unsorted'),
         ),
     )
