@@ -171,3 +171,14 @@ To run a script on a cluster with qsub/qstat, add the following command line opt
 Often a call to qsub requires specific command line parameters to request the correct queue, and importantly to request the correct amount of memory.  To allow correct calls to qsub, use the `--nativespec` command line option, and use the placeholder `{mem}` which will be replaced by the amount of memory (in gigabytes) required for each job launched with qsub.  For example, to use qsub, and request queue `all.q` and set the `mem_free` to the required memory, add the following command line options:
 
     --submit asyncqsub --nativespec "-q all.q -l mem_free={mem}G"
+
+# Build
+
+## Docker builds
+
+To build a destruct docker image, for instance version v0.4.13, run the following docker command:
+
+    docker build --build-arg app_version=0.4.13 -t amcpherson/destruct .
+    docker push amcpherson/destruct:0.4.13
+
+
