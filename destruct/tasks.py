@@ -187,10 +187,16 @@ def merge_clusters(in_clusters_filenames, in_breakpoints_filenames,
                 new_cluster_id += 1
 
 
-def tabulate_reads(clusters_filename, library_ids, reads1_filenames, reads2_filenames, reads_table_filename):
+def tabulate_reads(clusters_filename, likelihoods_filename, library_ids, reads1_filenames, reads2_filenames, reads_table_filename):
     fields = ['cluster_id', 'cluster_end', 'lib_id', 'read_id', 'read_end', 'align_id']
     clusters = pd.read_csv(clusters_filename, sep='\t', names=fields, usecols=['cluster_id', 'lib_id', 'read_id'])
     clusters = clusters.drop_duplicates().set_index(['lib_id', 'read_id']).sort_index()['cluster_id']
+
+    likelihoods = pd.read_csv(likelihoods_filename, sep='\t',
+                              names=destruct.predict_breaks.likelihoods_fields,
+                              converters=converters)
+    passed_reads = set(zip(likelihoods.library_id, likelihoods.read_id))
+
     with open(reads_table_filename, 'w') as reads_table_file:
         for lib_name in set(reads1_filenames.keys()).union(set(reads2_filenames.keys())):
             lib_id = library_ids[lib_name]
@@ -205,7 +211,8 @@ def tabulate_reads(clusters_filename, library_ids, reads1_filenames, reads2_file
                         if (lib_id, fragment_id) in clusters.index:
                             cluster_id = clusters.loc[(lib_id, fragment_id)]
                             assert np.issubdtype(type(cluster_id), np.integer)
-                            reads_table_file.write('\t'.join([str(cluster_id), str(lib_id), str(fragment_id), read_end, seq, qual, comment]) + '\n')
+                            filtered = 'False' if (lib_id, fragment_id) in passed_reads else 'True'
+                            reads_table_file.write('\t'.join([str(cluster_id), str(lib_id), str(fragment_id), read_end, seq, qual, comment, filtered]) + '\n')
 
 
 class DGVDatabase(object):
