@@ -23,6 +23,9 @@ def detect_balanced_rearrangements(
     inc_nt_per_break=500.,
     cost_resolution=1000.,
 ):
+    if len(breakpoints.index) == 0:
+        return []
+
     G = networkx.Graph()
 
     breakpoints = breakpoints.copy()
