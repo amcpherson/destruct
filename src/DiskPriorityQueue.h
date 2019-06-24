@@ -39,7 +39,10 @@ struct FileStack
 
 			// Number of elements at the top of the archive
 			(*mArchive) >> mLen;
+		}
 
+		if (mFile->good())
+		{
 			(*mArchive) >> Top;
 
 			mIdx++;
