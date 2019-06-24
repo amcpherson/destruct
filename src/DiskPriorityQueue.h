@@ -41,12 +41,7 @@ struct FileStack
 			(*mArchive) >> mLen;
 		}
 
-		if (mFile->good())
-		{
-			(*mArchive) >> Top;
-
-			mIdx++;
-		}
+		Pop();
 	}
 
 	void Pop()
