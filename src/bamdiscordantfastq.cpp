@@ -444,7 +444,6 @@ int main(int argc, char* argv[])
 	if (concordantReadCount + discordantReadCount == 0)
 	{
 		cerr << "Error: No reads" << endl;
-		exit(1);
 	}
 	
 	// Check for a bam file with no concordant reads (fail, somethings wrong)
@@ -457,7 +456,6 @@ int main(int argc, char* argv[])
 	if (discordantReadCount == 0)
 	{
 		cerr << "Error: No discordant reads" << endl;
-		exit(1);
 	}
 	
 	// Output stats
