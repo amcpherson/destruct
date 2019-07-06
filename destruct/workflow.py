@@ -506,6 +506,7 @@ def create_destruct_fastq_workflow(
         func='destruct.tasks.tabulate_reads',
         args=(
             mgd.TempInputFile('clusters_setcover'),
+            mgd.TempInputFile('likelihoods'),
             mgd.TempInputObj('library_id', 'bylibrary'),
             mgd.InputFile('reads1.fq.gz', 'bylibrary', fnames=fastq1_filenames),
             mgd.InputFile('reads2.fq.gz', 'bylibrary', fnames=fastq2_filenames),
