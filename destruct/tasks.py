@@ -192,6 +192,9 @@ def tabulate_reads(clusters_filename, likelihoods_filename, library_ids, reads1_
     clusters = pd.read_csv(clusters_filename, sep='\t', names=fields, usecols=['cluster_id', 'lib_id', 'read_id'])
     clusters = clusters.drop_duplicates().set_index(['lib_id', 'read_id']).sort_index()['cluster_id']
 
+    # The likelihoods file contains a list of read alignments that have passed
+    # filtering, use this to generate a list of library / read id pairs that
+    # can be used to annotate each read cluster assignment as filtered or not
     likelihoods = pd.read_csv(likelihoods_filename, sep='\t',
                               names=destruct.predict_breaks.likelihoods_fields,
                               converters=converters)
