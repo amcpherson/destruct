@@ -1,0 +1,27 @@
+package:
+  name: destruct_utils
+  version: '0.4.15'
+
+source:
+  git_url: git://github.com/amcpherson/destruct.git
+  git_rev: v0.4.15
+
+build:
+  number: 1
+
+requirements:
+  build:
+    - scons
+    - boost_lib ==1.60.0
+    - tclap ==1.2.1
+    - bzip2
+
+  run:
+    - boost_lib ==1.60.0
+    - bowtie
+
+about:
+  home: http://bitbucket.org/dranew/destruct
+  license: MIT
+  summary: 'Bioinformatics tool for joint prediction of rearrangement breakpoints from single or multiple tumour samples'
+
