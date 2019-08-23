@@ -68,7 +68,7 @@ def read_stats(stats_filename, fragment_length_num_stddevs):
 
 def write_stats_table(library_ids, lib_stats, stats_table_filename):
     with open(stats_table_filename, 'w') as stats_table_file:
-        for lib_name, library_id in library_ids.iteritems():
+        for lib_name, library_id in library_ids.items():
             stats_table_file.write(str(library_id) + '\t')
             stats_table_file.write(str(lib_stats[lib_name].fragment_length_mean) + '\t')
             stats_table_file.write(str(lib_stats[lib_name].fragment_length_stddev) + '\n')
@@ -174,7 +174,7 @@ def merge_clusters(in_clusters_filenames, in_breakpoints_filenames,
     with open(out_clusters_filename, 'w') as out_clusters_file, \
          open(out_breakpoints_filename, 'w') as out_breakpoints_file, \
          open(debug_filename, 'w') as debug_file:
-        for idx, in_clusters_filename in in_clusters_filenames.iteritems():
+        for idx, in_clusters_filename in in_clusters_filenames.items():
             in_breakpoints_filename = in_breakpoints_filenames[idx]
             for cluster_id, cluster_rows, breakend_rows in read_clusters_breakpoints(in_clusters_filename, in_breakpoints_filename):
                 for row in cluster_rows:
@@ -234,7 +234,7 @@ class DGVDatabase(object):
                 chrvars[chr].append((idx, start, end))
                 self.variations.append((id, start, end))
         self.intervals = dict()
-        for chr, vars in chrvars.iteritems():
+        for chr, vars in chrvars.items():
             self.intervals[chr] = pygenes.IntervalTree(vars)
 
     def query(self, chromosome, start, end):
@@ -251,7 +251,7 @@ class DGVDatabase(object):
 def merge_tars(output_filename, *input_filename_sets):
     with tarfile.open(output_filename, 'w') as output_tar:
         for input_filenames in input_filename_sets:
-            for input_filename in input_filenames.itervalues():
+            for input_filename in input_filenames.values():
                 with tarfile.open(input_filename, 'r') as in_tar:
                     for tarinfo in in_tar:
                         output_tar.addfile(tarinfo, in_tar.extractfile(tarinfo))
