@@ -90,7 +90,7 @@ def convert_bcf(bcf_filename, output_filename, control_id=None):
             breakpoint_table.append((prediction_id + '_' + breakpoint_id, chrom_1, chrom_2, strand_1, strand_2, coord_1, coord_2, svtype, breakpoint_read_count))
             breakpoint_ids.append(prediction_id + '_' + breakpoint_id)
 
-        for sample, call in row.samples.iteritems():
+        for sample, call in row.samples.items():
             num_spanning = call['PE']
             num_split = call['SR']
 

@@ -114,7 +114,7 @@ def convert_vcf(bcf_filename, output_filename, control_id=None):
 
         breakpoint_table.append((prediction_id, chrom_1, chrom_2, strand_1, strand_2, coord_1, coord_2, qual))
 
-        for sample, call in row.samples.iteritems():
+        for sample, call in row.samples.items():
             num_spanning = call['DV']
             num_split = call['RV']
 

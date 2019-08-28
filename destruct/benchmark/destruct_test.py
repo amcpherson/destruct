@@ -25,7 +25,7 @@ class BreakpointDatabase(object):
             for side in ('1', '2'):
                 self.positions[(row['chromosome_'+side], row['strand_'+side])].append(row['position_'+side])
                 self.break_ids[(row['chromosome_'+side], row['strand_'+side], row['position_'+side])].add((row[id_col], side))
-        for key in self.positions.iterkeys():
+        for key in self.positions.keys():
             self.positions[key] = sorted(self.positions[key])
     def query(self, row, extend=0):
         matched_ids = list()
@@ -365,7 +365,7 @@ def samtools_sample_reheader(output_filename, input_filename, sample_name):
             fields = line.rstrip().split('\t')
             if fields[0] == '@RG':
                 replaced = False
-                for idx in xrange(len(fields)):
+                for idx in range(len(fields)):
                     if fields[idx].startswith('SM:'):
                         fields[idx] = 'SM:' + sample_name
                         replaced = True

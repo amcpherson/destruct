@@ -3,8 +3,7 @@ import numpy as np
 
 
 def reverse_complement(sequence):
-    return sequence[::-1].translate(string.maketrans('ACTGactg','TGACtgac'))
-
+    return sequence[::-1].translate(str.maketrans('ACTGactg','TGACtgac'))
 
 def column_flip(df, cond, col_1, col_2):
     df.loc[cond, col_1], df.loc[cond, col_2] = df.loc[cond, col_2], df.loc[cond, col_1]
