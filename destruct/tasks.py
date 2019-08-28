@@ -25,7 +25,7 @@ def prepare_seed_fastq(reads_1_fastq, reads_2_fastq, seed_length, seed_fastq):
             fastq_lines[1].append(fastq_2_line.rstrip())
             if len(fastq_lines[0]) == 4:
                 for read_end in (0, 1):
-                    if fastq_lines[read_end][1] > seed_length:
+                    if len(fastq_lines[read_end][1]) > seed_length:
                         fastq_lines[read_end][1] = fastq_lines[read_end][1][0:seed_length]
                         fastq_lines[read_end][3] = fastq_lines[read_end][3][0:seed_length]
                     for line in fastq_lines[read_end]:
