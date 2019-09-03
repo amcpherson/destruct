@@ -18,14 +18,14 @@ import destruct.predict_breaks
 def prepare_seed_fastq(reads_1_fastq, reads_2_fastq, seed_length, seed_fastq):
     opener_1 = (open, gzip.open)[reads_1_fastq.endswith('.gz')]
     opener_2 = (open, gzip.open)[reads_2_fastq.endswith('.gz')]
-    with opener_1(reads_1_fastq, 'r') as reads_1, opener_2(reads_2_fastq, 'r') as reads_2, open(seed_fastq, 'w') as seed:
+    with opener_1(reads_1_fastq, 'rt') as reads_1, opener_2(reads_2_fastq, 'rt') as reads_2, open(seed_fastq, 'wt') as seed:
         fastq_lines = [[], []]
         for fastq_1_line, fastq_2_line in zip(reads_1, reads_2):
             fastq_lines[0].append(fastq_1_line.rstrip())
             fastq_lines[1].append(fastq_2_line.rstrip())
             if len(fastq_lines[0]) == 4:
                 for read_end in (0, 1):
-                    if fastq_lines[read_end][1] > seed_length:
+                    if len(fastq_lines[read_end][1]) > seed_length:
                         fastq_lines[read_end][1] = fastq_lines[read_end][1][0:seed_length]
                         fastq_lines[read_end][3] = fastq_lines[read_end][3][0:seed_length]
                     for line in fastq_lines[read_end]:
@@ -67,15 +67,15 @@ def read_stats(stats_filename, fragment_length_num_stddevs):
 
 
 def write_stats_table(library_ids, lib_stats, stats_table_filename):
-    with open(stats_table_filename, 'w') as stats_table_file:
-        for lib_name, library_id in library_ids.iteritems():
+    with open(stats_table_filename, 'wt') as stats_table_file:
+        for lib_name, library_id in library_ids.items():
             stats_table_file.write(str(library_id) + '\t')
             stats_table_file.write(str(lib_stats[lib_name].fragment_length_mean) + '\t')
             stats_table_file.write(str(lib_stats[lib_name].fragment_length_stddev) + '\n')
 
 
 def split_file_byline(in_filename, lines_per_file, out_filename_callback):
-    with open(in_filename, 'r') as in_file:
+    with open(in_filename, 'rt') as in_file:
         file_number = 0
         out_file = None
         out_file_lines = None
@@ -84,7 +84,7 @@ def split_file_byline(in_filename, lines_per_file, out_filename_callback):
                 if out_file is None or out_file_lines == lines_per_file:
                     if out_file is not None:
                         out_file.close()
-                    out_file = open(out_filename_callback(file_number), 'w')
+                    out_file = open(out_filename_callback(file_number), 'wt')
                     out_file_lines = 0
                     file_number += 1
                 out_file.write(line)
@@ -95,16 +95,16 @@ def split_file_byline(in_filename, lines_per_file, out_filename_callback):
 
 
 def split_fastq(in_filename, num_reads_per_file, out_filename_callback):
-    with gzip.open(in_filename, 'r') as in_file:
+    with gzip.open(in_filename, 'rt') as in_file:
         file_number = 0
         out_file = None
         out_file_read_count = None
         try:
-            for name, seq, comment, qual in itertools.izip_longest(*[in_file]*4):
+            for name, seq, comment, qual in itertools.zip_longest(*[in_file]*4):
                 if out_file is None or out_file_read_count == num_reads_per_file:
                     if out_file is not None:
                         out_file.close()
-                    out_file = open(out_filename_callback(file_number), 'w')
+                    out_file = open(out_filename_callback(file_number), 'wt')
                     out_file_read_count = 0
                     file_number += 1
                 out_file.write(name)
@@ -118,9 +118,9 @@ def split_fastq(in_filename, num_reads_per_file, out_filename_callback):
 
 
 def merge_files_by_line(in_filenames, out_filename):
-    with open(out_filename, 'w') as out_file:
+    with open(out_filename, 'wt') as out_file:
         for id, in_filename in sorted(in_filenames.items()):
-            with open(in_filename, 'r') as in_file:
+            with open(in_filename, 'rt') as in_file:
                 for line in in_file:
                     out_file.write(line)
 
@@ -130,10 +130,10 @@ def create_library_ids(library_names):
 
 
 def merge_alignment_files(in_filenames, out_filename, library_idxs):
-    with open(out_filename, 'w') as out_file:
+    with open(out_filename, 'wt') as out_file:
         for lib_id, in_filename in in_filenames.items():
             idx = library_idxs[lib_id]
-            with open(in_filename, 'r') as in_file:
+            with open(in_filename, 'rt') as in_file:
                 for line in in_file:
                     line = str(idx) + line[line.index('\t'):]
                     out_file.write(line)
@@ -145,7 +145,7 @@ def merge_sorted_files_by_line(in_filenames, out_filename, temp_space, sort_fiel
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise
-    pypeliner.commandline.execute(*['sort', '-T', temp_space, '-m', '-n', '-k', sort_fields] + in_filenames.values() + ['>', out_filename])
+    pypeliner.commandline.execute(*['sort', '-T', temp_space, '-m', '-n', '-k', sort_fields] + list(in_filenames.values()) + ['>', out_filename])
 
 
 def generate_chromosome_args(chromosomes):
@@ -157,12 +157,12 @@ def generate_chromosome_args(chromosomes):
 
 
 def read_clusters_breakpoints(clusters_filename, breakpoints_filename):
-    with open(clusters_filename, 'r') as clusters_file, open(breakpoints_filename, 'r') as breakpoints_file:
+    with open(clusters_filename, 'rt') as clusters_file, open(breakpoints_filename, 'rt') as breakpoints_file:
         clusters_reader = csv.reader(clusters_file, delimiter='\t')
         breakpoints_reader = csv.reader(breakpoints_file, delimiter='\t')
         cluster_iter = itertools.groupby(clusters_reader, lambda row: row[0])
         breakend_iter = itertools.groupby(breakpoints_reader, lambda row: row[0])
-        for (cluster_id_1, cluster_rows), (cluster_id_2, breakend_rows) in itertools.izip(cluster_iter, breakend_iter):
+        for (cluster_id_1, cluster_rows), (cluster_id_2, breakend_rows) in zip(cluster_iter, breakend_iter):
             if cluster_id_1 != cluster_id_2:
                 raise ValueError('Consistency issue between clusters and breakpoints for ' + clusters_filename + ' and ' + breakpoints_filename)
             yield cluster_id_1, cluster_rows, breakend_rows
@@ -171,10 +171,10 @@ def read_clusters_breakpoints(clusters_filename, breakpoints_filename):
 def merge_clusters(in_clusters_filenames, in_breakpoints_filenames,
                    out_clusters_filename, out_breakpoints_filename, debug_filename):
     new_cluster_id = 0
-    with open(out_clusters_filename, 'w') as out_clusters_file, \
-         open(out_breakpoints_filename, 'w') as out_breakpoints_file, \
-         open(debug_filename, 'w') as debug_file:
-        for idx, in_clusters_filename in in_clusters_filenames.iteritems():
+    with open(out_clusters_filename, 'wt') as out_clusters_file, \
+         open(out_breakpoints_filename, 'wt') as out_breakpoints_file, \
+         open(debug_filename, 'wt') as debug_file:
+        for idx, in_clusters_filename in in_clusters_filenames.items():
             in_breakpoints_filename = in_breakpoints_filenames[idx]
             for cluster_id, cluster_rows, breakend_rows in read_clusters_breakpoints(in_clusters_filename, in_breakpoints_filename):
                 for row in cluster_rows:
@@ -200,12 +200,12 @@ def tabulate_reads(clusters_filename, likelihoods_filename, library_ids, reads1_
                               converters=converters)
     passed_reads = set(zip(likelihoods.library_id, likelihoods.read_id))
 
-    with open(reads_table_filename, 'w') as reads_table_file:
+    with open(reads_table_filename, 'wt') as reads_table_file:
         for lib_name in set(reads1_filenames.keys()).union(set(reads2_filenames.keys())):
             lib_id = library_ids[lib_name]
             for reads_filename in [reads1_filenames[lib_name], reads2_filenames[lib_name]]:
-                with gzip.open(reads_filename, 'r') as reads_file:
-                    for name, seq, comment, qual in itertools.izip_longest(*[(a.rstrip() for a in reads_file)]*4):
+                with gzip.open(reads_filename, 'rt') as reads_file:
+                    for name, seq, comment, qual in itertools.zip_longest(*[(a.rstrip() for a in reads_file)]*4):
                         assert name[0] == '@'
                         assert name[-1] == '1' or name[-1] == '2'
                         assert name[-2] == '/'
@@ -222,7 +222,7 @@ class DGVDatabase(object):
     def __init__(self, dgv_filename):
         self.variations = list()
         chrvars = collections.defaultdict(list)
-        with open(dgv_filename, 'r') as dgv_file:
+        with open(dgv_filename, 'rt') as dgv_file:
             dgv_reader = csv.reader(dgv_file, delimiter='\t')
             dgv_header = next(dgv_reader)
             for row in dgv_reader:
@@ -234,7 +234,7 @@ class DGVDatabase(object):
                 chrvars[chr].append((idx, start, end))
                 self.variations.append((id, start, end))
         self.intervals = dict()
-        for chr, vars in chrvars.iteritems():
+        for chr, vars in chrvars.items():
             self.intervals[chr] = pygenes.IntervalTree(vars)
 
     def query(self, chromosome, start, end):
@@ -249,10 +249,10 @@ class DGVDatabase(object):
 
 
 def merge_tars(output_filename, *input_filename_sets):
-    with tarfile.open(output_filename, 'w') as output_tar:
+    with tarfile.open(output_filename, 'wt') as output_tar:
         for input_filenames in input_filename_sets:
-            for input_filename in input_filenames.itervalues():
-                with tarfile.open(input_filename, 'r') as in_tar:
+            for input_filename in input_filenames.values():
+                with tarfile.open(input_filename, 'rt') as in_tar:
                     for tarinfo in in_tar:
                         output_tar.addfile(tarinfo, in_tar.extractfile(tarinfo))
 
@@ -423,7 +423,7 @@ def tabulate_results(breakpoints_filename, likelihoods_filename, library_ids,
 
     # Annotate sequence
     reference_sequences = dict()
-    for id, seq in destruct.utils.seq.read_sequences(open(genome_fasta, 'r')):
+    for id, seq in destruct.utils.seq.read_sequences(open(genome_fasta, 'rt')):
         reference_sequences[id] = seq
 
     breakpoints['sequence'] = breakpoints.apply(lambda row: create_sequence(row, reference_sequences), axis=1)

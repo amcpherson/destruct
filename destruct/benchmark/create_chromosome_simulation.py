@@ -239,13 +239,13 @@ def write_fasta(fasta, id, sequence):
         fasta.write(sequence[start:start+nt_per_line] + '\n')
 
 def simulate(cfg, sim_info, read_count, sequences_fasta, reads1, reads2, random_reads=True):
-    print 'Simulating {0} reads from {1}'.format(read_count, sequences_fasta)
+    print ('Simulating {0} reads from {1}'.format(read_count, sequences_fasta))
     temp_prefix = reads1 + '.dwgsim.temp.prefix'
     random_reads_flag = ''
     if not random_reads:
         random_reads_flag = '-y 0'
     dwgsim_command = cfg.dwgsim_bin + ' -H {7} -z {0} -d {1} -s {2} -N {3} -1 {4} -2 {4} {5} {6}'.format(sim_info['dwgsim_seed'], sim_info['fragment_mean'], sim_info['fragment_stddev'], read_count, sim_info['read_length'], sequences_fasta, temp_prefix, random_reads_flag)
-    print dwgsim_command
+    print (dwgsim_command)
     dwgsim_retcode = subprocess.call(dwgsim_command.split())
     assert(dwgsim_retcode == 0)
     os.rename(temp_prefix + '.bwa.read1.fastq', reads1)

@@ -82,7 +82,7 @@ def detect_balanced_rearrangements(
             G.add_edge(break_end_1, break_end_2, edge_type='reference')
 
         # Add segment edges
-        for start, end in itertools.izip(chrom_break_ends['position'].values[:-1], chrom_break_ends['position'].values[1:]):
+        for start, end in zip(chrom_break_ends['position'].values[:-1], chrom_break_ends['position'].values[1:]):
             break_end_1 = (chromosome, start, '-')
             break_end_2 = (chromosome, end, '+')
             length = end - start
@@ -108,7 +108,7 @@ def detect_balanced_rearrangements(
     # Color each edge, +1 for red, -1 for blue
     # add cost for each edge
     for edge in H.edges():
-        for multi_edge_idx, edge_attr in H[edge[0]][edge[1]].iteritems():
+        for multi_edge_idx, edge_attr in H[edge[0]][edge[1]].items():
             edge_type = edge_attr['attr_dict']['edge_type']
             edge_attr['cost'] = 0
             if edge_type == 'segment':
@@ -149,7 +149,7 @@ def detect_balanced_rearrangements(
         M.add_edge(*transverse_edge, cost=transverse_edge_cost)
 
     for edge in H.edges():
-        for multi_edge_idx, edge_attr in H[edge[0]][edge[1]].iteritems():
+        for multi_edge_idx, edge_attr in H[edge[0]][edge[1]].items():
             cost = edge_attr['cost']
             if np.isinf(cost):
                 continue

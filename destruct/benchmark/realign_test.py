@@ -393,7 +393,7 @@ else:
                     true_cluster_ids.add(cluster_id)
                     if predicted_homology[cluster_id] == homology:
                         homology_correct = '1'
-                for cluster_id, region in cluster_regions.iteritems():
+                for cluster_id, region in cluster_regions.items():
                     if match(region, list(breakends)):
                         approx_cluster_id = cluster_id
                         true_cluster_ids.add(approx_cluster_id)
@@ -415,7 +415,7 @@ else:
                 identified_file.write(str(split_eval['true_best_align'].get(sim_id, default=0.0)) + '\n')
             
             classified_file.write('\t'.join(['cluster_id', 'is_true']) + '\n')
-            for cluster_id, region in cluster_regions.iteritems():
+            for cluster_id, region in cluster_regions.items():
                 classified_file.write('\t'.join([str(cluster_id), str(int(cluster_id in true_cluster_ids))]) + '\n')
 
 

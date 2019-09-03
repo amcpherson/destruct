@@ -13,10 +13,10 @@ def random_chromosome_position(genome, dist_to_end):
      > Note that positions are 1-based
     """
 
-    genome_length = sum([len(chr) for chr in genome.itervalues()])
+    genome_length = sum([len(chr) for chr in genome.values()])
     while True:
         position = random.randint(1, genome_length + 1)
-        for id, chr in genome.iteritems():
+        for id, chr in genome.items():
             if position <= len(chr):
                 if position <= dist_to_end or len(chr) - position < dist_to_end:
                     break
@@ -144,7 +144,7 @@ def simulate(sim_info, read_count, sequences_fasta, reads1, reads2, random_reads
     dwgsim_command += [sequences_fasta]
     dwgsim_command += [temp_prefix]
     dwgsim_command = [str(a) for a in dwgsim_command]
-    print ' '.join(dwgsim_command)
+    print (' '.join(dwgsim_command))
     dwgsim_retcode = subprocess.call(dwgsim_command)
     assert(dwgsim_retcode == 0)
     os.rename(temp_prefix + '.bwa.read1.fastq', reads1)

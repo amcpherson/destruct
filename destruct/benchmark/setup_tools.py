@@ -30,6 +30,6 @@ if __name__ == '__main__':
     if args.get('chromosomes', None) is not None:
         test_config['chromosomes'] = args['chromosomes']
 
-    for tool_name, tool_info in tool_defs.iteritems():
+    for tool_name, tool_info in tool_defs.items():
         destruct.benchmark.destruct_test.run_setup_function(tool_info, test_config)
 

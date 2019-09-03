@@ -3,7 +3,7 @@ import tarfile
 import numpy as np
 import pandas as pd
 
-import utils.plots
+import destruct.utils.plots
 
 
 def load_align_data_hist(filename):

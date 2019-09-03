@@ -8,7 +8,7 @@ import destruct.benchmark.wrappers.lumpysv.tasks
 
 def create_lumpysv_wrapper_workflow(bam_filenames, output_filename, raw_data_dir, control_id=None):
     bams = list()
-    for lib_id, bam_filename in bam_filenames.iteritems():
+    for lib_id, bam_filename in bam_filenames.items():
         bams += [destruct.benchmark.wrappers.utils.symlink(bam_filename, link_name='{0}.bam'.format(lib_id), link_directory=raw_data_dir)]
         destruct.benchmark.wrappers.utils.symlink(bam_filename+'.bai', link_name='{0}.bam.bai'.format(lib_id), link_directory=raw_data_dir)
 

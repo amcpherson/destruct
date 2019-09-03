@@ -186,7 +186,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
 
     def filter_split(df):
         filtered = list()
-        for side, left_merge_columns in split_merge_columns.iteritems():
+        for side, left_merge_columns in split_merge_columns.items():
             df_2 = pd.merge(df, clusters_alignments,
                             left_on=left_merge_columns,
                             right_on=merge_columns,
@@ -204,7 +204,7 @@ def predict_breaks(clusters_filename, spanning_filename, split_filename, breakpo
                                 iterator=True, chunksize=1000000)
 
     def filter_spanning(df):
-        return pd.merge(chunk, clusters_alignments, how='inner')
+        return pd.merge(df, clusters_alignments, how='inner')
 
     spanning = pd.concat([filter_spanning(chunk) for chunk in spanning_iter])
 
