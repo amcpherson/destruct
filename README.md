@@ -155,6 +155,7 @@ The breakpoint library table contains information per breakpoint per discordant 
 * `seq`: Read sequence
 * `qual`: Read quality
 * `comment`: Read comment
+* `filtered`: The read was filtered prior to finalizing the prediction
 
 ## Parallelism Using Pypeliner
 
