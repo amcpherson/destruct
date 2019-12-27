@@ -1,16 +1,9 @@
 import os
 
-import pypeliner
-import pypeliner.workflow
-import pypeliner.managed as mgd
-
-import destruct.score_stats
-import destruct.utils.misc
-import destruct.utils.seq
-import destruct.predict_breaks
-import destruct.tasks
 import destruct.defaultconfig
-
+import pypeliner
+import pypeliner.managed as mgd
+import pypeliner.workflow
 
 # Pypeliner contexts
 locally = {'local': True}
@@ -20,13 +13,13 @@ himem = {'mem': 16, 'num_retry': 2, 'mem_retry_factor': 2}
 
 
 def create_destruct_workflow(
-    bam_filenames,
-    breakpoint_table,
-    breakpoint_library_table,
-    breakpoint_read_table,
-    config,
-    ref_data_dir,
-    raw_data_dir=None,
+        bam_filenames,
+        breakpoint_table,
+        breakpoint_library_table,
+        breakpoint_read_table,
+        config,
+        ref_data_dir,
+        raw_data_dir=None,
 ):
     # Optionally cache raw reads for quicker rerun
     if raw_data_dir is not None:
@@ -48,10 +41,14 @@ def create_destruct_workflow(
     workflow = pypeliner.workflow.Workflow()
 
     # Set the library ids
-    
-    workflow.setobj(
-        obj=mgd.TempOutputObj('library_id', 'bylibrary'),
-        value=destruct.tasks.create_library_ids(bam_filenames.keys()),
+
+    workflow.transform(
+        name='set_lib_ids',
+        func='destruct.tasks.create_library_ids',
+        ret=mgd.TempOutputObj('library_id', 'bylibrary'),
+        args=(
+            bam_filenames.keys(),
+        )
     )
 
     # Retrieve discordant reads and stats from bam files
@@ -277,10 +274,13 @@ def create_destruct_workflow(
     )
 
     # Cluster spanning reads
-
-    workflow.setobj(
-        obj=mgd.TempOutputObj('chrom.args', 'bychromarg'),
-        value=destruct.tasks.generate_chromosome_args(config['chromosomes']),
+    workflow.transform(
+        name='set_chrom_args',
+        func='destruct.tasks.generate_chromosome_args',
+        ret=mgd.TempOutputObj('chrom.args', 'bychromarg'),
+        args=(
+            config['chromosomes'],
+        )
     )
 
     workflow.transform(
@@ -308,7 +308,7 @@ def create_destruct_workflow(
             '--fragmax', config['fragment_length_max'],
         ),
     )
-    
+
     # Predict breakpoints from split reads
 
     workflow.transform(
@@ -482,7 +482,6 @@ def create_destruct_workflow(
         ),
     )
 
-
     # Tabulate results
 
     workflow.transform(
@@ -502,4 +501,3 @@ def create_destruct_workflow(
     )
 
     return workflow
-
