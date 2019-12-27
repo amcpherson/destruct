@@ -80,7 +80,7 @@ def create_destruct_workflow(
         name='readstats',
         axes=('bylibrary',),
         ctx=lowmem,
-        func=destruct.tasks.read_stats,
+        func='destruct.tasks.read_stats',
         ret=mgd.TempOutputObj('stats', 'bylibrary'),
         args=(
             mgd_stats.as_input(),
@@ -94,7 +94,7 @@ def create_destruct_workflow(
         name='prepseed_sample',
         axes=('bylibrary',),
         ctx=medmem,
-        func=destruct.tasks.prepare_seed_fastq,
+        func='destruct.tasks.prepare_seed_fastq',
         args=(
             mgd_sample_1.as_input(),
             mgd_sample_2.as_input(),
@@ -136,7 +136,7 @@ def create_destruct_workflow(
         name='scorestats',
         axes=('bylibrary',),
         ctx=medmem,
-        func=destruct.score_stats.create_score_stats,
+        func='destruct.score_stats.create_score_stats',
         args=(
             mgd.TempInputFile('samples.align.true', 'bylibrary'),
             config['match_score'],
@@ -150,7 +150,7 @@ def create_destruct_workflow(
         name='splitfastq1',
         axes=('bylibrary',),
         ctx=lowmem,
-        func=destruct.tasks.split_fastq,
+        func='destruct.tasks.split_fastq',
         args=(
             mgd_reads_1.as_input(),
             int(config['reads_per_split']),
@@ -162,7 +162,7 @@ def create_destruct_workflow(
         name='splitfastq2',
         axes=('bylibrary',),
         ctx=lowmem,
-        func=destruct.tasks.split_fastq,
+        func='destruct.tasks.split_fastq',
         args=(
             mgd_reads_2.as_input(),
             int(config['reads_per_split']),
@@ -174,7 +174,7 @@ def create_destruct_workflow(
         name='prepseed',
         axes=('bylibrary', 'byread'),
         ctx=medmem,
-        func=destruct.tasks.prepare_seed_fastq,
+        func='destruct.tasks.prepare_seed_fastq',
         args=(
             mgd.TempInputFile('reads1', 'bylibrary', 'byread'),
             mgd.TempInputFile('reads2', 'bylibrary', 'byread'),
@@ -223,7 +223,7 @@ def create_destruct_workflow(
         name='merge_spanning_1',
         axes=('bylibrary',),
         ctx=lowmem,
-        func=destruct.tasks.merge_files_by_line,
+        func='destruct.tasks.merge_files_by_line',
         args=(
             mgd.TempInputFile('spanning.alignments', 'bylibrary', 'byread'),
             mgd.TempOutputFile('spanning.alignments_1', 'bylibrary'),
@@ -247,7 +247,7 @@ def create_destruct_workflow(
         name='merge_split_1',
         axes=('bylibrary',),
         ctx=lowmem,
-        func=destruct.tasks.merge_files_by_line,
+        func='destruct.tasks.merge_files_by_line',
         args=(
             mgd.TempInputFile('split.alignments', 'bylibrary', 'byread'),
             mgd.TempOutputFile('split.alignments', 'bylibrary'),
@@ -257,7 +257,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='merge_spanning_2',
         ctx=lowmem,
-        func=destruct.tasks.merge_alignment_files,
+        func='destruct.tasks.merge_alignment_files',
         args=(
             mgd.TempInputFile('spanning.alignments', 'bylibrary'),
             mgd.TempOutputFile('spanning.alignments'),
@@ -268,7 +268,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='merge_split_2',
         ctx=lowmem,
-        func=destruct.tasks.merge_alignment_files,
+        func='destruct.tasks.merge_alignment_files',
         args=(
             mgd.TempInputFile('split.alignments', 'bylibrary'),
             mgd.TempOutputFile('split.alignments'),
@@ -286,7 +286,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='write_stats_table',
         ctx=lowmem,
-        func=destruct.tasks.write_stats_table,
+        func='destruct.tasks.write_stats_table',
         args=(
             mgd.TempInputObj('library_id', 'bylibrary'),
             mgd.TempInputObj('stats', 'bylibrary'),
@@ -315,7 +315,7 @@ def create_destruct_workflow(
         name='predict_breaks',
         axes=('bychromarg',),
         ctx=medmem,
-        func=destruct.predict_breaks.predict_breaks,
+        func='destruct.predict_breaks.predict_breaks',
         args=(
             mgd.TempInputFile('clusters', 'bychromarg'),
             mgd.TempInputFile('spanning.alignments'),
@@ -327,7 +327,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='merge_clusters',
         ctx=lowmem,
-        func=destruct.tasks.merge_clusters,
+        func='destruct.tasks.merge_clusters',
         args=(
             mgd.TempInputFile('clusters', 'bychromarg'),
             mgd.TempInputFile('breakpoints_2', 'bychromarg'),
@@ -365,7 +365,7 @@ def create_destruct_workflow(
         name='calculate_realignment_likelihoods',
         axes=('bylibrary', 'byread'),
         ctx=medmem,
-        func=destruct.predict_breaks.calculate_realignment_likelihoods,
+        func='destruct.predict_breaks.calculate_realignment_likelihoods',
         args=(
             mgd.TempInputFile('breakpoints_2'),
             mgd.TempInputFile('realignments', 'bylibrary', 'byread'),
@@ -381,7 +381,7 @@ def create_destruct_workflow(
         name='merge_likelihoods_1',
         axes=('bylibrary',),
         ctx=lowmem,
-        func=destruct.tasks.merge_sorted_files_by_line,
+        func='destruct.tasks.merge_sorted_files_by_line',
         args=(
             mgd.TempInputFile('likelihoods_2', 'bylibrary', 'byread'),
             mgd.TempOutputFile('likelihoods_2', 'bylibrary'),
@@ -393,7 +393,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='merge_likelihoods_2',
         ctx=lowmem,
-        func=destruct.tasks.merge_sorted_files_by_line,
+        func='destruct.tasks.merge_sorted_files_by_line',
         args=(
             mgd.TempInputFile('likelihoods_2', 'bylibrary'),
             mgd.TempOutputFile('likelihoods_2'),
@@ -407,7 +407,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='calc_weights',
         ctx=medmem,
-        func=destruct.predict_breaks.calculate_cluster_weights,
+        func='destruct.predict_breaks.calculate_cluster_weights',
         args=(
             mgd.TempInputFile('breakpoints_2'),
             mgd.TempOutputFile('cluster_weights'),
@@ -430,7 +430,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='select_clusters',
         ctx=medmem,
-        func=destruct.predict_breaks.select_clusters,
+        func='destruct.predict_breaks.select_clusters',
         args=(
             mgd.TempInputFile('clusters_setcover'),
             mgd.TempInputFile('breakpoints_2'),
@@ -445,7 +445,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='select_predictions',
         ctx=himem,
-        func=destruct.predict_breaks.select_predictions,
+        func='destruct.predict_breaks.select_predictions',
         args=(
             mgd.TempInputFile('breakpoints_1'),
             mgd.TempOutputFile('breakpoints'),
@@ -462,7 +462,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='tabreads',
         ctx=medmem,
-        func=destruct.tasks.tabulate_reads,
+        func='destruct.tasks.tabulate_reads',
         args=(
             mgd.TempInputFile('clusters_setcover'),
             mgd.TempInputObj('library_id', 'bylibrary'),
@@ -488,7 +488,7 @@ def create_destruct_workflow(
     workflow.transform(
         name='tabulate',
         ctx=himem,
-        func=destruct.tasks.tabulate_results,
+        func='destruct.tasks.tabulate_results',
         args=(
             mgd.TempInputFile('breakpoints'),
             mgd.TempInputFile('likelihoods'),
