@@ -267,6 +267,40 @@ struct ReservoirSampler
 	RandomNumberGenerator mRNG;	
 };
 
+const char empty_gz[] = {
+	0x1f,
+	0x8b,
+	0x8,
+	0x8,
+	0x34,
+	0x1d,
+	0x1e,
+	0x5e,
+	0x0,
+	0x3,
+	0x61,
+	0x73,
+	0x64,
+	0x66,
+	0x0,
+	0x3,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+	0x0,
+};
+unsigned int empty_gz_len = 25;
+
+void write_empty_gz(ofstream& file)
+{
+	file.write(empty_gz, empty_gz_len);
+}
+
 int main(int argc, char* argv[])
 {
 	string bamFilename;
@@ -373,6 +407,8 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
+			discordantReadCount++;
+
 			// Optionally change the fragment name
 			string fragment = alignment1.Name;
 			if (renameReads)
@@ -438,6 +474,28 @@ int main(int argc, char* argv[])
 		fastq2Stream << discordantRead2.Qualities << endl;
 		
 		fragmentIndex++;
+	}
+
+	fastq1Stream.flush();
+	fastq1Stream.reset();
+
+	fastq2Stream.flush();
+	fastq2Stream.reset();
+
+	fastq1File.close();
+	fastq2File.close();
+
+	// Ensure we have valid output on empty input
+	if (discordantReadCount == 0)
+	{
+		ofstream fastq1File(fastq1Filename.c_str(), std::ios_base::out | std::ios_base::binary);
+		ofstream fastq2File(fastq2Filename.c_str(), std::ios_base::out | std::ios_base::binary);
+
+		CheckFile(fastq1File, fastq1Filename);
+		CheckFile(fastq2File, fastq2Filename);
+
+		write_empty_gz(fastq1File);
+		write_empty_gz(fastq2File);
 	}
 
 	// Check for an empty bam file (fail, somethings wrong)
