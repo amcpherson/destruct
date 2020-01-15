@@ -179,7 +179,7 @@ Often a call to qsub requires specific command line parameters to request the co
 
 To build a destruct docker image, for instance version v0.4.13, run the following docker command:
 
-    docker build --build-arg app_version=0.4.13 -t amcpherson/destruct .
-    docker push amcpherson/destruct:0.4.13
+    docker build --build-arg app_version=0.4.17 -t amcpherson/destruct:0.4.17 .
+    docker push amcpherson/destruct:0.4.17
 
 
