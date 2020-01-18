@@ -1,13 +1,13 @@
 package:
   name: destruct_utils
-  version: '0.4.17'
+  version: '0.4.18'
 
 source:
   git_url: git://github.com/amcpherson/destruct.git
-  git_rev: v0.4.17
+  git_rev: v0.4.18
 
 build:
-  number: 2
+  number: 1
 
 requirements:
   build:
