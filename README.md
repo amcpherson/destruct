@@ -182,4 +182,30 @@ To build a destruct docker image, for instance version v0.4.13, run the followin
     docker build --build-arg app_version=0.4.17 -t amcpherson/destruct:0.4.17 .
     docker push amcpherson/destruct:0.4.17
 
+# Benchmarking
+
+## Setup
+
+The following requirements should be installed with conda:
+
+    conda create -n lumpy lumpy-sv
+    conda create -n delly -c dranew delly==0.7.3
+    conda create -n sambamba sambamba
+    conda create -n bcftools bcftools
+    conda create -n vcftools -c bioconda perl-vcftools-vcf
+    conda create -n htslib htslib
+
+Add the requirements to your path with:
+
+    PATH=$PATH:/opt/conda/envs/lumpy/bin/
+    PATH=$PATH:/opt/conda/envs/delly/bin/
+    LD_LIBRARY_PATH=/opt/conda/envs/delly/lib/
+    PATH=$PATH:/opt/conda/envs/sambamba/bin/
+    PATH=$PATH:/opt/conda/envs/bcftools/bin/
+    PATH=$PATH:/opt/conda/envs/vcftools/bin/
+    PATH=$PATH:/opt/conda/envs/htslib/bin/
+
+You may also need to link sambamba into the lumpy install:
+
+    ln -s /opt/conda/envs/sambamba/bin/sambamba /opt/conda/envs/lumpy/bin/sambamba
 
