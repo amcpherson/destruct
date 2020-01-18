@@ -73,7 +73,7 @@ Clone the destruct repo to obtain additional scripts.  Change to the destruct re
 Setup a chromosome 20, 21 specific reference dataset.
 
     destruct create_ref_data \
-        -c examples/chromosome_20_user_config.py \
+        -c examples/chromosome_20_21_user_config.py \
         destruct_ref_data/
 
 Generate a bam file using the dwgsim read simulator.
