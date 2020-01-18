@@ -11,7 +11,7 @@ def create_destruct_wrapper_workflow(bam_filenames, output_filename, raw_data_di
 
     workflow.setobj(
         obj=mgd.OutputChunks('sample_id'),
-        value=bam_filenames.keys(),
+        value=list(bam_filenames.keys()),
     )
 
     workflow.subworkflow(

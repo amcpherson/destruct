@@ -16,7 +16,7 @@ def create_lumpysv_wrapper_workflow(bam_filenames, output_filename, raw_data_dir
 
     workflow.setobj(
         obj=mgd.OutputChunks('sample_id'),
-        value=bam_filenames.keys(),
+        value=list(bam_filenames.keys()),
     )
 
     workflow.commandline(

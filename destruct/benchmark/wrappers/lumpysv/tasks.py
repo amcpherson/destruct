@@ -68,7 +68,7 @@ def convert_bcf(bcf_filename, output_filename, control_id=None):
                 coord_2 = int(coord_2)
         else:
             chrom_2 = row.chrom
-            coord_2 = row.info['END']
+            coord_2 = row.stop
             assert coord_1 < coord_2
 
         breakpoint_ids = []

@@ -5,7 +5,7 @@ import destruct.create_ref_data
 def create_ref_data(**args):
     config = {}
     if args['config'] is not None:
-        execfile(args['config'], {}, config)
+        exec(open(args['config']).read(), {}, config)
 
     destruct.create_ref_data.create_ref_data(config, args['ref_data_dir'])
 

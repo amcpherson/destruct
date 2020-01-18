@@ -14,7 +14,7 @@ def run(**args):
 
     config = {}
     if args['config'] is not None:
-        execfile(args['config'], {}, config)
+        exec(open(args['config']).read(), {}, config)
 
     pyp = pypeliner.app.Pypeline(modules=[destruct], config=args)
 

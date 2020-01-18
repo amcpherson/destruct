@@ -15,7 +15,7 @@ def split_fastq(in_filename, num_reads_per_file, out_filename_callback):
         out_file = None
         out_file_read_count = None
         try:
-            for name, seq, comment, qual in itertools.izip_longest(*[in_file]*4):
+            for name, seq, comment, qual in itertools.zip_longest(*[in_file]*4):
                 if out_file is None or out_file_read_count == num_reads_per_file:
                     if out_file is not None:
                         out_file.close()
@@ -62,6 +62,6 @@ def merge_bam(input_bams, output_bam):
         os.remove(output_bam_tmp1)
         os.remove(output_bam_tmp2)
     elif len(input_bams) == 1:
-        pypeliner.commandline.execute('cp', input_bams.values()[0], output_bam)
+        pypeliner.commandline.execute('cp', list(input_bams.values())[0], output_bam)
     else:
         pypeliner.commandline.execute('samtools', 'merge', '-c', output_bam, *input_bams.values())
