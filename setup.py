@@ -15,5 +15,14 @@ setup(
     classifiers=[],
     entry_points={'console_scripts': ['destruct = destruct.ui.main:main']},
     package_data={'destruct': ['data/*_chr_map.tsv']},
+    install_requires=[
+        'pandas',
+        'pypeliner',
+        'pygenes',
+        'pyyaml',
+        'matplotlib',
+        'seaborn',
+        'pysam',
+    ]
 )
 
