@@ -554,7 +554,8 @@ int main(int argc, char* argv[])
 	sample1Stream.push(sample1File);
 	sample2Stream.push(sample2File);
 
-	for (int sampleIndex = 0; sampleIndex < sampledReads.mSamples.size(); sampleIndex++)
+	int sampleIndex = 0;
+	for (; sampleIndex < sampledReads.mSamples.size(); sampleIndex++)
 	{
 		const ReadInfo& read1 = sampledReads.mSamples[sampleIndex].first;
 		const ReadInfo& read2 = sampledReads.mSamples[sampleIndex].second;
@@ -568,6 +569,28 @@ int main(int argc, char* argv[])
 		sample2Stream << read2.Sequence << endl;
 		sample2Stream << "+" << read2.Name << endl;
 		sample2Stream << read2.Qualities << endl;
+	}
+
+	sample1Stream.flush();
+	sample1Stream.reset();
+
+	sample2Stream.flush();
+	sample2Stream.reset();
+
+	sample1File.close();
+	sample2File.close();
+
+	// Ensure we have valid output on empty input
+	if (sampleIndex == 0)
+	{
+		ofstream sample1File(sample1Filename.c_str(), std::ios_base::out | std::ios_base::binary);
+		ofstream sample2File(sample2Filename.c_str(), std::ios_base::out | std::ios_base::binary);
+
+		CheckFile(sample1File, sample1Filename);
+		CheckFile(sample2File, sample2Filename);
+
+		write_empty_gz(sample1File);
+		write_empty_gz(sample2File);
 	}
 }
 
