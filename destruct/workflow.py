@@ -4,7 +4,6 @@ import pypeliner
 import pypeliner.workflow
 import pypeliner.managed as mgd
 
-import destruct.tasks
 import destruct.defaultconfig
 
 
@@ -44,10 +43,12 @@ def create_destruct_workflow(
     workflow = pypeliner.workflow.Workflow()
 
     # Set the library ids
-    
-    workflow.setobj(
-        obj=mgd.TempOutputObj('library_id', 'bylibrary'),
-        value=destruct.tasks.create_library_ids(bam_filenames.keys()),
+
+    workflow.transform(
+        name='create_lib_ids',
+        func='destruct.tasks.create_library_ids',
+        ret=mgd.TempOutputObj('library_id', 'bylibrary'),
+        args=(list(bam_filenames.keys()),)
     )
 
     # Retrieve discordant reads and stats from bam files
@@ -74,7 +75,7 @@ def create_destruct_workflow(
 
     workflow.subworkflow(
         name='destruct_fastq',
-        func=create_destruct_fastq_workflow,
+        func='destruct.workflow.create_destruct_fastq_workflow',
         args=(
             mgd_reads_1.as_input(),
             mgd_reads_2.as_input(),
@@ -111,10 +112,12 @@ def create_destruct_fastq_workflow(
     workflow = pypeliner.workflow.Workflow()
 
     # Set the library ids
-    
-    workflow.setobj(
-        obj=mgd.TempOutputObj('library_id', 'bylibrary'),
-        value=destruct.tasks.create_library_ids(fastq1_filenames.keys()),
+
+    workflow.transform(
+        name='create_lib_ids',
+        func='destruct.tasks.create_library_ids',
+        ret=mgd.TempOutputObj('library_id', 'bylibrary'),
+        args=(list(fastq1_filenames.keys()),)
     )
 
     workflow.transform(
@@ -319,9 +322,11 @@ def create_destruct_fastq_workflow(
 
     # Cluster spanning reads
 
-    workflow.setobj(
-        obj=mgd.TempOutputObj('chrom.args', 'bychromarg'),
-        value=destruct.tasks.generate_chromosome_args(config['chromosomes']),
+    workflow.transform(
+        name='generate_chrom_args',
+        func='destruct.tasks.generate_chromosome_args',
+        ret=mgd.TempOutputObj('chrom.args', 'bychromarg'),
+        args=(config['chromosomes'],)
     )
 
     workflow.transform(
