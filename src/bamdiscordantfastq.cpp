@@ -133,6 +133,10 @@ public:
 			BamAlignment alignment;
 			while (mBamReader.GetNextAlignment(alignment))
 			{
+				if (!alignment.IsPrimaryAlignment())
+				{
+					continue;
+				}
 				if (alignment.IsProperPair())
 				{
 					// Proper pairs should be close to each other in the bam file
