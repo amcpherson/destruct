@@ -1,10 +1,10 @@
 package:
   name: destruct_utils
-  version: '0.4.18'
+  version: '0.4.19'
 
 source:
   git_url: git://github.com/amcpherson/destruct.git
-  git_rev: v0.4.18
+  git_rev: v0.4.19
 
 build:
   number: 1
@@ -12,13 +12,13 @@ build:
 requirements:
   build:
     - scons
-    - boost_lib ==1.60.0
+    - boost_lib ==1.75.0
     - tclap ==1.2.1
     - bzip2
 
   run:
-    - boost_lib ==1.60.0
-    - bowtie
+    - boost_lib ==1.75.0
+    - bzip2
 
 about:
   home: http://bitbucket.org/dranew/destruct
