@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import versioneer
 
 setup(
-    name='destruct',
+    name='ngs-destruct',
     packages=find_packages(),
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),

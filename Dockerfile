@@ -7,7 +7,7 @@ RUN conda config --add channels https://conda.anaconda.org/dranew && conda confi
 RUN conda install destruct_utils==$app_version
 RUN conda install openssl=1.0
 RUN conda install bowtie dwgsim bwa samtools
-RUN pip install destruct==$app_version
+RUN pip install ngs-destruct==$app_version
 RUN mkdir -p /root/.config/matplotlib
 RUN echo "backend : Agg" > /root/.config/matplotlib/matplotlibrc
 
