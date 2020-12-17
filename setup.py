@@ -28,6 +28,10 @@ setup(
         'matplotlib',
         'seaborn',
         'pysam',
+        'blossomv',
+    ],
+    dependency_links=[
+        'https://github.com/amcpherson/blossomv/archive/v2.04_r4.tar.gz#egg=blossomv',
     ],
 )
 

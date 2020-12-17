@@ -15,10 +15,12 @@ requirements:
     - boost_lib ==1.75.0
     - tclap ==1.2.1
     - bzip2
+    - zstd
 
   run:
     - boost_lib ==1.75.0
     - bzip2
+    - zstd
 
 about:
   home: http://bitbucket.org/dranew/destruct
