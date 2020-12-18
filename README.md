@@ -6,11 +6,20 @@ Destruct is a tool for joint prediction of rearrangement breakpoints from single
 
 ### Installing from conda
 
-The recommended method of installation for destruct is using `conda`.  First install [anaconda python](https://store.continuum.io/cshop/anaconda/) from the continuum website.  Then add my channel, and the bioconda channel, and install destruct as follows.
+The recommended method of installation for destruct is using a combination of `conda` and pip.  First install [anaconda python](https://store.continuum.io/cshop/anaconda/) from the continuum website.  Then add my channel, and the bioconda channel, and install the destruct command line utils as follows.
 
     conda config --add channels https://conda.anaconda.org/dranew
     conda config --add channels 'bioconda'
     conda install destruct
+
+Then install all command line dependencies with conda:
+
+    conda install openssl=1.0
+    conda install bowtie dwgsim bwa samtools
+
+Finally, install the destruct python package with pip:
+
+    pip install ngs-destruct
 
 ### Installing from source
 
@@ -181,6 +190,13 @@ To build a destruct docker image, for instance version v0.4.13, run the followin
 
     docker build --build-arg app_version=0.4.17 -t amcpherson/destruct:0.4.17 .
     docker push amcpherson/destruct:0.4.17
+
+## Pip build
+
+To build with pip and distribute to pypi, use the following commands:
+
+    python setup.py sdist
+    twine upload --repository pypi dist/*
 
 # Benchmarking
 
