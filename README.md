@@ -10,7 +10,7 @@ The recommended method of installation for destruct is using a combination of `c
 
     conda config --add channels https://conda.anaconda.org/dranew
     conda config --add channels 'bioconda'
-    conda install destruct
+    conda install destruct_utils
 
 Then install all command line dependencies with conda:
 
