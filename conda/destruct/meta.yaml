@@ -12,11 +12,11 @@ build:
 requirements:
   build:
     - python
-    - numpy==1.19.2
+    - numpy==1.21.5
 
   run:
     - python
-    - numpy==1.19.2
+    - numpy==1.21.5
     - pandas
     - pypeliner
     - pygenes
