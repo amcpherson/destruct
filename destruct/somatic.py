@@ -143,19 +143,13 @@ def filter_annotate_breakpoints(
     brk['dist_filtered'] = dist_filtered
     brk.reset_index(inplace=True)
 
-    chromosomes = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
-                   '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22',
-                   'X', 'Y']
-
     # Filter breakpoints
     brk = brk.loc[(~brk['is_filtered']) &
                   (brk['dist_filtered'] > 50) &
                   (brk['num_reads'] >= 2) &
                   (brk['num_split'] >= 2) &
                   (brk['log_likelihood'] > -20.) &
-                  (brk['template_length_min'] > 120) &
-                  (brk['chromosome_1'].isin(chromosomes)) &
-                  (brk['chromosome_2'].isin(chromosomes))]
+                  (brk['template_length_min'] > 120)]
 
     brklib = brklib.merge(brk[['prediction_id']].drop_duplicates())
 
