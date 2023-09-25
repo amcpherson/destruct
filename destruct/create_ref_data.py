@@ -1,6 +1,6 @@
 import csv
 import os
-
+import gzip 
 import pypeliner
 
 import destruct.defaultconfig
@@ -60,12 +60,47 @@ def create_ref_data(config, ref_data_dir):
     auto_sentinal.run(wget_genome_fasta)
 
     def wget_gtf():
-        wget_gunzip(config['ensembl_gtf_url'], config['gtf_filename'])
+        temp_gtf = os.path.join(temp_directory, 'genes.gtf.gz')
+        wget(config['ensembl_gtf_url'], temp_gtf)
+
+        with open(config['chromosome_map'], 'r') as chr_map_file:
+            chr_map = {a.split()[1]: a.split()[0] for a in chr_map_file}
+
+        with gzip.open(temp_gtf, 'rt') as reader, open(config['gtf_filename'], 'wt') as writer:
+            for line in reader:
+                if line.startswith('#'):
+                    writer.write(line)
+                else:
+                    line = line.strip().split('\t')
+                    if line[0] not in chr_map:
+                        continue
+                    line[0] = chr_map[line[0]]
+                    line = '\t'.join(line) + '\n'
+                    writer.write(line)
     auto_sentinal.run(wget_gtf)
 
     def wget_dgv():
-        wget(config['dgv_url'], config['dgv_filename'])
+        temp_dgv = os.path.join(temp_directory, 'dgv.txt')
+        wget(config['dgv_url'], temp_dgv)
+
+        with open(config['chromosome_map'], 'r') as chr_map_file:
+            chr_map = {a.split()[1]: a.split()[0] for a in chr_map_file}
+
+
+        with open(temp_dgv, 'rt') as reader, open(config['dgv_filename'], 'wt') as writer:
+            header = reader.readline()
+            writer.write(header)
+            chr_idx = header.split('\t').index('chr')
+            for line in reader:
+                line = line.strip().split('\t')
+
+                if line[chr_idx] not in chr_map:
+                    continue
+                line[chr_idx] = chr_map[line[chr_idx]]
+                line = '\t'.join(line) + '\n'
+                writer.write(line)
     auto_sentinal.run(wget_dgv)
+
 
     def wget_repeats():
         repeat_filename = os.path.join(temp_directory, 'repeats.txt')
