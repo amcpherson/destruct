@@ -1,6 +1,9 @@
 
-yum install gcc-c++ git -y
+yum install gcc-c++ git make -y
 conda config --set always_yes true
+conda update conda
+conda install python=3.9
+conda config --add channels 'conda-forge'
 conda config --add channels https://conda.anaconda.org/dranew
 conda config --add channels https://conda.anaconda.org/shahcompbio
 conda config --add channels 'bioconda'
