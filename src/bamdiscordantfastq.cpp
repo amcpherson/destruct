@@ -36,6 +36,26 @@ using namespace std;
 
 using namespace BamTools;
 
+inline string GetBarcodedComment(const BamAlignment& alignment)
+{
+    const string& alignmentname = alignment.Name;
+    string barcode;
+    if (alignment.GetTag("CB", barcode))
+    {
+        char tagtype;
+        alignment.GetTagType("CB", tagtype);
+        if (tagtype != 'Z')
+        {
+            return alignmentname;
+	}
+    }
+    else
+    {
+        return alignmentname;
+    }
+    return alignmentname + ":CB_" + barcode;
+}
+
 // Get sequence from an alignment accounting for strand
 inline string GetSequence(const BamAlignment& alignment)
 {
@@ -89,7 +109,8 @@ struct ReadInfo
 		: Name(alignment.Name), 
 		  Sequence(GetSequence(alignment)),
 		  Qualities(GetQualities(alignment)),
-		  IsFailedQC(alignment.IsFailedQC())
+		  IsFailedQC(alignment.IsFailedQC()),
+                  Comment(GetBarcodedComment(alignment))
 	{
 	}
 
@@ -97,6 +118,7 @@ struct ReadInfo
 	string Sequence;
 	string Qualities;
 	bool IsFailedQC;
+        string Comment;
 
 	// Used for sorting by read name
 	bool operator<(const ReadInfo& other) const
@@ -112,6 +134,7 @@ struct ReadInfo
         ar & Sequence;
         ar & Qualities;
         ar & IsFailedQC;
+        ar & Comment;
     }
 };
 
@@ -422,16 +445,14 @@ int main(int argc, char* argv[])
 				fragment = fragmentStream.str();
 			}
 
-			// Write fastq
-			
 			fastq1Stream << "@" << fragment << "/1" << endl;
 			fastq1Stream << GetSequence(alignment1) << endl;
-			fastq1Stream << "+" << alignment1.Name << endl;
+			fastq1Stream << "+" << GetBarcodedComment(alignment1) << endl;
 			fastq1Stream << GetQualities(alignment1) << endl;
 			
 			fastq2Stream << "@" << fragment << "/2" << endl;
 			fastq2Stream << GetSequence(alignment2) << endl;
-			fastq2Stream << "+" << alignment2.Name << endl;
+			fastq2Stream << "+" << GetBarcodedComment(alignment2) << endl;
 			fastq2Stream << GetQualities(alignment2) << endl;
 			
 			fragmentIndex++;
@@ -465,35 +486,16 @@ int main(int argc, char* argv[])
 			fragment = fragmentStream.str();
 		}
 
-		string comment_1 = alignment1.Name;
-		string tag1;
-		if (alignment1.GetTag("CB", tag1)){
-			char tag1type;
-			alignment1.GetTagType("CB", tag1type);
-			if (tag1type == 'Z'){
-				comment_1 = comment_1 + ":CB_" + tag1;
-			}
-		}
-		string comment_2 = alignment2.Name;
-		string tag2;
-		if (alignment2.GetTag("CB", tag2)){
-			char tag2type;
-			alignment2.GetTagType("CB", tag2type);
-			if (tag2type == 'Z'){
-				comment_2 = comment_2 + ":CB_" + tag2;
-			}
-		}
-
 		// Write fastq
 		fastq1Stream << "@" << fragment << "/1" << endl;
-		fastq1Stream << GetSequence(alignment1) << endl;
-		fastq1Stream << "+" << comment_1 << endl;
-		fastq1Stream << GetQualities(alignment1) << endl;
+		fastq1Stream << discordantRead1.Sequence << endl;
+		fastq1Stream << "+" << discordantRead1.Comment << endl;
+		fastq1Stream << discordantRead1.Qualities << endl;
 
 		fastq2Stream << "@" << fragment << "/2" << endl;
-		fastq2Stream << GetSequence(alignment2) << endl;
-		fastq2Stream << "+" << comment_2 << endl;
-		fastq2Stream << GetQualities(alignment2) << endl;
+		fastq2Stream << discordantRead2.Sequence << endl;
+		fastq2Stream << "+" <<  discordantRead2.Comment << endl;
+		fastq2Stream << discordantRead2.Qualities << endl;
 
 		fragmentIndex++;
 	}
