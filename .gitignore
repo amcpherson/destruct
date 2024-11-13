@@ -3,3 +3,4 @@
 .sconsign.dblite
 bin/*
 .DS_Store
+.eggs
