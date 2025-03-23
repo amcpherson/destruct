@@ -14,8 +14,7 @@ The recommended method of installation for destruct is using a combination of `c
 
 Then install all command line dependencies with conda:
 
-    conda install openssl=1.0
-    conda install bowtie dwgsim bwa samtools
+    conda install bowtie dwgsim bwa samtools python=3.9
 
 Finally, install the destruct python package with pip:
 
